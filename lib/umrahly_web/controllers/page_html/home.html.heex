@@ -10,12 +10,19 @@
         <button id="lang-toggle" class="text-zinc-900 hover:underline focus:outline-none">
           EN/MY
         </button>
-        <a href="#register" class="hover:text-zinc-900">Register</a>
-        <a href="#login" class="hover:text-zinc-900">Login</a>
+
+        <%= if @current_user do %>
+          <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+          <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
+        <% else %>
+          <.link href={~p"/users/register"} class="hover:text-zinc-900">Register</.link>
+          <.link href={~p"/users/log_in"} class="hover:text-zinc-900">Login</.link>
+        <% end %>
       </div>
     </div>
   </div>
 </nav>
+
 
 <!-- Language Toggle Script -->
 <script>

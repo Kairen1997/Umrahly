@@ -1,11 +1,16 @@
-<nav class="w-full bg-teal-300">
-  <div class=" h-3 w-full"></div>
-  <div class="px-4 sm:px-6 lg:px-10">
-    <div class="flex items-center justify-between py-4">
+<!-- Navbar -->
+<nav class="w-full sticky top-0 z-50">
+  <div class="h-3 w-full"></div>
+  <div class="px-4 bg-teal-300 sm:px-6 lg:px-10">
+    <div class="flex items-center justify-between py-2">
+      <!-- Logo -->
       <a href="/" class="font-extrabold tracking-wider text-zinc-900 text-xl">UMRAHLY</a>
-      <div class="flex items-center gap-4 text-sm font-medium text-zinc-700">
-        <span class="rounded-lg bg-amber-200 px-3 py-1 text-zinc-900">EN/MYR</span>
-        <a href="#contact" class="hover:text-zinc-900">Contact</a>
+
+      <!-- Menu -->
+      <div class="flex items-center gap-4 text-sm font-medium text-zinc-700 rounded-lg bg-amber-200 px-3 py-1">
+        <button id="lang-toggle" class="text-zinc-900 hover:underline focus:outline-none">
+          EN/MY
+        </button>
         <a href="#register" class="hover:text-zinc-900">Register</a>
         <a href="#login" class="hover:text-zinc-900">Login</a>
       </div>
@@ -13,55 +18,212 @@
   </div>
 </nav>
 
+<!-- Language Toggle Script -->
+<script>
+  const langToggle = document.getElementById('lang-toggle');
+  let currentLang = 'EN';
+
+  langToggle.addEventListener('click', () => {
+    currentLang = currentLang === 'EN' ? 'MY' : 'EN';
+    langToggle.textContent = currentLang + '/' + (currentLang === 'EN' ? 'MY' : 'EN');
+    console.log('Language changed to', currentLang);
+    // Add your language switching logic here
+  });
+</script>
+
+<!-- Main Content -->
 <main class="px-4 sm:px-6 lg:px-10">
-  <section class="py-12 sm:py-16 lg:py-20">
-    <h1 class="text-center text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-zinc-900">Plan Your Umrah with Confidence</h1>
-    <p class="mt-3 text-center text-sm sm:text-base text-zinc-600">Flexible payments. Trusted packages. Personal support.</p>
+  <!-- Hero Section -->
+  <section class="relative w-full overflow-hidden" style="height: 50vh;">
+    <!-- Video Background -->
+    <video autoplay muted loop playsinline class="absolute top-0 left-0 w-full h-full object-cover">
+      <source src="/images/umrah background.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+    <!-- Overlay for dark effect -->
+    <div class="absolute top-0 left-0 w-full h-full bg-black bg-opacity-40"></div>
 
-    <div class="mt-12">
-      <h2 class="text-zinc-800 text-base font-semibold">Top Umrah Packages</h2>
+    <!-- Hero Content -->
+    <div class="relative z-10 flex flex-col items-center justify-center h-full text-center text-white px-6">
+      <h1 class="text-4xl md:text-6xl font-bold">Your Journey to Umrah Made Simple</h1>
+      <p class="mt-4 text-lg md:text-xl">Book, manage, and track your Umrah journey with ease and transparency.</p>
+      <a href="/register" class="mt-6 bg-teal-500 hover:bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold">
+        Get Started
+      </a>
+    </div>
+  </section>
 
-      <div class="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
-          <div class="h-44 w-full bg-zinc-200"></div>
-          <div class="p-5">
-            <p class="text-sm text-zinc-700">Standard</p>
-            <p class="mt-1 font-bold text-emerald-600">RM 6, 499</p>
-            <a href="#" class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">View Details</a>
-          </div>
+  <!--About Us-->
+  <section class="bg-gray-50 py-4">
+    <div class="max-w-6xl mx-auto px-6 text-center">
+      <h2 class="text-3xl font-bold text-gray-900 mb-6">About Umrahly</h2>
+      <p class="text-gray-700 max-w-3xl mx-auto">
+        Umrahly is your trusted partner for planning and booking your blessed journey.  
+        We simplify the process with easy package browsing, transparent pricing, affordable, and installment options.  
+        Our goal is to ensure your focus remains on the spiritual experience, not the logistics.
+      </p>
+    </div>
+  </section>
+
+  <!-- Packages Section -->
+  <section id="packages" class="mt-12" py-4>
+    <h2 class="text-zinc-1500 text-base font-bold">Top Umrah Packages</h2>
+
+    <div class="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- Package 1 -->
+      <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
+        <img src="/images/Standard.jpg" alt="Standard Umrah Package" class="h-44 w-full object-cover bg-zinc-200">
+        <div class="p-5">
+          <p class="text-sm text-zinc-700">Standard</p>
+          <p class="mt-1 font-bold text-emerald-600">RM 6,299</p>
+          <ul class="mt-2 text-xs text-zinc-600 space-y-1">
+            <li>3-star hotel</li>
+            <li>Return flights</li>
+            <li>Daily breakfast</li>
+          </ul>
+          <a href="#" class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">View Details</a>
         </div>
+      </div>
 
-        <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
-          <div class="h-44 w-full bg-zinc-200"></div>
-          <div class="p-5">
-            <p class="text-sm text-zinc-700">Premium</p>
-            <p class="mt-1 font-bold text-emerald-600">RM 6, 499</p>
-            <a href="#" class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">View Details</a>
-          </div>
+      <!-- Package 2 -->
+      <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
+        <img src="/images/Premium.jpg" alt="Premium Umrah Package" class="h-44 w-full object-cover bg-zinc-200">
+        <div class="p-5">
+          <p class="text-sm text-zinc-700">Premium</p>
+          <p class="mt-1 font-bold text-emerald-600">RM 8,499</p>
+          <ul class="mt-2 text-xs text-zinc-600 space-y-1">
+            <li>5-star hotel</li>
+            <li>Return flights</li>
+            <li>All meals included</li>
+          </ul>
+          <a href="#" class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">View Details</a>
         </div>
+      </div>
 
-        <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
-          <div class="h-44 w-full bg-zinc-200"></div>
-          <div class="p-5">
-            <p class="text-sm text-zinc-700">Family</p>
-            <p class="mt-1 font-bold text-emerald-600">RM 6, 499</p>
-            <a href="#" class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">View Details</a>
+      <!-- Package 3 -->
+      <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
+        <img src="/images/family.jpg" alt="Family Umrah Package" class="h-44 w-full object-cover bg-zinc-200">
+        <div class="p-5">
+          <p class="text-sm text-zinc-700">Family</p>
+          <p class="mt-1 font-bold text-emerald-600">RM 18,999</p>
+          <ul class="mt-2 text-xs text-zinc-600 space-y-1">
+            <li>4-person family room</li>
+            <li>Return flights</li>
+            <li>Guided tours</li>
+          </ul>
+          <a href="#" class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">View Details</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Why Choose Us Section -->
+  <section class="py-4 bg-white">
+    <div class="py-4 bg-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 text-center">
+        <h2 class="text-3xl font-bold text-zinc-900 animate-fadeInDown">
+          Why Choose Us
+        </h2>
+        <p class="mt-4 text-zinc-600 max-w-2xl mx-auto animate-fadeIn delay-200">
+          We simplify your Umrah booking experience with affordable packages, flexible payments, and expert guidance.
+        </p>
+        <div class="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <div class="p-6 bg-teal-50 rounded-xl shadow hover:shadow-lg transition duration-300 animate-fadeInUp delay-300">
+            <h3 class="text-xl font-semibold">Affordable Packages</h3>
+            <p class="mt-2 text-sm text-zinc-600">Tailored packages to fit your budget without compromising quality.</p>
+          </div>
+          <div class="p-6 bg-teal-50 rounded-xl shadow hover:shadow-lg transition duration-300 animate-fadeInUp delay-400">
+            <h3 class="text-xl font-semibold">Flexible Payments</h3>
+            <p class="mt-2 text-sm text-zinc-600">Pay in installments and manage your journey stress-free.</p>
+          </div>
+          <div class="p-6 bg-teal-50 rounded-xl shadow hover:shadow-lg transition duration-300 animate-fadeInUp delay-500">
+            <h3 class="text-xl font-semibold">Expert Support</h3>
+            <p class="mt-2 text-sm text-zinc-600">Guidance from start to finish to ensure a smooth pilgrimage.</p>
           </div>
         </div>
       </div>
     </div>
   </section>
+
+  <style>
+  @keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+  }
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  </style>
+
+  <!--Testimonials-->
+    <section class="bg-gray-50 py-4">
+    <div class="max-w-6xl mx-auto px-4">
+      <h2 class="text-3xl font-bold text-center mb-12">What Our Customers Say</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="bg-white p-6 rounded-lg shadow">
+          <p class="italic text-gray-600">"Booking my Umrah was so easy! Everything was clear and organized."</p>
+          <div class="mt-4 text-sm font-semibold">— Aisha, Semporna</div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+          <p class="italic text-gray-600">"The installment plan made my dream trip possible. Highly recommended!"</p>
+          <div class="mt-4 text-sm font-semibold">— Farhan, Tawau</div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+          <p class="italic text-gray-600">"Friendly team and great customer service. Thank you Umrahly!"</p>
+          <div class="mt-4 text-sm font-semibold">— Nurul, Kota Kinabalu</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
 </main>
 
-<a href="https://wa.me/" target="_blank" rel="noopener" class="fixed bottom-6 right-6 inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600" aria-label="Chat on WhatsApp">
+<!-- WhatsApp Floating Button -->
+<a href="https://wa.me/60123456789" target="_blank" rel="noopener" title="Chat on WhatsApp" class="fixed bottom-6 right-6 inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600">
   <svg viewBox="0 0 32 32" aria-hidden="true" class="h-7 w-7 fill-current">
     <path d="M19.11 17.42c-.31-.16-1.82-.9-2.1-1.01-.28-.11-.49-.16-.7.16-.21.31-.81 1.01-.99 1.22-.18.21-.36.24-.67.08-.31-.16-1.34-.49-2.55-1.56-.94-.84-1.58-1.88-1.76-2.19-.18-.31-.02-.48.14-.64.14-.14.31-.36.46-.54.16-.18.21-.31.31-.52.1-.21.05-.39-.03-.54-.08-.16-.7-1.68-.96-2.29-.25-.6-.5-.52-.7-.53l-.6-.01c-.21 0-.54.08-.82.39-.28.31-1.08 1.05-1.08 2.56s1.11 2.97 1.27 3.18c.16.21 2.18 3.33 5.28 4.67.74.32 1.32.5 1.77.64.74.24 1.41.21 1.94.13.59-.09 1.82-.74 2.07-1.46.25-.72.25-1.34.18-1.46-.07-.12-.28-.2-.59-.36ZM26.67 5.33C23.79 2.44 20.05 1 16.01 1 7.67 1 1 7.67 1 16.01c0 2.63.69 5.2 2 7.47L1 31l7.68-2c2.21 1.21 4.73 1.85 7.33 1.85h.01c8.34 0 15.01-6.67 15.01-14.99 0-4.02-1.57-7.79-4.36-10.53Zm-10.66 23.8h-.01c-2.29 0-4.54-.62-6.5-1.79l-.47-.28-4.56 1.19 1.22-4.44-.31-.46c-1.22-1.89-1.86-4.08-1.86-6.34 0-6.48 5.28-11.76 11.77-11.76 3.14 0 6.09 1.22 8.31 3.44 2.22 2.22 3.44 5.18 3.44 8.32 0 6.48-5.28 11.76-11.76 11.76Z"/>
   </svg>
 </a>
 
-<footer class="mt-16">
-  <div class="px-4 sm:px-6 bg-teal-300 lg:px-10">
-    <p class="border-t border-zinc-200 py-6 text-center text-sm font-semibold text-zinc-700">© 2025 UMRAHLY. All rights reserved.</p>
+<!-- Footer -->
+<footer class="bg-gray-900 text-gray-300 py-10">
+  <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-4 gap-8">
+    <div>
+      <h3 class="text-xl font-bold text-white mb-4">Umrahly</h3>
+      <p class="text-sm">Making your Umrah journey simple, affordable, and stress-free.</p>
+    </div>
+    <div>
+      <h4 class="font-semibold text-white mb-3">Quick Links</h4>
+      <ul class="space-y-2 text-sm">
+        <li><a href="/" class="hover:text-white">Home</a></li>
+        <li><a href="/packages" class="hover:text-white">Packages</a></li>
+        <li><a href="/contact" class="hover:text-white">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4 class="font-semibold text-white mb-3">Support</h4>
+      <ul class="space-y-2 text-sm">
+        <li><a href="/faq" class="hover:text-white">FAQ</a></li>
+        <li><a href="/terms" class="hover:text-white">Terms & Conditions</a></li>
+        <li><a href="/privacy" class="hover:text-white">Privacy Policy</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4 class="font-semibold text-white mb-3">Follow Us</h4>
+      <div class="flex space-x-4">
+        <a href="#" class="hover:text-white">Facebook</a>
+        <a href="#" class="hover:text-white">Instagram</a>
+        <a href="#" class="hover:text-white">Twitter</a>
+      </div>
+    </div>
   </div>
-  <div class=" h-4 w-full"></div>
+  <div class="mt-8 text-center text-xs text-gray-500">
+    &copy; 2025 Umrahly. All rights reserved.
+  </div>
 </footer>
+

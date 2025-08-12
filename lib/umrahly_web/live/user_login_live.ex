@@ -3,58 +3,45 @@ defmodule UmrahlyWeb.UserLoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="max-w-md mx-auto p-8 bg-amber-200 rounded-lg shadow-lg">
-      <h1 class="text-3xl font-bold mb-4 text-center text-teal-700">Log in to your account</h1>
+    <div class="min-h-screen flex flex-col items-center justify-center">
+        <div class="max-w-md w-full bg-[#EAD4AB] rounded-lg p-8 shadow-lg">
+          <h2 class="text-center text-xl font-semibold mb-6">Login to your account</h2>
+          <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-6">
+            <div>
+              <label for="email" class="block mb-1 text-sm font-medium text-gray-900">Email</label>
+              <.input
+                field={@form[:email]}
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                required
+                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
+              />
+            </div>
 
-      <p class="text-center text-sm mb-6">
-        Don't have an account?
-        <.link navigate={~p"/users/register"} class="text-teal-600 font-semibold hover:underline">
-          Sign up
-        </.link>
-        now.
-      </p>
+            <div>
+              <label for="password" class="block mb-1 text-sm font-medium text-gray-900">Password</label>
+              <.input
+                field={@form[:password]}
+                id="password"
+                type="password"
+                placeholder="Enter your Password"
+                required
+                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
+              />
+            </div>
 
-      <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-6">
-        <div>
-          <label for="email" class="block mb-1 text-sm font-medium text-gray-700">Email</label>
-          <.input
-            field={@form[:email]}
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            required
-            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
+            <div>
+              <.button phx-disable-with="Logging in..." class="w-full bg-teal-700 text-white py-3 rounded-md hover:bg-teal-800 font-semibold">
+                Login
+              </.button>
+            </div>
+          </.simple_form>
+          <p class="mt-4 text-center text-sm text-gray-700">
+            Don't have an account?
+            <.link navigate={~p"/users/register"} class="text-teal-700 hover:underline">Register</.link>
+          </p>
         </div>
-
-        <div>
-          <label for="password" class="block mb-1 text-sm font-medium text-gray-700">Password</label>
-          <.input
-            field={@form[:password]}
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            required
-            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-
-        <div class="flex items-center justify-between text-sm text-gray-600">
-          <div class="flex items-center">
-            <.input field={@form[:remember_me]} type="checkbox" id="remember_me" class="mr-2" />
-            <label for="remember_me" class="select-none">Keep me logged in</label>
-          </div>
-          <.link href={~p"/users/reset_password"} class="hover:underline">
-            Forgot your password?
-          </.link>
-        </div>
-
-        <div>
-          <.button phx-disable-with="Logging in..." class="w-full bg-teal-600 text-white py-3 rounded-md hover:bg-teal-700 font-semibold">
-            Log in <span aria-hidden="true">→</span>
-          </.button>
-        </div>
-      </.simple_form>
     </div>
     """
   end

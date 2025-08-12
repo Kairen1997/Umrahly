@@ -1,28 +1,16 @@
-<header class="header-2 px-4 sm:px-6 lg:px-8">
+<header class="px-4 sm:px-6 lg:px-8">
   <div class="flex items-center justify-between border-b border-zinc-100 py-3 text-sm">
     <div class="flex items-center gap-4">
       <a href="/">
-        <!-- Replace this with your logo image or text as per Figma -->
-        <p class="text-3"><span class="text-black">Umrahly</span></p>
+        <img src={~p"/images/logo.svg"} width="36" />
       </a>
-    </div>
-
-    <div class="flex items-center gap-4 font-semibold leading-6 text-zinc-900">
-      <!-- Example nav links; customize as needed -->
-      <a href="/" class="hover:text-zinc-700">Home</a>
-      <a href="#about" class="hover:text-zinc-700">About Us</a>
-      <a href="#contact" class="hover:text-zinc-700">Contact</a>
-      <a href="/users/register" class="rounded-lg bg-teal-600 px-3 py-1 text-white hover:bg-teal-700">
-        Register
-      </a>
-      <a href="/users/log_in" class="rounded-lg bg-amber-300 px-3 py-1 text-zinc-900 hover:bg-amber-400">
-        Login
-      </a>
+      <p class="bg-brand/5 text-brand rounded-full px-2 font-medium leading-6">
+        v{Application.spec(:phoenix, :vsn)}
+      </p>
     </div>
   </div>
 </header>
-
-<main class="login-account-1 px-4 py-20 sm:px-6 lg:px-8">
+<main class="px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-2xl">
     <.flash_group flash={@flash} />
     {@inner_content}

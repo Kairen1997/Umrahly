@@ -117,4 +117,24 @@ defmodule Umrahly.Profiles do
   def change_profile(%Profile{} = profile, attrs \\ %{}) do
     Profile.changeset(profile, attrs)
   end
+
+  @doc """
+  Creates or updates a profile (upsert).
+
+  ## Examples
+
+      iex> upsert_profile(profile, %{field: new_value})
+      {:ok, %Profile{}}
+
+      iex> upsert_profile(nil, %{user_id: 123, field: value})
+      {:ok, %Profile{}}
+
+  """
+  def upsert_profile(%Profile{} = profile, attrs) do
+    update_profile(profile, attrs)
+  end
+
+  def upsert_profile(nil, attrs) do
+    create_profile(attrs)
+  end
 end

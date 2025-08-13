@@ -6,5 +6,7 @@ defmodule UmrahlyWeb.PageHTML do
   """
   use UmrahlyWeb, :html
 
+  import UmrahlyWeb.SidebarComponent
+
   embed_templates "page_html/*"
 end

@@ -18,6 +18,6 @@ defmodule UmrahlyWeb.PageController do
   end
 
   def dashboard(conn, _params) do
-    render(conn, :dashboard)
+    render(conn, :dashboard, current_user: conn.assigns.current_user)
   end
 end

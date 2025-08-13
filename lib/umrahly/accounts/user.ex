@@ -10,6 +10,8 @@ defmodule Umrahly.Accounts.User do
     field :current_password, :string, virtual: true, redact: true
     field :confirmed_at, :utc_datetime
 
+    has_one :profile, Umrahly.Profiles.Profile
+
     timestamps(type: :utc_datetime)
   end
 

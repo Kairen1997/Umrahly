@@ -3,7 +3,7 @@ defmodule UmrahlyWeb.UserLoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="w-[542px] h-[542px] flex flex-col items-center justify-center bg-amber-200 shadow-lg rounded-lg">
+    <div class="flex justify-center items-center min-h-screen bg-[#F9FAF5]">
       <div class="max-w-md w-full bg-[#EAD4AB] rounded-lg p-8 shadow-lg">
         <h2 class="text-center text-xl font-semibold mb-6">Login to your account</h2>
         <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-6">

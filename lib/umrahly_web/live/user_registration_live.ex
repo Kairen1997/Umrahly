@@ -6,41 +6,75 @@ defmodule UmrahlyWeb.UserRegistrationLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm">
-      <.header class="text-center">
-        Register for an account
-        <:subtitle>
-          Already registered?
-          <.link navigate={~p"/users/log_in"} class="font-semibold text-brand hover:underline">
-            Log in
-          </.link>
-          to your account now.
-        </:subtitle>
-      </.header>
+    <div class="flex justify-center items-center min-h-screen bg-[#F9FAF5]">
+      <!-- Form Container -->
+      <div class="bg-[#EAD4AB] p-8 rounded-lg shadow-lg w-full max-w-md">
 
-      <.simple_form
-        for={@form}
-        id="registration_form"
-        phx-submit="save"
-        phx-change="validate"
-        phx-trigger-action={@trigger_submit}
-        action={~p"/users/log_in?_action=registered"}
-        method="post"
-      >
-        <.error :if={@check_errors}>
-          Oops, something went wrong! Please check the errors below.
-        </.error>
+        <!-- Tabs -->
+        <div class="flex justify-center mb-6 space-x-8 text-sm font-medium">
+          <span class="text-[#00897B] cursor-pointer border-b-2 border-[#00897B] pb-1">Register</span>
+          <.link navigate={~p"/users/log_in"} class="text-gray-500 hover:text-[#00897B]">Login</.link>
+        </div>
 
-        <.input field={@form[:email]} type="email" label="Email" required />
-        <.input field={@form[:password]} type="password" label="Password" required />
+        <!-- Form -->
+        <.simple_form
+          for={@form}
+          id="registration_form"
+          phx-submit="save"
+          phx-change="validate"
+          phx-trigger-action={@trigger_submit}
+          action={~p"/users/log_in?_action=registered"}
+          method="post"
+          class="space-y-4"
+        >
+          <.error :if={@check_errors}>
+            Oops, something went wrong! Please check the errors below.
+          </.error>
 
-        <:actions>
-          <.button phx-disable-with="Creating account..." class="w-full">Create an account</.button>
-        </:actions>
-      </.simple_form>
+          <.input
+            field={@form[:full_name]}
+            type="text"
+            label="Full Name"
+            placeholder="Enter your full name"
+            required
+            class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+          />
+
+          <.input
+            field={@form[:email]}
+            type="email"
+            label="Email"
+            placeholder="Enter your email"
+            required
+            class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+          />
+
+          <.input
+            field={@form[:password]}
+            type="password"
+            label="Password"
+            placeholder="Enter your Password"
+            required
+            class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+          />
+
+          <:actions>
+            <.button phx-disable-with="Registering..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
+              Register
+            </.button>
+          </:actions>
+        </.simple_form>
+
+        <!-- Bottom text -->
+        <p class="mt-4 text-center text-sm text-gray-700">
+          Already have an account?
+          <.link navigate={~p"/users/log_in"} class="text-[#00897B] hover:underline">Login</.link>
+        </p>
+      </div>
     </div>
     """
   end
+
 
   def mount(_params, _session, socket) do
     changeset = Accounts.change_user_registration(%User{})

@@ -3,6 +3,7 @@ defmodule Umrahly.Accounts.User do
   import Ecto.Changeset
 
   schema "users" do
+    field :full_name, :string
     field :email, :string
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
@@ -37,11 +38,18 @@ defmodule Umrahly.Accounts.User do
   """
   def registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:email, :password])
+    |> cast(attrs, [:full_name, :email, :password])
+    |> validate_full_name(opts)
     |> validate_email(opts)
     |> validate_password(opts)
   end
 
+  defp validate_full_name(changeset, _opts) do
+    changeset
+    |>validate_required([:full_name])
+    |>validate_length(:full_name, min: 3, max: 100)
+    |>validate_format(:full_name, ~r/^[A-Za-z\s'.-]+$/)
+  end
   defp validate_email(changeset, opts) do
     changeset
     |> validate_required([:email])

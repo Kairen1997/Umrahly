@@ -65,6 +65,7 @@ defmodule UmrahlyWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     get "/dashboard", PageController, :dashboard
+    live "/profile", UserProfileLive, :edit
 
     live_session :require_authenticated_user,
       on_mount: [{UmrahlyWeb.UserAuth, :ensure_authenticated}] do

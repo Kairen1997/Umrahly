@@ -9,6 +9,7 @@ defmodule Umrahly.Profiles.Profile do
     field :monthly_income, :integer
     field :birthdate, :date
     field :gender, :string
+    field :profile_photo, :string
 
     belongs_to :user, Umrahly.Accounts.User
     timestamps(type: :utc_datetime)
@@ -17,7 +18,7 @@ defmodule Umrahly.Profiles.Profile do
   @doc false
   def changeset(profile, attrs) do
     profile
-    |> cast(attrs, [:user_id, :identity_card_number, :phone_number, :address, :monthly_income, :birthdate, :gender])
+    |> cast(attrs, [:user_id, :identity_card_number, :phone_number, :address, :monthly_income, :birthdate, :gender, :profile_photo])
     |> validate_required([:user_id, :identity_card_number, :phone_number, :address, :monthly_income, :birthdate, :gender])
     |> foreign_key_constraint(:user_id)
   end

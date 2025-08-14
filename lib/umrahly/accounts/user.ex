@@ -139,6 +139,15 @@ defmodule Umrahly.Accounts.User do
   end
 
   @doc """
+  A user changeset for updating user information.
+  """
+  def update_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:full_name])
+    |> validate_full_name(validate_email: false)
+  end
+
+  @doc """
   Verifies the password.
 
   If there is no user or the user doesn't have a password, we call

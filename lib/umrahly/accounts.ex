@@ -215,6 +215,24 @@ defmodule Umrahly.Accounts do
     end
   end
 
+  @doc """
+  Updates a user with the given attributes.
+
+  ## Examples
+
+      iex> update_user(user, %{full_name: "New Name"})
+      {:ok, %User{}}
+
+      iex> update_user(user, %{full_name: nil})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def update_user(%User{} = user, attrs) do
+    user
+    |> User.update_changeset(attrs)
+    |> Repo.update()
+  end
+
   ## Session
 
   @doc """

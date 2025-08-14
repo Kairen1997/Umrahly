@@ -8,13 +8,21 @@ defmodule UmrahlyWeb.PageController do
     # so skip the default app layout.
     current_user = conn.assigns[:current_user]
 
-    has_profile = if current_user do
-      Profiles.get_profile_by_user_id(current_user.id) != nil
+    {has_profile, profile} = if current_user do
+      profile = Profiles.get_profile_by_user_id(current_user.id)
+      {profile != nil, profile}
     else
-      false
+      {false, nil}
     end
 
-    render(conn, :home, layout: false, has_profile: has_profile)
+    # Add profile to current_user assigns for template access
+    current_user = if current_user && profile do
+      %{current_user | profile: profile}
+    else
+      current_user
+    end
+
+    render(conn, :home, layout: false, has_profile: has_profile, current_user: current_user)
   end
 
   def dashboard(conn, _params) do

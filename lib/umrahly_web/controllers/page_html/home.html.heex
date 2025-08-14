@@ -12,13 +12,26 @@
         </button>
 
         <%= if @current_user do %>
-          <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
-          <%= if @has_profile do %>
-            <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
-          <% else %>
-            <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
-          <% end %>
-          <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
+          <div class="flex items-center gap-3">
+            <!-- Profile Photo -->
+            <div class="relative">
+              <%= if @current_user.profile && @current_user.profile.profile_photo do %>
+                <img src={@current_user.profile.profile_photo} alt="Profile Photo" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+              <% else %>
+                <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                  <%= String.first(@current_user.email) |> String.upcase() %>
+                </div>
+              <% end %>
+            </div>
+            
+            <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+            <%= if @has_profile do %>
+              <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
+            <% else %>
+              <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
+            <% end %>
+            <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
+          </div>
         <% else %>
           <.link href={~p"/users/register"} class="hover:text-zinc-900">Register</.link>
           <.link href={~p"/users/log_in"} class="hover:text-zinc-900">Login</.link>

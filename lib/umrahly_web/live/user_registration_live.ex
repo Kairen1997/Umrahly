@@ -96,8 +96,11 @@ defmodule UmrahlyWeb.UserRegistrationLive do
             &url(~p"/users/confirm/#{&1}")
           )
 
-        changeset = Accounts.change_user_registration(user)
-        {:noreply, socket |> assign(trigger_submit: true) |> assign_form(changeset)}
+        # Redirect to login with a special parameter to indicate profile completion is needed
+        {:noreply,
+         socket
+         |> put_flash(:info, "Registration successful! Please log in to complete your profile.")
+         |> push_navigate(to: ~p"/users/log_in?complete_profile=true")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, socket |> assign(check_errors: true) |> assign_form(changeset)}

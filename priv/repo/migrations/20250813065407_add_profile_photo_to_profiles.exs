@@ -3,7 +3,7 @@ defmodule Umrahly.Repo.Migrations.AddProfilePhotoToProfiles do
 
   def change do
     alter table(:profiles) do
-      add :profile_photo, :string
+      add :profile_photo, :binary
     end
   end
 end

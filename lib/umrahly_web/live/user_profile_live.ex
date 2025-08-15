@@ -12,15 +12,24 @@ defmodule UmrahlyWeb.UserProfileLive do
     socket = assign(socket,
       user: user,
       profile: profile,
-      page_title: "Profile"
+      page_title: "Profile",
+      last_updated: nil
     )
+    socket = if is_nil(profile) do
+      put_flash(socket, :error, "Please complete your profile first. Some features may not be available.")
+    else
+      socket
+    end
 
-    socket = allow_upload(socket, :profile_photo,
-      accept: ~w(.jpg .jpeg .png .gif),
-      max_entries: 1,
-      max_file_size: 10_000_000,
-      chunk_size: 64_000
-    )
+    socket =
+      socket
+      |> assign(:profile, profile)
+      |> assign(:changeset, Profiles.change_profile(profile))
+      |> allow_upload(:profile_photo,
+        accept: ~w(.jpg .jpeg .png),
+        max_entries: 1,
+        max_file_size: 5_000_000
+      )
 
     {:ok, socket}
   end
@@ -28,27 +37,120 @@ defmodule UmrahlyWeb.UserProfileLive do
   def handle_event("save-profile", %{"profile" => profile_params}, socket) do
     user = socket.assigns.user
     profile = socket.assigns.profile
+    user_attrs = %{
+      "full_name" => profile_params["full_name"]
+    }
+    profile_attrs = Map.drop(profile_params, ["full_name"])
+    profile_attrs = Map.put(profile_attrs, :user_id, user.id)
+    with {:ok, updated_user} <- Accounts.update_user(user, user_attrs),
+         {:ok, updated_profile} <- Profiles.upsert_profile(profile, profile_attrs) do
+
+      {:noreply,
+       socket
+       |> assign(user: updated_user, profile: updated_profile, last_updated: DateTime.utc_now())
+       |> put_flash(:info, "Profile updated successfully")}
+    else
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> assign(profile_changeset: changeset)
+         |> put_flash(:error, "Failed to update profile. Please check the form and try again.")}
+    end
+  end
+
+  def handle_event("save-identity-contact", %{"profile" => profile_params}, socket) do
+    user = socket.assigns.user
+    profile = socket.assigns.profile
+
+
+
+    # Start with a clean map using only string keys from the form
+    profile_attrs = %{
+      "user_id" => user.id,
+      "identity_card_number" => profile_params["identity_card_number"],
+      "phone_number" => profile_params["phone_number"],
+      "address" => profile_params["address"],
+      "monthly_income" => profile_params["monthly_income"],
+      "gender" => profile_params["gender"],
+      "birthdate" => profile_params["birthdate"]
+    }
+
+    # Clean up empty strings to nil
+    profile_attrs = profile_attrs
+    |> Map.update("identity_card_number", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("phone_number", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("address", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("monthly_income", nil, &if(&1 == "" or is_nil(&1), do: nil, else: &1))
+    |> Map.update("gender", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("birthdate", nil, &if(&1 == "" or is_nil(&1), do: nil, else: &1))
+
+    # Convert monthly_income to integer if it's a string
+    profile_attrs = case profile_attrs["monthly_income"] do
+      income when is_binary(income) and income != "" ->
+        case Integer.parse(income) do
+          {int, _} -> Map.put(profile_attrs, "monthly_income", int)
+          :error -> Map.put(profile_attrs, "monthly_income", nil)
+        end
+      income when is_integer(income) -> profile_attrs
+      _ -> Map.put(profile_attrs, "monthly_income", nil)
+    end
+
+    # Convert birthdate to Date if it's a string
+    profile_attrs = case profile_attrs["birthdate"] do
+      date when is_binary(date) and date != "" ->
+        case Date.from_iso8601(date) do
+          {:ok, parsed_date} -> Map.put(profile_attrs, "birthdate", parsed_date)
+          {:error, _} -> Map.put(profile_attrs, "birthdate", nil)
+        end
+      date when is_struct(date, Date) -> profile_attrs
+      _ -> Map.put(profile_attrs, "birthdate", nil)
+    end
+
+
+
+    # Check if at least one field has a value (for new profiles)
+    if is_nil(profile) do
+      has_values = profile_attrs
+      |> Map.take(["identity_card_number", "phone_number", "address", "monthly_income", "gender", "birthdate"])
+      |> Map.values()
+      |> Enum.any?(&(&1 != nil))
+
+      if not has_values do
+
+        {:noreply,
+         socket
+         |> put_flash(:error, "Please fill in at least one field to create your profile.")}
+      else
+
+        continue_profile_update(socket, profile, profile_attrs)
+      end
+    else
+
+      continue_profile_update(socket, profile, profile_attrs)
+    end
+  end
+
+  def handle_event("save-personal-info", %{"profile" => profile_params}, socket) do
+    user = socket.assigns.user
 
     # Extract user fields from profile params
     user_attrs = %{
       "full_name" => profile_params["full_name"]
     }
 
-    # Extract profile fields, excluding user fields
-    profile_attrs = Map.drop(profile_params, ["full_name"])
-    profile_attrs = Map.put(profile_attrs, :user_id, user.id)
+    # Update user
+    case Accounts.update_user(user, user_attrs) do
+      {:ok, updated_user} ->
+        {:noreply,
+         socket
+         |> assign(user: updated_user, last_updated: DateTime.utc_now())
+         |> put_flash(:info, "Personal information updated successfully!")}
 
-    # Update both user and profile
-    with {:ok, updated_user} <- Accounts.update_user(user, user_attrs),
-         {:ok, updated_profile} <- Profiles.upsert_profile(profile, profile_attrs) do
-
-      {:noreply,
-       socket
-       |> assign(user: updated_user, profile: updated_profile)
-       |> put_flash(:info, "Profile updated successfully")}
-    else
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, profile_changeset: changeset)}
+        {:noreply,
+         socket
+         |> assign(user_changeset: changeset)
+         |> put_flash(:error, "Failed to update personal information. Please check the form and try again.")}
     end
   end
 
@@ -68,34 +170,44 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
-  def handle_event("upload-photo", params, socket) do
-    IO.inspect(params, label: "upload-photo params")
-    IO.inspect(socket.assigns.uploads.profile_photo, label: "uploads state in upload-photo")
-
+  def handle_event("upload-photo", _params, socket) do
     user = socket.assigns.user
     profile = socket.assigns.profile
 
     if is_nil(profile) do
-      {:noreply,
-       socket
-       |> put_flash(:error, "Profile not found. Please complete your profile first.")}
+      {:noreply, put_flash(socket, :error, "Profile not found. Please complete your profile first.")}
     else
-      case handle_upload(socket.assigns.uploads.profile_photo, user, profile) do
-        {:ok, updated_profile} ->
-          {:noreply,
-           socket
-           |> assign(profile: updated_profile)
-           |> put_flash(:info, "Profile photo uploaded successfully")}
+      uploaded_files =
+        consume_uploaded_entries(socket, :profile_photo, fn entry, _socket ->
+          uploads_dir = Path.join(:code.priv_dir(:umrahly), "static/uploads")
+          File.mkdir_p!(uploads_dir)
 
-        {:error, message} ->
-          {:noreply,
-           socket
-           |> put_flash(:error, "Failed to upload photo: #{message}")}
+          extension = Path.extname(entry.client_name)
+          filename = "#{user.id}_#{System.system_time()}#{extension}"
+          dest_path = Path.join(uploads_dir, filename)
+
+          File.cp!(entry.path, dest_path)
+          {:ok, "/uploads/#{filename}"}
+        end)
+
+      case uploaded_files do
+        [photo_path | _] ->
+          case Profiles.update_profile(profile, %{profile_photo: photo_path}) do
+            {:ok, updated_profile} ->
+              {:noreply,
+               socket
+               |> assign(profile: updated_profile)
+               |> put_flash(:info, "Profile photo uploaded successfully")}
+
+            {:error, changeset} ->
+              {:noreply, put_flash(socket, :error, "Failed to save profile: #{inspect(changeset.errors)}")}
+          end
+
+        [] ->
+          {:noreply, put_flash(socket, :error, "No file uploaded")}
       end
     end
   end
-
-
 
   def handle_event("remove-photo", _params, socket) do
     profile = socket.assigns.profile
@@ -114,9 +226,24 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
-  def handle_event("validate-photo", params, socket) do
-    IO.inspect(params, label: "validate-photo params")
-    IO.inspect(socket.assigns.uploads.profile_photo, label: "uploads state in validate-photo")
+  def handle_event("validate-identity-contact", %{"profile" => profile_params}, socket) do
+    socket = case profile_params do
+      %{"identity_card_number" => id_num, "phone_number" => phone, "address" => addr, "monthly_income" => income, "gender" => gender, "birthdate" => birthdate} ->
+        cond do
+          id_num == "" and phone == "" and addr == "" and income == "" and gender == "" and birthdate == "" ->
+            put_flash(socket, :warning, "Please fill in at least one field")
+          true ->
+            socket
+        end
+      _ ->
+        socket
+    end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("validate-photo", _params, socket) do
+
     {:noreply, socket}
   end
 
@@ -124,8 +251,50 @@ defmodule UmrahlyWeb.UserProfileLive do
     {:noreply, cancel_upload(socket, :profile_photo, ref)}
   end
 
+
+
+  # Private functions
+  defp continue_profile_update(socket, profile, profile_attrs) do
+
+
+    # Update profile
+    case Profiles.upsert_profile(profile, profile_attrs) do
+      {:ok, updated_profile} ->
+
+        # Determine if this is a new profile or an update
+        message = if is_nil(profile) do
+          "Profile created successfully! Welcome to Umrahly!"
+        else
+          "Identity and contact information updated successfully!"
+        end
+
+
+        {:noreply,
+         socket
+         |> assign(profile: updated_profile, last_updated: DateTime.utc_now())
+         |> put_flash(:info, message)}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+
+        # Create a more informative error message
+        error_message = case changeset.errors do
+          [] -> "Failed to update identity and contact information. Please check the form and try again."
+          errors ->
+            error_details = errors
+            |> Enum.map(fn {field, {message, _}} -> "#{field}: #{message}" end)
+            |> Enum.join(", ")
+            "Validation errors: #{error_details}"
+        end
+
+        {:noreply,
+         socket
+         |> assign(profile_changeset: changeset)
+         |> put_flash(:error, error_message)}
+    end
+  end
+
   @spec handle_upload(Phoenix.LiveView.UploadConfig.t(), map(), map()) :: {:ok, map()} | {:error, String.t()}
-    def handle_upload(uploads, user, profile) do
+  def handle_upload(uploads, user, profile) do
     case uploads.entries do
       [entry] ->
         # Create uploads directory if it doesn't exist
@@ -221,15 +390,55 @@ defmodule UmrahlyWeb.UserProfileLive do
         <!-- Content Header -->
         <div class="bg-white border-b border-gray-200">
           <div class="px-6 py-4">
-            <h1 class="text-2xl font-semibold text-gray-900">
-              Profile
-            </h1>
+            <div class="flex items-center justify-between">
+              <div>
+                <h1 class="text-2xl font-semibold text-gray-900">
+                  Profile
+                </h1>
+                <%= if @last_updated do %>
+                  <p class="mt-1 text-sm text-gray-500">
+                    Last updated: <%= Calendar.strftime(@last_updated, "%B %d, %Y at %I:%M %p") %>
+                  </p>
+                <% end %>
+              </div>
+              <%= if @profile do %>
+                <div class="flex items-center space-x-2">
+                  <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                  <span class="text-sm text-gray-600">Profile Complete</span>
+                </div>
+              <% end %>
+            </div>
           </div>
         </div>
 
         <!-- Page Content -->
         <main class="flex-1 bg-gray-50 p-6 overflow-auto">
           <div class="max-w-6xl mx-auto">
+
+            <!-- Profile Completion Guidance -->
+            <%= if is_nil(@profile) do %>
+              <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Profile Incomplete</h3>
+                    <div class="mt-2 text-sm text-yellow-700">
+                      <p>You need to complete your profile to access all features. Please fill out the forms below or complete your profile first.</p>
+                    </div>
+                    <div class="mt-4">
+                      <a href="/complete-profile" class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors">
+                        Complete Profile
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
               <!-- Left Column - Forms -->
@@ -237,8 +446,16 @@ defmodule UmrahlyWeb.UserProfileLive do
 
                 <!-- Personal Information -->
                 <div class="bg-white rounded-lg shadow p-6">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
-                  <form phx-submit="save-profile" class="space-y-4">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Personal Information</h3>
+                    <%= if @last_updated do %>
+                      <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-xs text-green-600">Updated</span>
+                      </div>
+                    <% end %>
+                  </div>
+                  <form id="personal-info-form" phx-submit="save-personal-info" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
@@ -249,13 +466,19 @@ defmodule UmrahlyWeb.UserProfileLive do
                         <input type="email" value={@user.email} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50" placeholder="Email Read Only" disabled />
                       </div>
                     </div>
+                    <div class="pt-4">
+                      <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors phx-submit-loading:opacity-75 phx-submit-loading:cursor-not-allowed">
+                        <span class="phx-submit-loading:hidden">Save Personal Info</span>
+                        <span class="hidden phx-submit-loading:inline">Saving...</span>
+                      </button>
+                    </div>
                   </form>
                 </div>
 
                 <!-- Change Password -->
                 <div class="bg-white rounded-lg shadow p-6">
                   <h3 class="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
-                  <form phx-submit="change-password" class="space-y-4">
+                  <form id="change-password-form" phx-submit="change-password" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
@@ -271,8 +494,9 @@ defmodule UmrahlyWeb.UserProfileLive do
                       </div>
                     </div>
                     <div class="pt-4">
-                      <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors">
-                        Change Password
+                      <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors phx-submit-loading:opacity-75 phx-submit-loading:cursor-not-allowed">
+                        <span class="phx-submit-loading:hidden">Change Password</span>
+                        <span class="hidden phx-submit-loading:inline">Changing...</span>
                       </button>
                     </div>
                   </form>
@@ -280,8 +504,16 @@ defmodule UmrahlyWeb.UserProfileLive do
 
                 <!-- Identity and Contact Information -->
                 <div class="bg-white rounded-lg shadow p-6">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">Identity and Contact Information</h3>
-                  <form phx-submit="save-profile" class="space-y-4">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Identity and Contact Information</h3>
+                    <%= if @last_updated do %>
+                      <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-xs text-green-600">Updated</span>
+                      </div>
+                    <% end %>
+                  </div>
+                  <form id="identity-contact-form" phx-submit="save-identity-contact" phx-change="validate-identity-contact" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number</label>
@@ -299,7 +531,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income</label>
-                        <input type="number" name="profile[monthly_income]" value={@profile && @profile.monthly_income} step="0.01" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Monthly Income" />
+                        <input type="number" name="profile[monthly_income]" value={@profile && @profile.monthly_income} min="1" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Monthly Income" />
                       </div>
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -315,9 +547,12 @@ defmodule UmrahlyWeb.UserProfileLive do
                       </div>
                     </div>
                     <div class="pt-4">
-                      <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors">
-                        Save Profile
+                      <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors phx-submit-loading:opacity-75 phx-submit-loading:cursor-not-allowed">
+                        <span class="phx-submit-loading:hidden">Save Identity & Contact Info</span>
+                        <span class="hidden phx-submit-loading:inline">Saving...</span>
                       </button>
+
+
                     </div>
                   </form>
                 </div>
@@ -331,10 +566,10 @@ defmodule UmrahlyWeb.UserProfileLive do
                     <!-- Profile Photo Display -->
                     <div class="text-center">
                       <%= if @profile && @profile.profile_photo do %>
-                        <div class="relative inline-block">
+                        <div class="relative inline-block ">
                           <img src={@profile.profile_photo} alt="Profile Photo" class="w-32 h-32 rounded-full object-cover border-4 border-teal-200 shadow-lg" />
                           <button phx-click="remove-photo" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
@@ -352,7 +587,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                     </div>
 
                     <!-- Upload Form -->
-                    <form phx-submit="upload-photo" phx-upload class="space-y-4">
+                    <form id="upload-photo-form" phx-submit="upload-photo" phx-upload class="space-y-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Select Photo</label>
                         <div class="space-y-2">
@@ -405,8 +640,9 @@ defmodule UmrahlyWeb.UserProfileLive do
                           <% end %>
                         </div>
                       </div>
-                      <button type="submit" class="w-full bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors" disabled={Enum.empty?(@uploads.profile_photo.entries)}>
-                        Upload Profile Photo
+                      <button type="submit" class="w-full bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors phx-submit-loading:opacity-75 phx-submit-loading:cursor-not-allowed" disabled={Enum.empty?(@uploads.profile_photo.entries)}>
+                        <span class="phx-submit-loading:hidden">Upload Profile Photo</span>
+                        <span class="hidden phx-submit-loading:inline">Uploading...</span>
                       </button>
                     </form>
                   </div>

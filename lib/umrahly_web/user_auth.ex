@@ -29,11 +29,21 @@ defmodule UmrahlyWeb.UserAuth do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
 
+    # Check if user needs to complete profile
+    redirect_path = if user_return_to do
+      user_return_to
+    else
+      case Umrahly.Profiles.get_profile_by_user_id(user.id) do
+        nil -> ~p"/complete-profile"
+        _profile -> ~p"/dashboard"
+      end
+    end
+
     conn
     |> renew_session()
     |> put_token_in_session(token)
     |> maybe_write_remember_me_cookie(token, params)
-    |> redirect(to: user_return_to || signed_in_path(conn))
+    |> redirect(to: redirect_path)
   end
 
   defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
@@ -225,5 +235,16 @@ defmodule UmrahlyWeb.UserAuth do
 
   defp maybe_store_return_to(conn), do: conn
 
-  defp signed_in_path(_conn), do: ~p"/dashboard"
+  defp signed_in_path(conn) do
+    user = conn.assigns[:current_user]
+    if user do
+      # Check if user has a profile
+      case Umrahly.Profiles.get_profile_by_user_id(user.id) do
+        nil -> ~p"/complete-profile"
+        _profile -> ~p"/dashboard"
+      end
+    else
+      ~p"/dashboard"
+    end
+  end
 end

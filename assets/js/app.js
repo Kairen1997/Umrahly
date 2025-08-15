@@ -32,12 +32,44 @@ const FileUploadHook = {
   }
 };
 
+// Custom hook for form validation
+const FormValidationHook = {
+  mounted() {
+    console.log("FormValidationHook mounted", this.el);
+    
+    this.el.addEventListener("submit", (e) => {
+      const formData = new FormData(this.el);
+      const profileData = {};
+      
+      // Extract profile fields
+      for (let [key, value] of formData.entries()) {
+        if (key.startsWith("profile[")) {
+          const fieldName = key.replace("profile[", "").replace("]", "");
+          profileData[fieldName] = value;
+        }
+      }
+      
+      // Check if at least one field has a value
+      const hasValues = Object.values(profileData).some(value => value && value.trim() !== "");
+      
+      if (!hasValues) {
+        e.preventDefault();
+        alert("Please fill in at least one field to save your profile.");
+        return false;
+      }
+      
+      console.log("Form validation passed, submitting...");
+    });
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {
-    FileUploadHook
+    FileUploadHook,
+    FormValidationHook
   }
 })
 

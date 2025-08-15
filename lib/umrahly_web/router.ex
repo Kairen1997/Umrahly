@@ -65,6 +65,7 @@ defmodule UmrahlyWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     get "/dashboard", PageController, :dashboard
+    live "/complete-profile", CompleteProfileLive, :new
   end
 
   scope "/", UmrahlyWeb do

@@ -15,8 +15,10 @@
           <div class="flex items-center gap-3">
             <!-- Profile Photo -->
             <div class="relative">
-              <%= if @current_user.profile && @current_user.profile.profile_photo do %>
-                <img src={@current_user.profile.profile_photo} alt="Profile Photo" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+              <%= if @has_profile do %>
+                <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                  <%= String.first(@current_user.email) |> String.upcase() %>
+                </div>
               <% else %>
                 <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
                   <%= String.first(@current_user.email) |> String.upcase() %>
@@ -46,7 +48,8 @@
   <div id="profile-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
       <!-- Modal Header -->
-      <div class="px-6 py-4 border-b border-gray-200">
+      <div class="px-6 py-4 border-b border-gray-200 relative">
+        <button id="close-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
         <h1 class="text-2xl font-bold text-center text-gray-900">Complete Your Profile</h1>
         <p class="text-sm text-center text-gray-600 mt-2">This information is required to continue</p>
       </div>
@@ -119,6 +122,34 @@
     // Add your language switching logic here
   });
 
+  // Profile modal functionality
+  const showProfileModal = document.getElementById('show-profile-modal');
+  const profileModal = document.getElementById('profile-modal');
+  
+  if (showProfileModal && profileModal) {
+    showProfileModal.addEventListener('click', () => {
+      profileModal.style.display = 'flex';
+      document.body.classList.add('modal-open');
+    });
+    
+    // Close modal when clicking outside
+    profileModal.addEventListener('click', (e) => {
+      if (e.target === profileModal) {
+        profileModal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+      }
+    });
+    
+    // Close modal with close button
+    const closeModal = document.getElementById('close-modal');
+    if (closeModal) {
+      closeModal.addEventListener('click', () => {
+        profileModal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+      });
+    }
+  }
+
   // Profile form submission
   const profileForm = document.getElementById('profile-form');
   if (profileForm) {
@@ -170,6 +201,9 @@
         });
         
         if (response.ok) {
+          // Close modal and redirect
+          profileModal.style.display = 'none';
+          document.body.classList.remove('modal-open');
           window.location.href = '/dashboard';
         } else {
           const error = await response.json();
@@ -343,7 +377,7 @@
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: 9999;

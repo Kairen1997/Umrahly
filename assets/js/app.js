@@ -22,10 +22,23 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
+// Custom hook for file uploads
+const FileUploadHook = {
+  mounted() {
+    console.log("FileUploadHook mounted", this.el);
+    this.el.addEventListener("change", (e) => {
+      console.log("File selected:", e.target.files[0]);
+    });
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken}
+  params: {_csrf_token: csrfToken},
+  hooks: {
+    FileUploadHook
+  }
 })
 
 // Show progress bar on live navigation and form submits

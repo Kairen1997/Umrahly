@@ -18,7 +18,8 @@ defmodule UmrahlyWeb.UserProfileLive do
     socket = allow_upload(socket, :profile_photo,
       accept: ~w(.jpg .jpeg .png .gif),
       max_entries: 1,
-      max_file_size: 10_000_000
+      max_file_size: 10_000_000,
+      chunk_size: 64_000
     )
 
     {:ok, socket}
@@ -67,12 +68,12 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
-  def handle_event("upload-photo", _params, socket) do
+  def handle_event("upload-photo", params, socket) do
+    IO.inspect(params, label: "upload-photo params")
+    IO.inspect(socket.assigns.uploads.profile_photo, label: "uploads state in upload-photo")
+
     user = socket.assigns.user
     profile = socket.assigns.profile
-
-    # Debug: Log the uploads state
-    IO.inspect(socket.assigns.uploads.profile_photo, label: "Uploads state")
 
     if is_nil(profile) do
       {:noreply,
@@ -113,7 +114,9 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
-  def handle_event("validate-photo", _params, socket) do
+  def handle_event("validate-photo", params, socket) do
+    IO.inspect(params, label: "validate-photo params")
+    IO.inspect(socket.assigns.uploads.profile_photo, label: "uploads state in validate-photo")
     {:noreply, socket}
   end
 
@@ -122,7 +125,7 @@ defmodule UmrahlyWeb.UserProfileLive do
   end
 
   @spec handle_upload(Phoenix.LiveView.UploadConfig.t(), map(), map()) :: {:ok, map()} | {:error, String.t()}
-  defp handle_upload(uploads, user, profile) do
+    def handle_upload(uploads, user, profile) do
     case uploads.entries do
       [entry] ->
         # Create uploads directory if it doesn't exist
@@ -349,7 +352,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                     </div>
 
                     <!-- Upload Form -->
-                    <form phx-submit="upload-photo" phx-change="validate-photo" phx-upload class="space-y-4">
+                    <form phx-submit="upload-photo" phx-upload class="space-y-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Select Photo</label>
                         <div class="space-y-2">
@@ -361,7 +364,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                               <div class="flex text-sm text-gray-600">
                                 <label for={@uploads.profile_photo.ref} class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
                                   <span>Upload a file</span>
-                                  <input id={@uploads.profile_photo.ref} type="file" class="sr-only" accept=".jpg,.jpeg,.png,.gif" phx-hook="Phoenix.LiveView.UploadHook" phx-upload />
+                                  <input id={@uploads.profile_photo.ref} type="file" class="sr-only" accept=".jpg,.jpeg,.png,.gif" phx-upload phx-hook="FileUploadHook" />
                                 </label>
                                 <p class="pl-1">or drag and drop</p>
                               </div>

@@ -20,6 +20,18 @@ defmodule UmrahlyWeb.PageController do
   end
 
   def dashboard(conn, _params) do
-    render(conn, :dashboard, current_user: conn.assigns.current_user)
+    current_user = conn.assigns.current_user
+
+    has_profile = if current_user do
+      profile = Profiles.get_profile_by_user_id(current_user.id)
+      profile != nil
+    else
+      false
+    end
+
+    render(conn, :dashboard,
+      current_user: current_user,
+      has_profile: has_profile
+    )
   end
 end

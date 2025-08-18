@@ -597,6 +597,54 @@ defmodule UmrahlyWeb.CoreComponents do
     """
   end
 
+  def navbar(assigns) do
+    ~H"""
+    <nav class="w-full sticky top-0 z-50">
+      <div class="px-4 bg-teal-300 sm:px-6 lg:px-10">
+        <div class="flex items-center justify-between py-2">
+          <!-- Logo -->
+          <a href="/" class="font-extrabold tracking-wider text-zinc-900 text-xl">UMRAHLY</a>
+
+          <!-- Menu -->
+          <div class="flex items-center gap-4 text-sm font-medium text-zinc-700 rounded-lg bg-amber-200 px-3 py-1">
+            <button id="lang-toggle" class="text-zinc-900 hover:underline focus:outline-none">
+              EN/MY
+            </button>
+
+            <%= if @current_user do %>
+              <div class="flex items-center gap-3">
+                <!-- Profile Photo -->
+                <div class="relative">
+                  <%= if @has_profile do %>
+                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                      <%= String.first(@current_user.email) |> String.upcase() %>
+                    </div>
+                  <% else %>
+                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                      <%= String.first(@current_user.email) |> String.upcase() %>
+                    </div>
+                  <% end %>
+                </div>
+
+                <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+                <%= if @has_profile do %>
+                  <a href="/dashboard" class="hover:text-zinc-900">Dashboard</a>
+                <% else %>
+                  <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
+                <% end %>
+                <.link href="/users/log_out" method="delete" class="hover:text-zinc-900">Log out</.link>
+              </div>
+            <% else %>
+              <a href="/users/register" class="hover:text-zinc-900">Register</a>
+              <a href="/users/log_in" class="hover:text-zinc-900">Login</a>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </nav>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do

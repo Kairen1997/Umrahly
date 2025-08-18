@@ -29,22 +29,25 @@ defmodule UmrahlyWeb.UserAuth do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
 
-    # Check if user needs to complete profile or is admin
+        # Check if user needs to complete profile or is admin
     redirect_path = if user_return_to do
       user_return_to
     else
-      cond do
-        Umrahly.Accounts.is_admin?(user) ->
-          IO.inspect(user, label: "Admin user logging in")
-          IO.inspect(user.is_admin, label: "Admin flag value")
-          IO.inspect("Redirecting to admin dashboard", label: "Redirect path")
-          ~p"/admin/dashboard"
-        Umrahly.Profiles.get_profile_by_user_id(user.id) == nil ->
+      # Force admin check first
+      if Umrahly.Accounts.is_admin?(user) do
+        IO.inspect(user, label: "Admin user logging in")
+        IO.inspect(user.is_admin, label: "Admin flag value")
+        IO.inspect("Redirecting to admin dashboard", label: "Redirect path")
+        ~p"/admin/dashboard"
+      else
+        # Check profile completion for non-admin users
+        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
           IO.inspect("User has no profile, redirecting to complete-profile", label: "Redirect path")
           ~p"/complete-profile"
-        true ->
+        else
           IO.inspect("User has profile, redirecting to dashboard", label: "Redirect path")
           ~p"/dashboard"
+        end
       end
     end
 
@@ -263,10 +266,14 @@ defmodule UmrahlyWeb.UserAuth do
     user = conn.assigns[:current_user]
     if user do
       # Check if user is admin or has a profile
-      cond do
-        Umrahly.Accounts.is_admin?(user) -> ~p"/admin/dashboard"
-        Umrahly.Profiles.get_profile_by_user_id(user.id) == nil -> ~p"/complete-profile"
-        true -> ~p"/dashboard"
+      if Umrahly.Accounts.is_admin?(user) do
+        ~p"/admin/dashboard"
+      else
+        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
+          ~p"/complete-profile"
+        else
+          ~p"/dashboard"
+        end
       end
     else
       ~p"/dashboard"

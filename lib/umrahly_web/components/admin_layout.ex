@@ -110,8 +110,8 @@ defmodule UmrahlyWeb.AdminLayout do
 
                 <!-- User Profile Dropdown -->
                 <%= if @current_user do %>
-                  <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                  <details class="relative">
+                    <summary class="flex items-center gap-2 text-gray-600 hover:text-gray-800 cursor-pointer" style="list-style: none;">
                       <!-- Profile Photo/Avatar -->
                       <%= if @profile && @profile.profile_photo do %>
                         <img src={@profile.profile_photo} alt="Profile Photo" class="w-8 h-8 rounded-full object-cover border-2 border-gray-200" />
@@ -124,10 +124,10 @@ defmodule UmrahlyWeb.AdminLayout do
                       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                       </svg>
-                    </button>
+                    </summary>
 
                     <!-- Dropdown Menu -->
-                    <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                    <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
                       <div class="px-4 py-2 border-b border-gray-100">
                         <p class="text-sm font-medium text-gray-900"><%= @current_user.full_name %></p>
                         <p class="text-xs text-gray-500"><%= @current_user.email %></p>
@@ -139,7 +139,7 @@ defmodule UmrahlyWeb.AdminLayout do
                       <a href="/admin/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
                       <a href="/users/log_out" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Log Out</a>
                     </div>
-                  </div>
+                  </details>
                 <% end %>
               </div>
             </div>

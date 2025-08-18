@@ -1,4 +1,47 @@
-<.navbar current_user={@current_user} has_profile={@has_profile} />
+<!-- Navbar -->
+<nav class="w-full sticky top-0 z-50">
+  <div class="px-4 bg-teal-300 sm:px-6 lg:px-10">
+    <div class="flex items-center justify-between py-2">
+      <!-- Logo -->
+      <a href="/" class="font-extrabold tracking-wider text-zinc-900 text-xl">UMRAHLY</a>
+
+      <!-- Menu -->
+      <div class="flex items-center gap-4 text-sm font-medium text-zinc-700 rounded-lg bg-amber-200 px-3 py-1">
+        <button id="lang-toggle" class="text-zinc-900 hover:underline focus:outline-none">
+          EN/MY
+        </button>
+
+        <%= if @current_user do %>
+          <div class="flex items-center gap-3">
+            <!-- Profile Photo -->
+            <div class="relative">
+              <%= if @has_profile do %>
+                <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                  <%= String.first(@current_user.email) |> String.upcase() %>
+                </div>
+              <% else %>
+                <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                  <%= String.first(@current_user.email) |> String.upcase() %>
+                </div>
+              <% end %>
+            </div>
+            
+            <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+            <%= if @has_profile do %>
+              <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
+            <% else %>
+              <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
+            <% end %>
+            <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
+          </div>
+        <% else %>
+          <.link href={~p"/users/register"} class="hover:text-zinc-900">Register</.link>
+          <.link href={~p"/users/log_in"} class="hover:text-zinc-900">Login</.link>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</nav>
 
 <!-- Profile Completion Modal -->
 <%= if @current_user && !@has_profile do %>
@@ -67,8 +110,18 @@
   </div>
 <% end %>
 
-<!-- Profile modal functionality -->
+<!-- Language Toggle Script -->
 <script>
+  const langToggle = document.getElementById('lang-toggle');
+  let currentLang = 'EN';
+
+  langToggle.addEventListener('click', () => {
+    currentLang = currentLang === 'EN' ? 'MY' : 'EN';
+    langToggle.textContent = currentLang + '/' + (currentLang === 'EN' ? 'MY' : 'EN');
+    console.log('Language changed to', currentLang);
+    // Add your language switching logic here
+  });
+
   // Profile modal functionality
   const showProfileModal = document.getElementById('show-profile-modal');
   const profileModal = document.getElementById('profile-modal');

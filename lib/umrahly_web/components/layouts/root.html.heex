@@ -8,28 +8,10 @@
       {assigns[:page_title]}
     </.live_title>
     <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
-    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
+    </script>
   </head>
   <body class="bg-white">
     {@inner_content}
-    
-    <!-- Global Scripts -->
-    <script>
-      // Language toggle functionality
-      document.addEventListener('DOMContentLoaded', function() {
-        const langToggle = document.getElementById('lang-toggle');
-        if (langToggle) {
-          let currentLang = 'EN';
-          
-          langToggle.addEventListener('click', () => {
-            currentLang = currentLang === 'EN' ? 'MY' : 'EN';
-            langToggle.textContent = currentLang + '/' + (currentLang === 'EN' ? 'MY' : 'EN');
-            console.log('Language changed to', currentLang);
-            // Add your language switching logic here
-          });
-        }
-      });
-    </script>
   </body>
 </html>

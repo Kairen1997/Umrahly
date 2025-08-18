@@ -15,7 +15,11 @@ defmodule UmrahlyWeb.PageController do
       false
     end
 
-    render(conn, :home, layout: false, has_profile: has_profile, current_user: current_user)
+    render(conn, :home,
+      layout: false,
+      has_profile: has_profile,
+      current_user: current_user
+    )
   end
 
   def dashboard(conn, _params) do

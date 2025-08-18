@@ -68,6 +68,18 @@ defmodule UmrahlyWeb.Router do
     live "/complete-profile", CompleteProfileLive, :new
   end
 
+  # Admin routes
+  scope "/admin", UmrahlyWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    get "/dashboard", AdminController, :dashboard
+    live "/bookings", AdminBookingsLive, :index
+    live "/packages", AdminPackagesLive, :index
+    live "/payments", AdminPaymentsLive, :index
+    live "/flights", AdminFlightsLive, :index
+    live "/activity-log", AdminActivityLogLive, :index
+  end
+
   scope "/", UmrahlyWeb do
     pipe_through [:browser]
 

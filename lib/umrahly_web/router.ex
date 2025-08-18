@@ -70,7 +70,7 @@ defmodule UmrahlyWeb.Router do
 
   # Admin routes
   scope "/admin", UmrahlyWeb do
-    pipe_through [:browser, :require_authenticated_user]
+    pipe_through [:browser, :require_authenticated_user, :require_admin_user]
 
     get "/dashboard", AdminController, :dashboard
     live "/bookings", AdminBookingsLive, :index

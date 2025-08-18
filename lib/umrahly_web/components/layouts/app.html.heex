@@ -20,12 +20,22 @@
               <p class="mt-1 text-sm font-medium text-zinc-900 truncate"><%= @current_user.email %></p>
             </div>
             <div class="py-1">
+              <%= if @current_user && Umrahly.Accounts.is_admin?(@current_user) do %>
+                <.link navigate={~p"/admin/dashboard"} class="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
+                  <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.0 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    Admin Dashboard
+                  </div>
+                </.link>
+              <% end %>
               <.link navigate={~p"/profile"} class="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Profile</.link>
               <.link navigate={~p"/users/settings"} class="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Settings</.link>
               <form action={~p"/users/log_out"} method="post" class="mt-1">
                 <input type="hidden" name="_csrf_token" value={get_csrf_token()}>
                 <input type="hidden" name="_method" value="delete">
-                <button type="submit" class="w-full text-left block px-4 py-2 text-sm text-rose-700 hover:bg-rose-50">Log out</button>
+                <button type="submit" class="w-full text-left block px-4 py-2 text-sm text-rose-700 hover:bg-zinc-50">Log out</button>
               </form>
             </div>
           </div>

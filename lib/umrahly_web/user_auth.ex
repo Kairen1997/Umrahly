@@ -29,15 +29,26 @@ defmodule UmrahlyWeb.UserAuth do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
 
-    # Check if user needs to complete profile
+    # Check if user needs to complete profile or is admin
     redirect_path = if user_return_to do
       user_return_to
     else
-      case Umrahly.Profiles.get_profile_by_user_id(user.id) do
-        nil -> ~p"/complete-profile"
-        _profile -> ~p"/dashboard"
+      cond do
+        Umrahly.Accounts.is_admin?(user) ->
+          IO.inspect(user, label: "Admin user logging in")
+          IO.inspect(user.is_admin, label: "Admin flag value")
+          IO.inspect("Redirecting to admin dashboard", label: "Redirect path")
+          ~p"/admin/dashboard"
+        Umrahly.Profiles.get_profile_by_user_id(user.id) == nil ->
+          IO.inspect("User has no profile, redirecting to complete-profile", label: "Redirect path")
+          ~p"/complete-profile"
+        true ->
+          IO.inspect("User has profile, redirecting to dashboard", label: "Redirect path")
+          ~p"/dashboard"
       end
     end
+
+    IO.inspect(redirect_path, label: "Final redirect path")
 
     conn
     |> renew_session()
@@ -211,15 +222,28 @@ defmodule UmrahlyWeb.UserAuth do
   If you want to enforce the user email is confirmed before
   they use the application at all, here would be a good place.
   """
-  def require_authenticated_user(conn, _opts) do
+    def require_authenticated_user(conn, _opts) do
     if conn.assigns[:current_user] do
       conn
     else
       conn
-      |> put_flash(:error, "You must log in to access this page.")
-      |> maybe_store_return_to()
-      |> redirect(to: ~p"/users/log_in")
-      |> halt()
+        |> put_flash(:error, "You must log in to access this page.")
+        |> maybe_store_return_to()
+        |> redirect(to: ~p"/users/log_in")
+        |> halt()
+    end
+  end
+
+  def require_admin_user(conn, _opts) do
+    current_user = conn.assigns[:current_user]
+
+    if current_user && Umrahly.Accounts.is_admin?(current_user) do
+      conn
+    else
+      conn
+        |> Phoenix.Controller.put_flash(:error, "You must be an admin to access this page.")
+        |> Phoenix.Controller.redirect(to: ~p"/dashboard")
+        |> halt()
     end
   end
 
@@ -238,10 +262,11 @@ defmodule UmrahlyWeb.UserAuth do
   defp signed_in_path(conn) do
     user = conn.assigns[:current_user]
     if user do
-      # Check if user has a profile
-      case Umrahly.Profiles.get_profile_by_user_id(user.id) do
-        nil -> ~p"/complete-profile"
-        _profile -> ~p"/dashboard"
+      # Check if user is admin or has a profile
+      cond do
+        Umrahly.Accounts.is_admin?(user) -> ~p"/admin/dashboard"
+        Umrahly.Profiles.get_profile_by_user_id(user.id) == nil -> ~p"/complete-profile"
+        true -> ~p"/dashboard"
       end
     else
       ~p"/dashboard"

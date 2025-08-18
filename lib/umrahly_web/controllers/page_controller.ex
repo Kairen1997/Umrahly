@@ -4,8 +4,6 @@ defmodule UmrahlyWeb.PageController do
   alias Umrahly.Profiles
 
   def home(conn, _params) do
-    # The home page is often custom made,
-    # so skip the default app layout.
     current_user = conn.assigns[:current_user]
 
     has_profile = if current_user do
@@ -16,7 +14,6 @@ defmodule UmrahlyWeb.PageController do
     end
 
     render(conn, :home,
-      layout: false,
       has_profile: has_profile,
       current_user: current_user
     )

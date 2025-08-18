@@ -7,6 +7,7 @@ defmodule UmrahlyWeb.AdminLayout do
       |> assign_new(:has_profile, fn -> false end)
       |> assign_new(:current_user, fn -> nil end)
       |> assign_new(:profile, fn -> nil end)
+      |> assign_new(:is_admin, fn -> false end)
 
     ~H"""
     <div class="flex min-h-screen bg-gray-100">
@@ -17,7 +18,7 @@ defmodule UmrahlyWeb.AdminLayout do
           <nav class="mt-0">
             <div class="px-4 space-y-2">
               <!-- Dashboard -->
-              <a href="/" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200 bg-gray-700 text-white">
+              <a href="/admin/dashboard" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200 bg-gray-700 text-white">
                 <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
                 </svg>
@@ -93,8 +94,15 @@ defmodule UmrahlyWeb.AdminLayout do
 
               <!-- Right side icons -->
               <div class="flex items-center space-x-4">
+                <!-- Admin Role Badge -->
+                <%= if @current_user do %>
+                  <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    Admin
+                  </div>
+                <% end %>
+
                 <!-- Profile Completion Button (if needed) -->
-                <%= if @current_user && !@has_profile do %>
+                <%= if @current_user && !@has_profile && !@is_admin do %>
                   <button id="show-profile-modal" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm">
                     Complete Profile
                   </button>
@@ -120,8 +128,15 @@ defmodule UmrahlyWeb.AdminLayout do
 
                     <!-- Dropdown Menu -->
                     <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                      <div class="px-4 py-2 border-b border-gray-100">
+                        <p class="text-sm font-medium text-gray-900"><%= @current_user.full_name %></p>
+                        <p class="text-xs text-gray-500"><%= @current_user.email %></p>
+                        <%= if @is_admin do %>
+                          <span class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded-full mt-1">Admin</span>
+                        <% end %>
+                      </div>
                       <a href="/admin/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
-                      <a href="/admin/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Setting</a>
+                      <a href="/admin/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
                       <a href="/users/log_out" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Log Out</a>
                     </div>
                   </div>

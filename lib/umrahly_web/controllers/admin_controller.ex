@@ -48,6 +48,8 @@ defmodule UmrahlyWeb.AdminController do
     |> assign(:current_user, current_user)
     |> assign(:has_profile, has_profile)
     |> assign(:profile, profile)
+    |> assign(:is_admin, true)
+    |> assign(:current_page, "dashboard")
     |> render(:dashboard)
   end
 end

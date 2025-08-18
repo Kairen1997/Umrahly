@@ -9,6 +9,7 @@ defmodule Umrahly.Accounts.User do
     field :hashed_password, :string, redact: true
     field :current_password, :string, virtual: true, redact: true
     field :confirmed_at, :utc_datetime
+    field :is_admin, :boolean, default: false
 
     has_one :profile, Umrahly.Profiles.Profile
 
@@ -40,10 +41,11 @@ defmodule Umrahly.Accounts.User do
   """
   def registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:full_name, :email, :password])
+    |> cast(attrs, [:full_name, :email, :password, :is_admin])
     |> validate_full_name(opts)
     |> validate_email(opts)
     |> validate_password(opts)
+    |> validate_admin_role()
   end
 
   defp validate_full_name(changeset, _opts) do
@@ -69,6 +71,15 @@ defmodule Umrahly.Accounts.User do
     # |> validate_format(:password, ~r/[A-Z]/, message: "at least one upper case character")
     # |> validate_format(:password, ~r/[!?@#$%^&*_0-9]/, message: "at least one digit or punctuation character")
     |> maybe_hash_password(opts)
+  end
+
+  defp validate_admin_role(changeset) do
+    # Only set default if is_admin is not already set
+    if get_change(changeset, :is_admin) == nil do
+      changeset |> put_change(:is_admin, false)
+    else
+      changeset
+    end
   end
 
   defp maybe_hash_password(changeset, opts) do

@@ -65,10 +65,15 @@ defmodule UmrahlyWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     get "/dashboard", PageController, :dashboard
-    live "/profile", UserProfileLive, :edit
+    live "/complete-profile", CompleteProfileLive, :new
+  end
+
+  scope "/", UmrahlyWeb do
+    pipe_through [:browser]
 
     live_session :require_authenticated_user,
       on_mount: [{UmrahlyWeb.UserAuth, :ensure_authenticated}] do
+      live "/profile", UserProfileLive, :edit
       live "/users/settings", UserSettingsLive, :edit
       live "/users/settings/confirm_email/:token", UserSettingsLive, :confirm_email
     end

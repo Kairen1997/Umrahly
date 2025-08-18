@@ -6,7 +6,7 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
-    user = socket.assigns.current_user
+   user = socket.assigns.current_user
     profile = Profiles.get_profile_by_user_id(user.id)
 
     socket = assign(socket,
@@ -40,8 +40,10 @@ defmodule UmrahlyWeb.UserProfileLive do
     user_attrs = %{
       "full_name" => profile_params["full_name"]
     }
-    profile_attrs = Map.drop(profile_params, ["full_name"])
-    profile_attrs = Map.put(profile_attrs, :user_id, user.id)
+    profile_attrs =
+      profile_params
+      |> Map.drop(["full_name"])
+      |> Map.put(:user_id, user.id)
     with {:ok, updated_user} <- Accounts.update_user(user, user_attrs),
          {:ok, updated_profile} <- Profiles.upsert_profile(profile, profile_attrs) do
 
@@ -186,14 +188,24 @@ defmodule UmrahlyWeb.UserProfileLive do
           filename = "#{user.id}_#{System.system_time()}#{extension}"
           dest_path = Path.join(uploads_dir, filename)
 
-          File.cp!(entry.path, dest_path)
-          {:ok, "/uploads/#{filename}"}
+          case File.cp(entry.path, dest_path) do
+            :ok ->
+              {:ok, "/uploads/#{filename}"}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end)
 
       case uploaded_files do
         [photo_path | _] ->
           case Profiles.update_profile(profile, %{profile_photo: photo_path}) do
             {:ok, updated_profile} ->
+              updated_profile =
+                Map.update!(updated_profile, :profile_photo, fn path ->
+                  path <> "?v=#{DateTime.to_unix(DateTime.utc_now())}"
+                end)
+
               {:noreply,
                socket
                |> assign(profile: updated_profile)
@@ -209,6 +221,7 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
+
   def handle_event("remove-photo", _params, socket) do
     profile = socket.assigns.profile
 
@@ -220,9 +233,7 @@ defmodule UmrahlyWeb.UserProfileLive do
          |> put_flash(:info, "Profile photo removed successfully")}
 
       {:error, _changeset} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Failed to remove profile photo")}
+        {:noreply, socket |> put_flash(:error, "Failed to remove profile photo")}
     end
   end
 
@@ -238,10 +249,8 @@ defmodule UmrahlyWeb.UserProfileLive do
       _ ->
         socket
     end
-
     {:noreply, socket}
   end
-
   def handle_event("validate-photo", _params, socket) do
 
     {:noreply, socket}
@@ -255,8 +264,6 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   # Private functions
   defp continue_profile_update(socket, profile, profile_attrs) do
-
-
     # Update profile
     case Profiles.upsert_profile(profile, profile_attrs) do
       {:ok, updated_profile} ->
@@ -267,7 +274,6 @@ defmodule UmrahlyWeb.UserProfileLive do
         else
           "Identity and contact information updated successfully!"
         end
-
 
         {:noreply,
          socket
@@ -293,41 +299,7 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
-  @spec handle_upload(Phoenix.LiveView.UploadConfig.t(), map(), map()) :: {:ok, map()} | {:error, String.t()}
-  def handle_upload(uploads, user, profile) do
-    case uploads.entries do
-      [entry] ->
-        # Create uploads directory if it doesn't exist
-        uploads_dir = Path.join(:code.priv_dir(:umrahly), "static/uploads")
-        File.mkdir_p!(uploads_dir)
 
-        # Generate unique filename
-        extension = Path.extname(entry.client_name)
-        filename = "#{user.id}_#{System.system_time()}#{extension}"
-        filepath = Path.join(uploads_dir, filename)
-
-        # Copy uploaded file to uploads directory
-        case File.cp(entry.path, filepath) do
-          :ok ->
-            # Update profile with new photo path
-            photo_path = "/uploads/#{filename}"
-            case Profiles.update_profile(profile, %{profile_photo: photo_path}) do
-              {:ok, updated_profile} ->
-                {:ok, updated_profile}
-              {:error, changeset} ->
-                {:error, "Failed to update profile: #{inspect(changeset.errors)}"}
-            end
-
-          {:error, reason} ->
-            {:error, "Failed to save file: #{reason}"}
-        end
-
-      [] ->
-        {:error, "No file selected"}
-      _ ->
-        {:error, "Please select only one file"}
-    end
-  end
 
   def render(assigns) do
     ~H"""
@@ -490,7 +462,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                       </div>
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                        <input type="password" name="user[password_confirmation]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Confirm Password" required />
+                        <input type="password" name="user[password_confirmation]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus-border-transparent" placeholder="Confirm Password" required />
                       </div>
                     </div>
                     <div class="pt-4">
@@ -551,8 +523,6 @@ defmodule UmrahlyWeb.UserProfileLive do
                         <span class="phx-submit-loading:hidden">Save Identity & Contact Info</span>
                         <span class="hidden phx-submit-loading:inline">Saving...</span>
                       </button>
-
-
                     </div>
                   </form>
                 </div>
@@ -587,23 +557,27 @@ defmodule UmrahlyWeb.UserProfileLive do
                     </div>
 
                     <!-- Upload Form -->
-                    <form id="upload-photo-form" phx-submit="upload-photo" phx-upload class="space-y-4">
+                    <form id="upload-photo-form" phx-submit="upload-photo" class="space-y-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Select Photo</label>
                         <div class="space-y-2">
-                          <div class="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                          <!-- Drag & Drop Zone -->
+                          <div
+                            class="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg"
+                            phx-drop-target={@uploads.profile_photo.ref}
+                          >
                             <div class="space-y-1 text-center">
                               <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                                 <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                               </svg>
                               <div class="flex text-sm text-gray-600">
-                                <label for={@uploads.profile_photo.ref} class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
+                                <label class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
                                   <span>Upload a file</span>
-                                  <input id={@uploads.profile_photo.ref} type="file" class="sr-only" accept=".jpg,.jpeg,.png,.gif" phx-upload phx-hook="FileUploadHook" />
+                                  <.live_file_input upload={@uploads.profile_photo} class="sr-only" accept=".jpg,.jpeg,.png" />
                                 </label>
                                 <p class="pl-1">or drag and drop</p>
                               </div>
-                              <p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                              <p class="text-xs text-gray-500">PNG or JPG up to 5MB</p>
                             </div>
                           </div>
 
@@ -637,6 +611,10 @@ defmodule UmrahlyWeb.UserProfileLive do
                                 </svg>
                               </button>
                             </div>
+                          <% end %>
+
+                          <%= for err <- upload_errors(@uploads.profile_photo) do %>
+                            <p class="text-red-600 text-sm"><%= Phoenix.Naming.humanize(err) %></p>
                           <% end %>
                         </div>
                       </div>

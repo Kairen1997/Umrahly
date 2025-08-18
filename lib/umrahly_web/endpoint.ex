@@ -27,10 +27,9 @@ defmodule UmrahlyWeb.Endpoint do
 
   # Serve uploaded files
   plug Plug.Static,
-    at: "/uploads",
-    from: Path.join(:code.priv_dir(:umrahly), "static/uploads"),
-    gzip: false,
-    only: ~w(css fonts images js favicon.ico robots.txt uploads)
+  at: "/uploads",
+  from: Path.expand("./priv/static/uploads"),
+  gzip: false
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

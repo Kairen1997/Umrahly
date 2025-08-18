@@ -9,7 +9,7 @@ defmodule Umrahly.Profiles.Profile do
     field :monthly_income, :integer
     field :birthdate, :date
     field :gender, :string
-    field :profile_photo, :binary
+    field :profile_photo, :string
 
     belongs_to :user, Umrahly.Accounts.User
     timestamps(type: :utc_datetime)
@@ -22,6 +22,7 @@ defmodule Umrahly.Profiles.Profile do
     |> validate_required([:user_id])
     |> validate_monthly_income()
     |> validate_gender()
+    |> validate_length(:profile_photo, max: 255)
     |> foreign_key_constraint(:user_id)
   end
 
@@ -40,4 +41,6 @@ defmodule Umrahly.Profiles.Profile do
       _ -> add_error(changeset, :gender, "must be either male or female")
     end
   end
+
+
 end

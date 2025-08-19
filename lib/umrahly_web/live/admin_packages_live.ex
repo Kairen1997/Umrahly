@@ -13,6 +13,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:current_page, "packages")
       |> assign(:viewing_package_id, nil)
       |> assign(:show_add_form, false)
+      |> assign(:show_edit_form, false)
+      |> assign(:editing_package_id, nil)
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
 
     {:ok, socket}
@@ -42,6 +44,10 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     socket =
       socket
       |> assign(:show_add_form, true)
+      |> assign(:show_edit_form, false)
+      |> assign(:viewing_package_id, nil)
+      |> assign(:current_package, nil)
+      |> assign(:editing_package_id, nil)
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
 
     {:noreply, socket}
@@ -56,26 +62,81 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
+  def handle_event("edit_package", %{"id" => package_id}, socket) do
+    package = Packages.get_package!(package_id)
+    changeset = Packages.change_package(package)
+
+    socket =
+      socket
+      |> assign(:show_edit_form, true)
+      |> assign(:show_add_form, false)
+      |> assign(:viewing_package_id, nil)
+      |> assign(:current_package, nil)
+      |> assign(:editing_package_id, package_id)
+      |> assign(:package_changeset, changeset)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("close_edit_form", _params, socket) do
+    socket =
+      socket
+      |> assign(:show_edit_form, false)
+      |> assign(:editing_package_id, nil)
+      |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+
+    {:noreply, socket}
+  end
+
   def handle_event("save_package", %{"package" => package_params}, socket) do
-    case Packages.create_package(package_params) do
-      {:ok, _package} ->
-        packages = Packages.list_packages()
+    case socket.assigns.editing_package_id do
+      nil ->
+        # Creating new package
+        case Packages.create_package(package_params) do
+          {:ok, _package} ->
+            packages = Packages.list_packages()
 
-        socket =
-          socket
-          |> assign(:packages, packages)
-          |> assign(:show_add_form, false)
-          |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
-          |> put_flash(:info, "Package created successfully!")
+            socket =
+              socket
+              |> assign(:packages, packages)
+              |> assign(:show_add_form, false)
+              |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+              |> put_flash(:info, "Package created successfully!")
 
-        {:noreply, socket}
+            {:noreply, socket}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        socket =
-          socket
-          |> assign(:package_changeset, changeset)
+          {:error, %Ecto.Changeset{} = changeset} ->
+            socket =
+              socket
+              |> assign(:package_changeset, changeset)
 
-        {:noreply, socket}
+            {:noreply, socket}
+        end
+
+      package_id ->
+        # Updating existing package
+        package = Packages.get_package!(package_id)
+        case Packages.update_package(package, package_params) do
+          {:ok, _updated_package} ->
+            packages = Packages.list_packages()
+
+            socket =
+              socket
+              |> assign(:packages, packages)
+              |> assign(:show_edit_form, false)
+              |> assign(:editing_package_id, nil)
+              |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+              |> put_flash(:info, "Package updated successfully!")
+
+            {:noreply, socket}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            socket =
+              socket
+              |> assign(:package_changeset, changeset)
+
+            {:noreply, socket}
+        end
     end
   end
 
@@ -130,7 +191,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <input
                       type="text"
                       name="package[name]"
-                      value={@package_changeset.changes[:name] || ""}
+                      value={@package_changeset.changes[:name] || @package_changeset.data.name || ""}
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder="Enter package name"
                       required
@@ -147,8 +208,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       required
                     >
-                      <option value="inactive" selected={@package_changeset.changes[:status] == "inactive"}>Inactive</option>
-                      <option value="active" selected={@package_changeset.changes[:status] == "active"}>Active</option>
+                      <option value="inactive" selected={@package_changeset.changes[:status] == "inactive" || @package_changeset.data.status == "inactive"}>Inactive</option>
+                      <option value="active" selected={@package_changeset.changes[:status] == "active" || @package_changeset.data.status == "active"}>Active</option>
                     </select>
                   </div>
 
@@ -157,7 +218,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <input
                       type="number"
                       name="package[price]"
-                      value={@package_changeset.changes[:price] || ""}
+                      value={@package_changeset.changes[:price] || @package_changeset.data.price || ""}
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder="Enter price"
                       min="1"
@@ -173,7 +234,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <input
                       type="number"
                       name="package[duration_days]"
-                      value={@package_changeset.changes[:duration_days] || ""}
+                      value={@package_changeset.changes[:duration_days] || @package_changeset.data.duration_days || ""}
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder="Enter duration in days"
                       min="1"
@@ -190,7 +251,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <input
                       type="number"
                       name="package[duration_nights]"
-                      value={@package_changeset.changes[:duration_nights] || ""}
+                      value={@package_changeset.changes[:duration_nights] || @package_changeset.data.duration_nights || ""}
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder="Enter duration in nights"
                       min="1"
@@ -207,7 +268,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <input
                       type="number"
                       name="package[quota]"
-                      value={@package_changeset.changes[:quota] || ""}
+                      value={@package_changeset.changes[:quota] || @package_changeset.data.quota || ""}
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder="Enter quota"
                       min="1"
@@ -224,7 +285,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <input
                       type="date"
                       name="package[departure_date]"
-                      value={@package_changeset.changes[:departure_date] || ""}
+                      value={@package_changeset.changes[:departure_date] || @package_changeset.data.departure_date || ""}
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       required
                     />
@@ -247,6 +308,152 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     class="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors"
                   >
                     Create Package
+                  </button>
+                </div>
+              </form>
+            </div>
+          <% end %>
+
+          <%= if @show_edit_form do %>
+            <!-- Edit Package Form -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Edit Package</h2>
+                <button
+                  phx-click="close_edit_form"
+                  class="text-gray-500 hover:text-gray-700"
+                >
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <form phx-submit="save_package" class="space-y-4">
+                <input type="hidden" name="package[id]" value={@editing_package_id} />
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
+                    <input
+                      type="text"
+                      name="package[name]"
+                      value={@package_changeset.changes[:name] || @package_changeset.data.name || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter package name"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:name] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:name], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      name="package[status]"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="inactive" selected={@package_changeset.changes[:status] == "inactive" || @package_changeset.data.status == "inactive"}>Inactive</option>
+                      <option value="active" selected={@package_changeset.changes[:status] == "active" || @package_changeset.data.status == "active"}>Active</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Price (RM)</label>
+                    <input
+                      type="number"
+                      name="package[price]"
+                      value={@package_changeset.changes[:price] || @package_changeset.data.price || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter price"
+                      min="1"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:price] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:price], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Duration (Days)</label>
+                    <input
+                      type="number"
+                      name="package[duration_days]"
+                      value={@package_changeset.changes[:duration_days] || @package_changeset.data.duration_days || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter duration in days"
+                      min="1"
+                      max="30"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:duration_days] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:duration_days], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Duration (Nights)</label>
+                    <input
+                      type="number"
+                      name="package[duration_nights]"
+                      value={@package_changeset.changes[:duration_nights] || @package_changeset.data.duration_nights || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter duration in nights"
+                      min="1"
+                      max="30"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:duration_nights] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:duration_nights], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quota</label>
+                    <input
+                      type="number"
+                      name="package[quota]"
+                      value={@package_changeset.changes[:quota] || @package_changeset.data.quota || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter quota"
+                      min="1"
+                      max="100"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:quota] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:quota], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
+                    <input
+                      type="date"
+                      name="package[departure_date]"
+                      value={@package_changeset.changes[:departure_date] || @package_changeset.data.departure_date || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:departure_date] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:departure_date], 0) %></p>
+                    <% end %>
+                  </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    phx-click="close_edit_form"
+                    class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors"
+                  >
+                    Save Package
                   </button>
                 </div>
               </form>
@@ -308,7 +515,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 </div>
 
                 <div class="flex flex-col space-y-3">
-                  <button class="w-full bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+                  <button
+                    phx-click="edit_package"
+                    phx-value-id={@current_package.id}
+                    class="w-full bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+                  >
                     Edit Package
                   </button>
                   <button
@@ -364,13 +575,22 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     </div>
                   </div>
 
-                  <button
-                    phx-click="view_package"
-                    phx-value-id={package.id}
-                    class="w-full bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
-                  >
-                    View Package
-                  </button>
+                  <div class="flex space-x-2">
+                    <button
+                      phx-click="view_package"
+                      phx-value-id={package.id}
+                      class="flex-1 bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
+                    >
+                      View
+                    </button>
+                    <!--<button
+                      phx-click="edit_package"
+                      phx-value-id={package.id}
+                      class="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
+                    >
+                      Edit
+                    </button>-->
+                  </div>
                 </div>
               </div>
             <% end %>

@@ -11,7 +11,14 @@ defmodule Umrahly.Accounts.User do
     field :confirmed_at, :utc_datetime
     field :is_admin, :boolean, default: false
 
-    has_one :profile, Umrahly.Profiles.Profile
+    # Profile fields merged from profiles table
+    field :address, :string
+    field :identity_card_number, :string
+    field :phone_number, :string
+    field :monthly_income, :integer
+    field :birthdate, :date
+    field :gender, :string
+    field :profile_photo, :string
 
     timestamps(type: :utc_datetime)
   end
@@ -104,6 +111,51 @@ defmodule Umrahly.Accounts.User do
       |> unique_constraint(:email)
     else
       changeset
+    end
+  end
+
+  @doc """
+  A user changeset for updating profile information.
+  """
+  def profile_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> validate_identity_card_number()
+    |> validate_phone_number()
+    |> validate_monthly_income()
+    |> validate_gender()
+    |> validate_length(:profile_photo, max: 255)
+  end
+
+  defp validate_identity_card_number(changeset) do
+    case get_field(changeset, :identity_card_number) do
+      nil -> changeset
+      ic_number when is_binary(ic_number) and byte_size(ic_number) > 0 -> changeset
+      _ -> add_error(changeset, :identity_card_number, "must be a valid identity card number")
+    end
+  end
+
+  defp validate_phone_number(changeset) do
+    case get_field(changeset, :phone_number) do
+      nil -> changeset
+      phone when is_binary(phone) and byte_size(phone) > 0 -> changeset
+      _ -> add_error(changeset, :phone_number, "must be a valid phone number")
+    end
+  end
+
+  defp validate_monthly_income(changeset) do
+    case get_field(changeset, :monthly_income) do
+      nil -> changeset
+      income when is_integer(income) and income > 0 -> changeset
+      _ -> add_error(changeset, :monthly_income, "must be a positive integer")
+    end
+  end
+
+  defp validate_gender(changeset) do
+    case get_field(changeset, :gender) do
+      nil -> changeset
+      gender when gender in ["male", "female"] -> changeset
+      _ -> add_error(changeset, :gender, "must be either male or female")
     end
   end
 

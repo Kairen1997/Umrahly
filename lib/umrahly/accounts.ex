@@ -409,4 +409,35 @@ defmodule Umrahly.Accounts do
       {:error, :user, changeset, _} -> {:error, changeset}
     end
   end
+
+  @doc """
+  Updates the user profile information.
+
+  ## Examples
+
+      iex> update_user_profile(user, %{address: "123 Main St", phone_number: "123-456-7890"})
+      {:ok, %User{}}
+
+      iex> update_user_profile(user, %{address: ""})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def update_user_profile(%User{} = user, attrs) do
+    user
+    |> User.profile_changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Returns a changeset for updating user profile information.
+
+  ## Examples
+
+      iex> change_user_profile(user)
+      %Ecto.Changeset{}
+
+  """
+  def change_user_profile(%User{} = user) do
+    User.profile_changeset(user, %{})
+  end
 end

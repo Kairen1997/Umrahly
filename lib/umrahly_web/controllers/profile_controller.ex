@@ -1,14 +1,14 @@
 defmodule UmrahlyWeb.ProfileController do
   use UmrahlyWeb, :controller
 
-  alias Umrahly.Profiles
+  alias Umrahly.Accounts
 
   def create(conn, %{"identity_card_number" => _identity_card_number} = profile_params) do
     current_user = conn.assigns.current_user
-    profile_params = Map.put(profile_params, "user_id", current_user.id)
 
-    case Profiles.create_profile(profile_params) do
-      {:ok, _profile} ->
+    # Update the user with profile information
+    case Accounts.update_user_profile(current_user, profile_params) do
+      {:ok, _user} ->
         conn
         |> put_status(:created)
         |> json(%{message: "Profile created successfully"})

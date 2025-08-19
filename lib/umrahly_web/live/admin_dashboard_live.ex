@@ -2,15 +2,15 @@ defmodule UmrahlyWeb.AdminDashboardLive do
   use UmrahlyWeb, :live_view
 
   import UmrahlyWeb.AdminLayout
-  alias Umrahly.Profiles
   alias Umrahly.Packages
 
   def mount(_params, _session, socket) do
     current_user = socket.assigns.current_user
 
     {has_profile, profile} = if current_user do
-      profile = Profiles.get_profile_by_user_id(current_user.id)
-      {profile != nil, profile}
+      # Check if user has profile information directly
+      has_profile = current_user.address != nil or current_user.phone_number != nil or current_user.identity_card_number != nil
+      {has_profile, current_user}
     else
       {false, nil}
     end

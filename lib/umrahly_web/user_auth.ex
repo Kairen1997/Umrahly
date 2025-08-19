@@ -34,7 +34,11 @@ defmodule UmrahlyWeb.UserAuth do
       if Umrahly.Accounts.is_admin?(user) do
         ~p"/admin/dashboard"
       else
-        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
+        # Check if user has profile information
+        has_profile = user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
+                      user.monthly_income != nil or user.birthdate != nil or user.gender != nil
+
+        if not has_profile do
           ~p"/complete-profile"
         else
           ~p"/dashboard"
@@ -109,8 +113,9 @@ defmodule UmrahlyWeb.UserAuth do
 
     # Set has_profile assign for the root layout
     has_profile = if user do
-      profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
-      profile != nil
+      # Check if user has profile information
+      user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
+      user.monthly_income != nil or user.birthdate != nil or user.gender != nil
     else
       false
     end
@@ -208,8 +213,9 @@ defmodule UmrahlyWeb.UserAuth do
     # Set has_profile assign for LiveViews
     Phoenix.Component.assign_new(socket, :has_profile, fn ->
       if user = socket.assigns.current_user do
-        profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
-        profile != nil
+        # Check if user has profile information
+        user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
+        user.monthly_income != nil or user.birthdate != nil or user.gender != nil
       else
         false
       end
@@ -292,7 +298,11 @@ defmodule UmrahlyWeb.UserAuth do
       if Umrahly.Accounts.is_admin?(user) do
         ~p"/admin/dashboard"
       else
-        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
+        # Check if user has profile information
+        has_profile = user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
+                      user.monthly_income != nil or user.birthdate != nil or user.gender != nil
+
+        if not has_profile do
           ~p"/complete-profile"
         else
           ~p"/dashboard"

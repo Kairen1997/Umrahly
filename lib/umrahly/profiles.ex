@@ -6,135 +6,84 @@ defmodule Umrahly.Profiles do
   import Ecto.Query, warn: false
   alias Umrahly.Repo
 
-  alias Umrahly.Profiles.Profile
+  alias Umrahly.Accounts.User
 
   @doc """
-  Returns the list of profiles.
-
-  ## Examples
-
-      iex> list_profiles()
-      [%Profile{}, ...]
-
+  Returns the list of users with profile information.
   """
-  def list_profiles do
-    Repo.all(Profile)
+  def list_users_with_profiles do
+    Repo.all(User)
   end
 
   @doc """
-  Gets a single profile.
-
-  Raises if the Profile does not exist.
-
-  ## Examples
-
-      iex> get_profile!(123)
-      %Profile{}
-
+  Gets a single user with profile information.
+  Raises if the User does not exist.
   """
-  def get_profile!(id), do: Repo.get!(Profile, id)
+  def get_user_with_profile!(id), do: Repo.get!(User, id)
 
   @doc """
-  Gets a profile by user_id.
-
-  Returns nil if the Profile does not exist.
-
-  ## Examples
-
-      iex> get_profile_by_user_id(123)
-      %Profile{}
-
-      iex> get_profile_by_user_id(999)
-      nil
-
+  Gets a user with profile information by user_id.
+  Returns nil if the User does not exist.
   """
-  def get_profile_by_user_id(user_id) do
-    Repo.get_by(Profile, user_id: user_id)
+  def get_user_with_profile_by_id(user_id) do
+    Repo.get_by(User, id: user_id)
   end
 
   @doc """
-  Creates a profile.
-
-  ## Examples
-
-      iex> create_profile(%{field: value})
-      {:ok, %Profile{}}
-
-      iex> create_profile(%{field: bad_value})
-      {:error, ...}
-
+  Creates a profile for a user.
   """
   def create_profile(attrs \\ %{}) do
-    %Profile{}
-    |> Profile.changeset(attrs)
+    %User{}
+    |> User.profile_update_changeset(attrs)
     |> Repo.insert()
   end
 
-
   @doc """
-  Updates a profile.
-
-  ## Examples
-
-      iex> update_profile(profile, %{field: new_value})
-      {:ok, %Profile{}}
-
-      iex> update_profile(profile, %{field: bad_value})
-      {:error, ...}
-
+  Updates a user's profile information.
   """
-  def update_profile(%Profile{} = profile, attrs) do
-    profile
-    |> Profile.changeset(attrs)
+  def update_profile(%User{} = user, attrs) do
+    user
+    |> User.profile_update_changeset(attrs)
     |> Repo.update()
   end
 
   @doc """
-  Deletes a Profile.
-
-  ## Examples
-
-      iex> delete_profile(profile)
-      {:ok, %Profile{}}
-
-      iex> delete_profile(profile)
-      {:error, ...}
-
+  Deletes a user's profile information (sets fields to nil).
   """
-  def delete_profile(%Profile{} = profile) do
-    Repo.delete(profile)
+  def delete_profile(%User{} = user) do
+    user
+    |> User.profile_update_changeset(%{
+      address: nil,
+      identity_card_number: nil,
+      phone_number: nil,
+      monthly_income: nil,
+      birthdate: nil,
+      gender: nil,
+      profile_photo: nil
+    })
+    |> Repo.update()
   end
 
   @doc """
   Returns a data structure for tracking profile changes.
-
-  ## Examples
-
-      iex> change_profile(profile)
-      %Ecto.Changeset{...}
-
   """
-  def change_profile(%Profile{} = profile, attrs \\ %{}) do
-    Profile.changeset(profile, attrs)
+  def change_profile(%User{} = user, attrs \\ %{}) do
+    User.profile_update_changeset(user, attrs)
   end
 
   @doc """
   Creates or updates a profile (upsert).
-
-  ## Examples
-
-      iex> upsert_profile(profile, %{field: new_value})
-      {:ok, %Profile{}}
-
-      iex> upsert_profile(nil, %{user_id: 123, field: value})
-      {:ok, %Profile{}}
-
   """
-  def upsert_profile(%Profile{} = profile, attrs) do
-    update_profile(profile, attrs)
+  def upsert_profile(%User{} = user, attrs) do
+    update_profile(user, attrs)
   end
 
   def upsert_profile(nil, attrs) do
     create_profile(attrs)
   end
+
+  # Backward compatibility functions
+  def list_profiles, do: list_users_with_profiles()
+  def get_profile!(id), do: get_user_with_profile!(id)
+  def get_profile_by_user_id(user_id), do: get_user_with_profile_by_id(user_id)
 end

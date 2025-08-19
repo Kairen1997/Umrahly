@@ -4,7 +4,6 @@ defmodule UmrahlyWeb.CompleteProfileLive do
   on_mount {UmrahlyWeb.UserAuth, :ensure_authenticated}
 
   alias Umrahly.Profiles
-  alias Umrahly.Profiles.Profile
 
   def mount(_params, _session, socket) do
     current_user = socket.assigns.current_user
@@ -19,7 +18,7 @@ defmodule UmrahlyWeb.CompleteProfileLive do
       true ->
         case Profiles.get_profile_by_user_id(current_user.id) do
           nil ->
-            changeset = Profiles.change_profile(%Profile{user_id: current_user.id})
+            changeset = Profiles.change_profile(current_user)
             {:ok, assign(socket, changeset: changeset, current_user: current_user)}
 
           _profile ->
@@ -33,10 +32,9 @@ defmodule UmrahlyWeb.CompleteProfileLive do
 
   def handle_event("save", %{"profile" => profile_params}, socket) do
     current_user = socket.assigns.current_user
-    profile_params = Map.put(profile_params, "user_id", current_user.id)
 
-    case Profiles.create_profile(profile_params) do
-      {:ok, _profile} ->
+    case Profiles.update_profile(current_user, profile_params) do
+      {:ok, _updated_user} ->
         {:noreply,
          socket
          |> put_flash(:info, "Profile completed successfully!")

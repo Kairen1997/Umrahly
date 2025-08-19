@@ -2,28 +2,30 @@ defmodule Umrahly.ProfilesTest do
   use Umrahly.DataCase
 
   alias Umrahly.Profiles
+  alias Umrahly.Accounts.User
 
   describe "profiles" do
-    alias Umrahly.Profiles.Profile
-
-    import Umrahly.ProfilesFixtures
+    import Umrahly.AccountsFixtures
 
     @invalid_attrs %{}
 
-    test "list_profiles/0 returns all profiles" do
-      profile = profile_fixture()
-      assert Profiles.list_profiles() == [profile]
+    test "list_users_with_profiles/0 returns all users with profiles" do
+      user = user_fixture()
+      assert Profiles.list_users_with_profiles() == [user]
     end
 
-    test "get_profile!/1 returns the profile with given id" do
-      profile = profile_fixture()
-      assert Profiles.get_profile!(profile.id) == profile
+    test "get_user_with_profile!/1 returns the user with given id" do
+      user = user_fixture()
+      assert Profiles.get_user_with_profile!(user.id) == user
     end
 
-    test "create_profile/1 with valid data creates a profile" do
-      valid_attrs = %{}
+    test "create_profile/1 with valid data creates a profile for a user" do
+      user = user_fixture()
+      valid_attrs = %{address: "123 Main St", phone_number: "1234567890"}
 
-      assert {:ok, %Profile{} = profile} = Profiles.create_profile(valid_attrs)
+      assert {:ok, %User{} = updated_user} = Profiles.create_profile(valid_attrs)
+      assert updated_user.address == "123 Main St"
+      assert updated_user.phone_number == "1234567890"
     end
 
     test "create_profile/1 with invalid data returns error changeset" do
@@ -31,27 +33,43 @@ defmodule Umrahly.ProfilesTest do
     end
 
     test "update_profile/2 with valid data updates the profile" do
-      profile = profile_fixture()
-      update_attrs = %{}
+      user = user_fixture()
+      update_attrs = %{address: "456 Oak St"}
 
-      assert {:ok, %Profile{} = profile} = Profiles.update_profile(profile, update_attrs)
+      assert {:ok, %User{} = updated_user} = Profiles.update_profile(user, update_attrs)
+      assert updated_user.address == "456 Oak St"
     end
 
     test "update_profile/2 with invalid data returns error changeset" do
-      profile = profile_fixture()
-      assert {:error, %Ecto.Changeset{}} = Profiles.update_profile(profile, @invalid_attrs)
-      assert profile == Profiles.get_profile!(profile.id)
+      user = user_fixture()
+      assert {:error, %Ecto.Changeset{}} = Profiles.update_profile(user, @invalid_attrs)
+      assert user == Profiles.get_user_with_profile!(user.id)
     end
 
-    test "delete_profile/1 deletes the profile" do
-      profile = profile_fixture()
-      assert {:ok, %Profile{}} = Profiles.delete_profile(profile)
-      assert_raise Ecto.NoResultsError, fn -> Profiles.get_profile!(profile.id) end
+    test "delete_profile/1 deletes the profile information" do
+      user = user_fixture()
+      # First add some profile data
+      {:ok, user_with_profile} = Profiles.update_profile(user, %{address: "123 Main St", phone_number: "1234567890"})
+
+      assert {:ok, %User{} = updated_user} = Profiles.delete_profile(user_with_profile)
+      assert updated_user.address == nil
+      assert updated_user.phone_number == nil
     end
 
     test "change_profile/1 returns a profile changeset" do
-      profile = profile_fixture()
-      assert %Ecto.Changeset{} = Profiles.change_profile(profile)
+      user = user_fixture()
+      assert %Ecto.Changeset{} = Profiles.change_profile(user)
+    end
+
+    # Backward compatibility tests
+    test "list_profiles/0 returns all users with profiles" do
+      user = user_fixture()
+      assert Profiles.list_profiles() == [user]
+    end
+
+    test "get_profile!/1 returns the user with given id" do
+      user = user_fixture()
+      assert Profiles.get_profile!(user.id) == user
     end
   end
 end

@@ -1,8 +1,6 @@
 defmodule UmrahlyWeb.PageController do
   use UmrahlyWeb, :controller
 
-  alias Umrahly.Profiles
-
   def home(conn, _params) do
     current_user = conn.assigns[:current_user]
 
@@ -11,8 +9,9 @@ defmodule UmrahlyWeb.PageController do
       has_profile = if is_admin do
         true  # Admin users are considered to have "complete" profiles
       else
-        profile = Profiles.get_profile_by_user_id(current_user.id)
-        profile != nil
+        # Check if user has profile information
+        current_user.address != nil or current_user.identity_card_number != nil or current_user.phone_number != nil or
+        current_user.monthly_income != nil or current_user.birthdate != nil or current_user.gender != nil
       end
       {has_profile, is_admin}
     else
@@ -34,8 +33,9 @@ defmodule UmrahlyWeb.PageController do
       has_profile = if is_admin do
         true  # Admin users are considered to have "complete" profiles
       else
-        profile = Profiles.get_profile_by_user_id(current_user.id)
-        profile != nil
+        # Check if user has profile information
+        current_user.address != nil or current_user.identity_card_number != nil or current_user.phone_number != nil or
+        current_user.monthly_income != nil or current_user.birthdate != nil or current_user.gender != nil
       end
       {has_profile, is_admin}
     else

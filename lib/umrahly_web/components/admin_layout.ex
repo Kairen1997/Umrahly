@@ -1,0 +1,248 @@
+defmodule UmrahlyWeb.AdminLayout do
+  use UmrahlyWeb, :html
+
+  def admin_layout(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:has_profile, fn -> false end)
+      |> assign_new(:current_user, fn -> nil end)
+      |> assign_new(:profile, fn -> nil end)
+      |> assign_new(:is_admin, fn -> false end)
+
+    ~H"""
+    <div class="flex min-h-screen bg-gray-100 ">
+      <!-- Sidebar -->
+      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
+        <!-- Navigation Menu -->
+        <div>
+          <nav class="mt-0">
+            <div class="px-4 space-y-2">
+              <!-- Dashboard -->
+              <a href="/admin/dashboard" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200 bg-gray-700 text-white">
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                </svg>
+                Dashboard
+              </a>
+
+              <!-- Admin navigation items -->
+              <!-- Manage Bookings -->
+              <a href="/admin/bookings" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Manage Bookings
+              </a>
+
+              <!-- Manage Packages -->
+              <a href="/admin/packages" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Manage Packages
+              </a>
+
+              <!-- Manage Payments -->
+              <a href="/admin/payments" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599 1"/>
+                </svg>
+                Manage Payments
+              </a>
+
+              <!-- Flight Schedule -->
+              <a href="/admin/flights" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+                Flight Schedule
+              </a>
+
+              <!-- Activity Log -->
+              <a href="/admin/activity-log" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Activity Log
+              </a>
+
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header Bar -->
+        <div class="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+          <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+              <!-- Page Title -->
+              <div class="flex items-center">
+                <h1 class="text-2xl font-bold text-gray-900">
+                  <%= case @current_page do %>
+                    <% "dashboard" -> %>Admin Dashboard
+                    <% "bookings" -> %>Manage Bookings
+                    <% "packages" -> %>Manage Packages
+                    <% "payments" -> %>Manage Payments
+                    <% "flights" -> %>Flight Schedule
+                    <% "activity-log" -> %>Activity Log
+                    <% _ -> %>Admin Panel
+                  <% end %>
+                </h1>
+              </div>
+
+              <!-- Right side icons -->
+              <div class="flex items-center space-x-4">
+                <!-- Admin Role Badge -->
+                <%= if @current_user do %>
+                  <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    Admin
+                  </div>
+                <% end %>
+
+                <!-- Profile Completion Button (if needed) -->
+                <%= if @current_user && !@has_profile && !@is_admin do %>
+                  <button id="show-profile-modal" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm">
+                    Complete Profile
+                  </button>
+                <% end %>
+
+                <!-- User Profile Dropdown -->
+                <%= if @current_user do %>
+                  <details class="relative group">
+                    <summary class="flex items-center gap-2 text-gray-600 hover:text-gray-800 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-colors" style="list-style: none;">
+                      <!-- Profile Photo/Avatar -->
+                      <%= if @profile && @profile.profile_photo do %>
+                        <img src={@profile.profile_photo} alt="Profile Photo" class="w-8 h-8 rounded-full object-cover border-2 border-gray-200" />
+                      <% else %>
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-teal-600 to-blue-600 text-white text-sm font-semibold shadow-sm">
+                          <%= @current_user.email |> String.first() |> String.upcase() %>
+                        </span>
+                      <% end %>
+                      <!-- User Info -->
+                      <div class="hidden md:block text-left">
+                        <p class="text-sm font-medium text-gray-900"><%= @current_user.full_name %></p>
+                        <p class="text-xs text-gray-500"><%= @current_user.email %></p>
+                      </div>
+                      <!-- Dropdown Arrow -->
+                      <svg class="h-4 w-4 text-gray-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </summary>
+
+                    <!-- Dropdown Menu -->
+                    <div class="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl py-2 z-50 border border-gray-200">
+                      <!-- User Info Header -->
+                      <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-lg">
+                        <div class="flex items-center gap-3">
+                          <%= if @profile && @profile.profile_photo do %>
+                            <img src={@profile.profile_photo} alt="Profile Photo" class="w-10 h-10 rounded-full object-cover border-2 border-gray-200" />
+                          <% else %>
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-teal-600 to-blue-600 text-white text-base font-semibold shadow-sm">
+                              <%= @current_user.email |> String.first() |> String.upcase() %>
+                            </span>
+                          <% end %>
+                          <div>
+                            <p class="text-sm font-semibold text-gray-900"><%= @current_user.full_name %></p>
+                            <p class="text-xs text-gray-600"><%= @current_user.email %></p>
+                            <%= if @is_admin do %>
+                              <span class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded-full mt-1">Admin</span>
+                            <% end %>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Menu Items -->
+                      <div class="py-1">
+                        <a href="/admin/profile" class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                          </svg>
+                          Profile Settings
+                        </a>
+                        <a href="/admin/settings" class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                          </svg>
+                          Account Settings
+                        </a>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <a href="/users/log_out" class="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                          </svg>
+                          Sign Out
+                        </a>
+                      </div>
+                    </div>
+                  </details>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Page Content -->
+        <main class="flex-1 bg-gray-50 overflow-y-auto">
+          <div class="p-6">
+            <%= render_slot(@inner_block) %>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      // Profile modal functionality
+      const showProfileModal = document.getElementById('show-profile-modal');
+      const profileModal = document.getElementById('profile-modal');
+
+      if (showProfileModal && profileModal) {
+        showProfileModal.addEventListener('click', () => {
+          profileModal.style.display = 'flex';
+          document.body.classList.add('modal-open');
+        });
+      }
+    </script>
+
+    <style>
+      /* Profile dropdown styles */
+      details[open] summary ~ * {
+        animation: slideDown 0.2s ease-out;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Ensure dropdown is above other elements */
+      details .absolute {
+        z-index: 50;
+      }
+
+      /* Smooth transitions */
+      .transition-colors {
+        transition: all 0.2s ease-in-out;
+      }
+
+      /* Hover effects */
+      details summary:hover {
+        background-color: rgba(243, 244, 246, 0.8);
+      }
+
+      /* Dropdown shadow and border */
+      details .shadow-xl {
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      }
+    </style>
+    """
+  end
+end

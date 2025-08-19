@@ -58,6 +58,8 @@ defmodule UmrahlyWeb.UserRegistrationLive do
             class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
           />
 
+
+
           <:actions>
             <.button phx-disable-with="Registering..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
               Register
@@ -87,7 +89,10 @@ defmodule UmrahlyWeb.UserRegistrationLive do
     {:ok, socket, temporary_assigns: [form: nil]}
   end
 
-  def handle_event("save", %{"user" => user_params}, socket) do
+      def handle_event("save", %{"user" => user_params}, socket) do
+    user_params = Map.put(user_params, "is_admin", false)
+
+
     case Accounts.register_user(user_params) do
       {:ok, user} ->
         {:ok, _} =
@@ -96,16 +101,19 @@ defmodule UmrahlyWeb.UserRegistrationLive do
             &url(~p"/users/confirm/#{&1}")
           )
 
-        # Redirect to login with a special parameter to indicate profile completion is needed
+        message = "Registration successful! Please log in to complete your profile."
+
         {:noreply,
          socket
-         |> put_flash(:info, "Registration successful! Please log in to complete your profile.")
+         |> put_flash(:info, message)
          |> push_navigate(to: ~p"/users/log_in?complete_profile=true")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, socket |> assign(check_errors: true) |> assign_form(changeset)}
     end
   end
+
+
 
   def handle_event("validate", %{"user" => user_params}, socket) do
     changeset = Accounts.change_user_registration(%User{}, user_params)

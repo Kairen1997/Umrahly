@@ -1,48 +1,3 @@
-<!-- Navbar -->
-<nav class="w-full sticky top-0 z-50">
-  <div class="px-4 bg-teal-300 sm:px-6 lg:px-10">
-    <div class="flex items-center justify-between py-2">
-      <!-- Logo -->
-      <a href="/" class="font-extrabold tracking-wider text-zinc-900 text-xl">UMRAHLY</a>
-
-      <!-- Menu -->
-      <div class="flex items-center gap-4 text-sm font-medium text-zinc-700 rounded-lg bg-amber-200 px-3 py-1">
-        <button id="lang-toggle" class="text-zinc-900 hover:underline focus:outline-none">
-          EN/MY
-        </button>
-
-        <%= if @current_user do %>
-          <div class="flex items-center gap-3">
-            <!-- Profile Photo -->
-            <div class="relative">
-              <%= if @has_profile do %>
-                <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                  <%= String.first(@current_user.email) |> String.upcase() %>
-                </div>
-              <% else %>
-                <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                  <%= String.first(@current_user.email) |> String.upcase() %>
-                </div>
-              <% end %>
-            </div>
-            
-            <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
-            <%= if @has_profile do %>
-              <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
-            <% else %>
-              <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
-            <% end %>
-            <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
-          </div>
-        <% else %>
-          <.link href={~p"/users/register"} class="hover:text-zinc-900">Register</.link>
-          <.link href={~p"/users/log_in"} class="hover:text-zinc-900">Login</.link>
-        <% end %>
-      </div>
-    </div>
-  </div>
-</nav>
-
 <!-- Profile Completion Modal -->
 <%= if @current_user && !@has_profile do %>
   <div id="profile-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -110,18 +65,8 @@
   </div>
 <% end %>
 
-<!-- Language Toggle Script -->
+<!-- Profile modal functionality script -->
 <script>
-  const langToggle = document.getElementById('lang-toggle');
-  let currentLang = 'EN';
-
-  langToggle.addEventListener('click', () => {
-    currentLang = currentLang === 'EN' ? 'MY' : 'EN';
-    langToggle.textContent = currentLang + '/' + (currentLang === 'EN' ? 'MY' : 'EN');
-    console.log('Language changed to', currentLang);
-    // Add your language switching logic here
-  });
-
   // Profile modal functionality
   const showProfileModal = document.getElementById('show-profile-modal');
   const profileModal = document.getElementById('profile-modal');
@@ -233,7 +178,7 @@
     // Remove red border when user starts typing
     const inputs = profileForm.querySelectorAll('input, textarea, select');
     inputs.forEach(input => {
-      input.addEventListener('input', () => {
+      input.addEventListener('click', () => {
         if (input.value.trim()) {
           input.classList.remove('border-red-500');
         }
@@ -258,7 +203,7 @@
     <div class="relative z-10 flex flex-col items-center justify-center h-full text-center text-white px-6">
       <h1 class="text-4xl md:text-6xl font-bold">Your Journey to Umrah Made Simple</h1>
       <p class="mt-4 text-lg md:text-xl">Book, manage, and track your Umrah journey with ease and transparency.</p>
-      <a href="/register" class="mt-6 bg-teal-500 hover:bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold">
+      <a href="/users/register" class="mt-6 bg-teal-500 hover:bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold">
         Get Started
       </a>
     </div>
@@ -312,7 +257,7 @@
       </div>
 
       <!-- Package 3 -->
-      <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
+      <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
         <img src="/images/family.jpg" alt="Family Umrah Package" class="h-44 w-full object-cover bg-zinc-200">
         <div class="p-5">
           <p class="text-sm text-zinc-700">Family</p>

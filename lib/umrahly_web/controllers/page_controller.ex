@@ -4,21 +4,48 @@ defmodule UmrahlyWeb.PageController do
   alias Umrahly.Profiles
 
   def home(conn, _params) do
-    # The home page is often custom made,
-    # so skip the default app layout.
     current_user = conn.assigns[:current_user]
 
-    has_profile = if current_user do
-      profile = Profiles.get_profile_by_user_id(current_user.id)
-      profile != nil
+    {has_profile, is_admin} = if current_user do
+      is_admin = Umrahly.Accounts.is_admin?(current_user)
+      has_profile = if is_admin do
+        true  # Admin users are considered to have "complete" profiles
+      else
+        profile = Profiles.get_profile_by_user_id(current_user.id)
+        profile != nil
+      end
+      {has_profile, is_admin}
     else
-      false
+      {false, false}
     end
 
-    render(conn, :home, layout: false, has_profile: has_profile, current_user: current_user)
+    render(conn, :home,
+      has_profile: has_profile,
+      current_user: current_user,
+      is_admin: is_admin
+    )
   end
 
   def dashboard(conn, _params) do
-    render(conn, :dashboard, current_user: conn.assigns.current_user)
+    current_user = conn.assigns.current_user
+
+    {has_profile, is_admin} = if current_user do
+      is_admin = Umrahly.Accounts.is_admin?(current_user)
+      has_profile = if is_admin do
+        true  # Admin users are considered to have "complete" profiles
+      else
+        profile = Profiles.get_profile_by_user_id(current_user.id)
+        profile != nil
+      end
+      {has_profile, is_admin}
+    else
+      {false, false}
+    end
+
+    render(conn, :dashboard,
+      current_user: current_user,
+      has_profile: has_profile,
+      is_admin: is_admin
+    )
   end
 end

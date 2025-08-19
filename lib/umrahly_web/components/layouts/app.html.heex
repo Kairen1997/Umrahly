@@ -1,39 +1,3 @@
-<header class="sticky top-0 z-40 px-4 sm:px-6 lg:px-8 bg-teal-300">
-  <div class="flex items-center justify-between border-b border-zinc-100 py-3 text-sm">
-    <div class="flex items-center gap-4">
-      <a href="/" class="text-2xl font-extrabold tracking-wider text-zinc-900">
-        Umrahly
-      </a>
-    </div>
-    <div class="flex items-center gap-4">
-      <%= if @current_user do %>
-        <details class="relative">
-          <summary class="flex items-center gap-2 cursor-pointer list-none">
-            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white text-sm">
-              <%= @current_user.email |> String.first() |> String.upcase() %>
-            </span>
-            <span class="sr-only">Open user menu</span>
-          </summary>
-          <div class="absolute right-0 mt-2 w-56 rounded-md bg-white shadow-lg ring-1 ring-zinc-200 z-50">
-            <div class="px-4 py-3 border-b border-zinc-100">
-              <p class="text-xs text-zinc-500">Signed in as</p>
-              <p class="mt-1 text-sm font-medium text-zinc-900 truncate"><%= @current_user.email %></p>
-            </div>
-            <div class="py-1">
-              <.link navigate={~p"/profile"} class="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Profile</.link>
-              <.link navigate={~p"/users/settings"} class="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Settings</.link>
-              <form action={~p"/users/log_out"} method="post" class="mt-1">
-                <input type="hidden" name="_csrf_token" value={get_csrf_token()}>
-                <input type="hidden" name="_method" value="delete">
-                <button type="submit" class="w-full text-left block px-4 py-2 text-sm text-rose-700 hover:bg-rose-50">Log out</button>
-              </form>
-            </div>
-          </div>
-        </details>
-      <% end %>
-    </div>
-  </div>
-</header>
 <main class="p-0">
   <.flash_group flash={@flash} />
   {@inner_content}

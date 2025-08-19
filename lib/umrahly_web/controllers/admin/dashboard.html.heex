@@ -1,0 +1,360 @@
+<!-- Profile Completion Modal -->
+<%= if @current_user && !@has_profile && !@is_admin do %>
+  <div id="profile-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-gray-200 relative">
+        <button id="close-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+        <h1 class="text-2xl font-bold text-center text-gray-900">Complete Your Profile</h1>
+        <p class="text-sm text-center text-gray-600 mt-2">This information is required to continue</p>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="px-6 py-4">
+        <form id="profile-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number *</label>
+            <input type="text" name="identity_card_number" class="w-full border border-gray-300 rounded-lg p-2" required />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+            <input type="text" name="phone_number" class="w-full border border-gray-300 rounded-lg p-2" required />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+            <textarea name="address" class="w-full border border-gray-300 rounded-lg p-2" rows="3" required></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income (RM) *</label>
+            <input type="number" name="monthly_income" step="0.01" class="w-full border border-gray-300 rounded-lg p-2" required />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Birthdate *</label>
+            <input type="date" name="birthdate" class="w-full border border-gray-300 rounded-lg p-2" required />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
+            <select name="gender" class="w-full border border-gray-300 rounded-lg p-2" required>
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+
+          <div class="text-center pt-4">
+            <button type="submit" id="submit-btn" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 w-full transition-colors">
+              <span class="submit-text">Complete Profile & Continue</span>
+              <span class="loading-text hidden">Creating Profile...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <p class="text-xs text-center text-gray-500">
+          All fields marked with * are required. You must complete this profile to access the dashboard.
+        </p>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+
+
+<.admin_layout current_page="dashboard">
+  <div class="max-w-6xl mx-auto">
+    
+    <!-- Admin Welcome Banner -->
+    <div class="bg-gradient-to-r from-teal-600 to-blue-600 rounded-lg shadow-lg p-6 mb-8 text-white">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold">Welcome, <%= @current_user.full_name %></h1>
+          <p class="text-teal-100 mt-2">Admin Dashboard - Manage your Umrah application</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-teal-500">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div class="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </div>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-600">Total Bookings</p>
+            <p class="text-2xl font-bold text-gray-900"><%= @admin_stats.total_bookings %></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599 1"/>
+              </svg>
+            </div>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-600">Total Payments Received</p>
+            <p class="text-2xl font-bold text-gray-900"><%= @admin_stats.total_payments %></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+              </svg>
+            </div>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-600">Packages Available</p>
+            <p class="text-2xl font-bold text-gray-900"><%= @admin_stats.packages_available %></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-600">Pending Verification</p>
+            <p class="text-2xl font-bold text-gray-900"><%= @admin_stats.pending_verification %></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activities -->
+    <div class="bg-white rounded-lg shadow">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Recent Activities</h3>
+      </div>
+      <div class="p-6">
+        <div class="overflow-x-auto">
+          <table class="min-w-full">
+            <thead>
+              <tr class="border-b border-gray-200">
+                <th class="text-left py-3 px-4 font-medium text-gray-700">Element</th>
+                <th class="text-left py-3 px-4 font-medium text-gray-700">Activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for activity <- @recent_activities do %>
+                <tr class="border-b border-gray-100">
+                  <td class="py-3 px-4 text-sm text-gray-600">Title</td>
+                  <td class="py-3 px-4 text-sm text-gray-900"><%= activity.title %></td>
+                </tr>
+                <tr class="border-b border-gray-100">
+                  <td class="py-3 px-4 text-sm text-gray-600">Activity Message</td>
+                  <td class="py-3 px-4 text-sm text-gray-900"><%= activity.activity_message %></td>
+                </tr>
+                <tr class="border-b border-gray-100">
+                  <td class="py-3 px-4 text-sm text-gray-600">Timestamp</td>
+                  <td class="py-3 px-4 text-sm text-gray-900"><%= activity.timestamp %></td>
+                </tr>
+                <tr class="border-b border-gray-100">
+                  <td class="py-3 px-4 text-sm text-gray-600">Action</td>
+                  <td class="py-3 px-4 text-sm text-gray-900">
+                    <span class="text-blue-600 hover:text-blue-800 cursor-pointer">
+                      <%= activity.action %>
+                    </span>
+                  </td>
+                </tr>
+                <tr class="h-4"></tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View All Activity Logs Button -->
+    <div class="mt-8 text-center">
+      <button class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
+        View All Activity Logs
+      </button>
+    </div>
+  </div>
+</.admin_layout> 
+
+<!-- Profile Modal JavaScript -->
+<script>
+  // Profile modal functionality
+  const profileModal = document.getElementById('profile-modal');
+  
+  if (profileModal) {
+    // Close modal when clicking outside
+    profileModal.addEventListener('click', (e) => {
+      if (e.target === profileModal) {
+        profileModal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+      }
+    });
+    
+    // Close modal with close button
+    const closeModal = document.getElementById('close-modal');
+    if (closeModal) {
+      closeModal.addEventListener('click', () => {
+        profileModal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+      });
+    }
+  }
+
+  // Profile form submission
+  const profileForm = document.getElementById('profile-form');
+  if (profileForm) {
+    // Prevent body scrolling when modal is open
+    document.body.classList.add('modal-open');
+    
+    profileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Client-side validation
+      const requiredFields = profileForm.querySelectorAll('[required]');
+      let isValid = true;
+      
+      requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+          field.classList.add('border-red-500');
+          isValid = false;
+        } else {
+          field.classList.remove('border-red-500');
+        }
+      });
+      
+      if (!isValid) {
+        alert('Please fill in all required fields marked with *');
+        return;
+      }
+      
+      const formData = new FormData(profileForm);
+      const profileData = Object.fromEntries(formData.entries());
+      
+      try {
+        // Show loading state
+        const submitBtn = document.getElementById('submit-btn');
+        const submitText = submitBtn.querySelector('.submit-text');
+        const loadingText = submitBtn.querySelector('.loading-text');
+        
+        submitText.classList.add('hidden');
+        loadingText.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-75');
+        
+        const response = await fetch('/api/profiles', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+          },
+          body: JSON.stringify(profileData)
+        });
+        
+        if (response.ok) {
+          // Close modal and redirect
+          profileModal.style.display = 'none';
+          document.body.classList.remove('modal-open');
+          window.location.href = '/dashboard';
+        } else {
+          const error = await response.json();
+          alert('Error: ' + (error.message || 'Failed to create profile'));
+          
+          // Reset button state
+          submitText.classList.remove('hidden');
+          loadingText.classList.add('hidden');
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('opacity-75');
+        }
+      } catch (error) {
+        alert('Error submitting profile: ' + error.message);
+        
+        // Reset button state
+        const submitBtn = document.getElementById('submit-btn');
+        const submitText = submitBtn.querySelector('.submit-text');
+        const loadingText = submitBtn.querySelector('.loading-text');
+        
+        submitText.classList.remove('hidden');
+        loadingText.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-75');
+      }
+    });
+    
+    // Remove red border when user starts typing
+    const inputs = profileForm.querySelectorAll('input, textarea, select');
+    inputs.forEach(input => {
+      input.addEventListener('input', () => {
+        if (input.value.trim()) {
+          input.classList.remove('border-red-500');
+        }
+      });
+    });
+  }
+</script>
+
+<style>
+  /* Modal styles */
+  #profile-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  #profile-modal .bg-white {
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Prevent body scroll when modal is open */
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  /* Utility classes */
+  .hidden {
+    display: none;
+  }
+
+  .transition-colors {
+    transition: all 0.2s ease-in-out;
+  }
+
+  .opacity-75 {
+    opacity: 0.75;
+  }
+
+
+</style> 

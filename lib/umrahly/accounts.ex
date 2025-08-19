@@ -60,8 +60,39 @@ defmodule Umrahly.Accounts do
   """
   def get_user!(id), do: Repo.get!(User, id)
 
-  ## User registration
+  @doc """
+  Gets a user by email and checks if they are an admin.
 
+  ## Examples
+
+      iex> get_admin_user_by_email("admin@example.com")
+      %User{}
+
+      iex> get_admin_user_by_email("user@example.com")
+      nil
+
+  """
+  def get_admin_user_by_email(email) when is_binary(email) do
+    Repo.get_by(User, email: email, is_admin: true)
+  end
+
+  @doc """
+  Checks if a user is an admin.
+
+  ## Examples
+
+      iex> is_admin?(%User{is_admin: true})
+      true
+
+      iex> is_admin?(%User{is_admin: false})
+      false
+
+  """
+  def is_admin?(%User{} = user) do
+    user.is_admin == true
+  end
+
+  ## User registration
   @doc """
   Registers a user.
 
@@ -305,6 +336,16 @@ defmodule Umrahly.Accounts do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, User.confirm_changeset(user))
     |> Ecto.Multi.delete_all(:tokens, UserToken.by_user_and_contexts_query(user, ["confirm"]))
+  end
+
+  @doc """
+  Confirms a user directly without requiring a token.
+  This is useful for seeding or admin operations.
+  """
+  def confirm_user_directly(%User{} = user) do
+    user
+    |> User.confirm_changeset()
+    |> Repo.update()
   end
 
   ## Reset password

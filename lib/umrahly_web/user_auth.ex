@@ -28,14 +28,17 @@ defmodule UmrahlyWeb.UserAuth do
   def log_in_user(conn, user, params \\ %{}) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
-
-    # Check if user needs to complete profile
     redirect_path = if user_return_to do
       user_return_to
     else
-      case Umrahly.Profiles.get_profile_by_user_id(user.id) do
-        nil -> ~p"/complete-profile"
-        _profile -> ~p"/dashboard"
+      if Umrahly.Accounts.is_admin?(user) do
+        ~p"/admin/dashboard"
+      else
+        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
+          ~p"/complete-profile"
+        else
+          ~p"/dashboard"
+        end
       end
     end
 
@@ -103,7 +106,18 @@ defmodule UmrahlyWeb.UserAuth do
   def fetch_current_user(conn, _opts) do
     {user_token, conn} = ensure_user_token(conn)
     user = user_token && Accounts.get_user_by_session_token(user_token)
-    assign(conn, :current_user, user)
+
+    # Set has_profile assign for the root layout
+    has_profile = if user do
+      profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
+      profile != nil
+    else
+      false
+    end
+
+    conn
+    |> assign(:current_user, user)
+    |> assign(:has_profile, has_profile)
   end
 
   defp ensure_user_token(conn) do
@@ -185,9 +199,19 @@ defmodule UmrahlyWeb.UserAuth do
   end
 
   defp mount_current_user(socket, session) do
-    Phoenix.Component.assign_new(socket, :current_user, fn ->
+    socket = Phoenix.Component.assign_new(socket, :current_user, fn ->
       if user_token = session["user_token"] do
         Accounts.get_user_by_session_token(user_token)
+      end
+    end)
+
+    # Set has_profile assign for LiveViews
+    Phoenix.Component.assign_new(socket, :has_profile, fn ->
+      if user = socket.assigns.current_user do
+        profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
+        profile != nil
+      else
+        false
       end
     end)
   end
@@ -211,15 +235,41 @@ defmodule UmrahlyWeb.UserAuth do
   If you want to enforce the user email is confirmed before
   they use the application at all, here would be a good place.
   """
-  def require_authenticated_user(conn, _opts) do
+    def require_authenticated_user(conn, _opts) do
     if conn.assigns[:current_user] do
       conn
     else
       conn
-      |> put_flash(:error, "You must log in to access this page.")
-      |> maybe_store_return_to()
-      |> redirect(to: ~p"/users/log_in")
-      |> halt()
+        |> put_flash(:error, "You must log in to access this page.")
+        |> maybe_store_return_to()
+        |> redirect(to: ~p"/users/log_in")
+        |> halt()
+    end
+  end
+
+  def require_admin_user(conn, _opts) do
+    current_user = conn.assigns[:current_user]
+
+    if current_user && Umrahly.Accounts.is_admin?(current_user) do
+      conn
+    else
+      conn
+        |> Phoenix.Controller.put_flash(:error, "You must be an admin to access this page.")
+        |> Phoenix.Controller.redirect(to: ~p"/dashboard")
+        |> halt()
+    end
+  end
+
+  def require_regular_user(conn, _opts) do
+    current_user = conn.assigns[:current_user]
+
+    if current_user && !Umrahly.Accounts.is_admin?(current_user) do
+      conn
+    else
+      conn
+        |> Phoenix.Controller.put_flash(:error, "This page is only for regular users.")
+        |> Phoenix.Controller.redirect(to: ~p"/admin/dashboard")
+        |> halt()
     end
   end
 
@@ -238,10 +288,15 @@ defmodule UmrahlyWeb.UserAuth do
   defp signed_in_path(conn) do
     user = conn.assigns[:current_user]
     if user do
-      # Check if user has a profile
-      case Umrahly.Profiles.get_profile_by_user_id(user.id) do
-        nil -> ~p"/complete-profile"
-        _profile -> ~p"/dashboard"
+      # Check if user is admin or has a profile
+      if Umrahly.Accounts.is_admin?(user) do
+        ~p"/admin/dashboard"
+      else
+        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
+          ~p"/complete-profile"
+        else
+          ~p"/dashboard"
+        end
       end
     else
       ~p"/dashboard"

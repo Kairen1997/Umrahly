@@ -20,6 +20,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:show_edit_form, false)
       |> assign(:editing_package_id, nil)
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+      |> allow_upload(:package_picture,
+        accept: ~w(.jpg .jpeg .png .gif),
+        max_entries: 1,
+        max_file_size: 5_000_000
+      )
 
     {:ok, socket}
   end
@@ -121,6 +126,34 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   end
 
   def handle_event("save_package", %{"package" => package_params}, socket) do
+    # Process picture upload if any
+    picture_path = case consume_uploaded_entries(socket, :package_picture, fn entry, _socket ->
+      uploads_dir = Path.join(:code.priv_dir(:umrahly), "static/uploads")
+      File.mkdir_p!(uploads_dir)
+
+      extension = Path.extname(entry.client_name)
+      filename = "package_#{System.system_time()}#{extension}"
+      dest_path = Path.join(uploads_dir, filename)
+
+      case File.cp(entry.path, dest_path) do
+        :ok ->
+          {:ok, "/uploads/#{filename}"}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end) do
+      [path | _] -> path
+      [] -> nil
+    end
+
+    # Add picture path to package params if uploaded
+    package_params = if picture_path do
+      Map.put(package_params, "picture", picture_path)
+    else
+      package_params
+    end
+
     case socket.assigns.editing_package_id do
       nil ->
         # Creating new package
@@ -190,14 +223,19 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
+  def handle_event("cancel-upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :package_picture, ref)}
+  end
+
   defp filter_packages(packages, search_query, search_status, search_departure_date) do
     packages
     |> Enum.filter(fn package ->
       name_matches = search_query == "" || String.contains?(String.downcase(package.name), String.downcase(search_query))
+      description_matches = search_query == "" || (package.description && String.contains?(String.downcase(package.description), String.downcase(search_query)))
       status_matches = search_status == "" || package.status == search_status
       date_matches = search_departure_date == "" || to_string(package.departure_date) == search_departure_date
 
-      name_matches && status_matches && date_matches
+      (name_matches || description_matches) && status_matches && date_matches
     end)
   end
 
@@ -219,16 +257,16 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
             <form phx-change="search_packages" class="space-y-4">
               <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
-                  <input
-                    type="text"
-                    name="search[query]"
-                    value={@search_query}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    placeholder="Search by package name..."
-                  />
-                </div>
+                                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Package Name or Description</label>
+                    <input
+                      type="text"
+                      name="search[query]"
+                      value={@search_query}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Search by package name or description..."
+                    />
+                  </div>
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -236,7 +274,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     name="search[status]"
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   >
-                    <option value="">All Statuses</option>
+                    <option value="">All Status</option>
                     <option value="active" selected={@search_status == "active"}>Active</option>
                     <option value="inactive" selected={@search_status == "inactive"}>Inactive</option>
                   </select>
@@ -270,7 +308,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             <p class="text-sm text-gray-600">
               Showing <%= length(@filtered_packages) %> of <%= length(@packages) %> packages
               <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" do %>
-                (filtered results)
+                (filtered by name, description, status, and departure date)
               <% end %>
             </p>
           </div>
@@ -304,6 +342,19 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     />
                     <%= if @package_changeset.errors[:name] do %>
                       <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:name], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      name="package[description]"
+                      rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter package description..."
+                    ><%= @package_changeset.changes[:description] || @package_changeset.data.description || "" %></textarea>
+                    <%= if @package_changeset.errors[:description] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:description], 0) %></p>
                     <% end %>
                   </div>
 
@@ -398,6 +449,37 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <%= if @package_changeset.errors[:departure_date] do %>
                       <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:departure_date], 0) %></p>
                     <% end %>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Package Picture</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                      <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="flex text-sm text-gray-600">
+                          <label for="package-picture-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
+                            <span>Upload a file</span>
+                            <input id="package-picture-upload" name="package[picture]" type="file" class="sr-only" phx-hook="UploadHook" accept="image/*" />
+                          </label>
+                          <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                      </div>
+                    </div>
+                    <div class="mt-2">
+                      <%= for entry <- @uploads.package_picture.entries do %>
+                        <div class="flex items-center space-x-2">
+                          <div class="h-20 w-20 bg-gray-200 rounded flex items-center justify-center">
+                            <span class="text-xs text-gray-500">Preview</span>
+                          </div>
+                          <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-600 hover:text-red-800">
+                            Remove
+                          </button>
+                        </div>
+                      <% end %>
+                    </div>
                   </div>
                 </div>
 
@@ -453,6 +535,19 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <% end %>
                   </div>
 
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      name="package[description]"
+                      rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter package description..."
+                    ><%= @package_changeset.changes[:description] || @package_changeset.data.description || "" %></textarea>
+                    <%= if @package_changeset.errors[:description] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:description], 0) %></p>
+                    <% end %>
+                  </div>
+
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <select
@@ -545,6 +640,43 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:departure_date], 0) %></p>
                     <% end %>
                   </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Package Picture</label>
+                    <%= if @package_changeset.data.picture do %>
+                      <div class="mb-3">
+                        <p class="text-sm text-gray-600 mb-2">Current Picture:</p>
+                        <img src={@package_changeset.data.picture} alt="Current package picture" class="h-32 w-32 object-cover rounded border" />
+                      </div>
+                    <% end %>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                      <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="flex text-sm text-gray-600">
+                          <label for="edit-package-picture-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
+                            <span>Upload a file</span>
+                            <input id="edit-package-picture-upload" name="package[picture]" type="file" class="sr-only" phx-hook="UploadHook" accept="image/*" />
+                          </label>
+                          <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                      </div>
+                    </div>
+                    <div class="mt-2">
+                      <%= for entry <- @uploads.package_picture.entries do %>
+                        <div class="flex items-center space-x-2">
+                          <div class="h-20 w-20 bg-gray-200 rounded flex items-center justify-center">
+                            <span class="text-xs text-gray-500">Preview</span>
+                          </div>
+                          <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-600 hover:text-red-800">
+                            Remove
+                          </button>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
@@ -583,8 +715,19 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
+                  <%= if @current_package.picture do %>
+                    <div class="mb-4">
+                      <img src={@current_package.picture} alt={"#{@current_package.name} picture"} class="w-full h-64 object-cover rounded-lg" />
+                    </div>
+                  <% end %>
                   <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= @current_package.name %></h3>
-                  <p class="text-gray-600 mb-4">No description available</p>
+                  <p class="text-gray-600 mb-4">
+                    <%= if @current_package.description && @current_package.description != "" do %>
+                      <%= @current_package.description %>
+                    <% else %>
+                      No description available
+                    <% end %>
+                  </p>
 
                   <div class="space-y-3">
                     <div class="flex justify-between">
@@ -651,7 +794,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                   <h3 class="mt-2 text-sm font-medium text-gray-900">No packages found</h3>
                   <p class="mt-1 text-sm text-gray-500">
                     <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" do %>
-                      Try adjusting your search criteria.
+                      Try adjusting your search criteria for name, description, status, or departure date.
                     <% else %>
                       Get started by creating a new package.
                     <% end %>
@@ -661,6 +804,17 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             <% else %>
               <%= for package <- @filtered_packages do %>
                 <div class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <%= if package.picture do %>
+                    <div class="h-48 overflow-hidden rounded-t-lg">
+                      <img src={package.picture} alt={"#{package.name} picture"} class="w-full h-full object-cover" />
+                    </div>
+                  <% else %>
+                    <div class="h-48 bg-gray-200 flex items-center justify-center rounded-t-lg">
+                      <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  <% end %>
                   <div class="p-6">
                     <div class="flex items-center justify-between mb-4">
                       <h3 class="text-lg font-semibold text-gray-900"><%= package.name %></h3>
@@ -677,7 +831,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       </span>
                     </div>
 
-                    <p class="text-gray-600 text-sm mb-4">No description available</p>
+                    <p class="text-gray-600 text-sm mb-4">
+                      <%= if package.description && package.description != "" do %>
+                        <%= package.description %>
+                      <% else %>
+                        No description available
+                      <% end %>
+                    </p>
 
                     <div class="space-y-2 mb-4">
                       <div class="flex justify-between">

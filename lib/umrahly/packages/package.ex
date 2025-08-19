@@ -4,12 +4,14 @@ defmodule Umrahly.Packages.Package do
 
   schema "packages" do
     field :name, :string
+    field :description, :string
     field :status, :string, default: "inactive"
     field :price, :integer
     field :duration_days, :integer
     field :duration_nights, :integer
     field :quota, :integer
     field :departure_date, :date
+    field :picture, :string
 
     timestamps(type: :utc_datetime)
   end
@@ -17,7 +19,7 @@ defmodule Umrahly.Packages.Package do
   @doc false
   def changeset(package, attrs) do
     package
-    |> cast(attrs, [:name, :price, :duration_days, :duration_nights, :quota, :departure_date, :status])
+    |> cast(attrs, [:name, :description, :price, :duration_days, :duration_nights, :quota, :departure_date, :status, :picture])
     |> validate_required([:name, :price, :duration_days, :duration_nights, :quota, :departure_date, :status])
     |> validate_inclusion(:status, ["active", "inactive"])
     |> validate_inclusion(:duration_days, 1..30)
@@ -31,5 +33,6 @@ defmodule Umrahly.Packages.Package do
       end
     end)
     |> validate_number(:price, greater_than: 0)
+    |> validate_length(:picture, max: 255)
   end
 end

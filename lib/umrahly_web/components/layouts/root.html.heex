@@ -28,24 +28,35 @@
             
             <%= if @current_user do %>
               <div class="flex items-center gap-3">
-                <!-- Profile Photo -->
-                <div class="relative">
-                  <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                    <%= String.first(@current_user.email) |> String.upcase() %>
+                <!-- Profile Dropdown -->
+                <div class="relative" id="profile-dropdown">
+                  <button id="profile-toggle" class="flex items-center gap-2 hover:text-zinc-900 focus:outline-none">
+                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                      <%= String.first(@current_user.email) |> String.upcase() %>
+                    </div>
+                    <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+                    <svg id="dropdown-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+                  
+                  <!-- Dropdown Menu -->
+                  <div id="dropdown-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                    <%= if @current_user.is_admin do %>
+                      <.link href={~p"/admin/dashboard"} class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</.link>
+                    <% else %>
+                      <%= if @has_profile do %>
+                        <.link href={~p"/dashboard"} class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Dashboard</.link>
+                      <% else %>
+                        <.link href={~p"/complete-profile"} class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Complete Profile</.link>
+                      <% end %>
+                    <% end %>
+                    <.link href={~p"/profile"} class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</.link>
+                    <.link href={~p"/users/settings"} class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</.link>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <.link href={~p"/users/log_out"} method="delete" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Log out</.link>
                   </div>
                 </div>
-                
-                <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
-                <%= if @current_user.is_admin do %>
-                  <.link href={~p"/admin/dashboard"} class="hover:text-zinc-900">Admin Dashboard</.link>
-                <% else %>
-                  <%= if @has_profile do %>
-                    <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
-                  <% else %>
-                    <.link href={~p"/complete-profile"} class="hover:text-zinc-900">Complete Profile</.link>
-                  <% end %>
-                <% end %>
-                <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
               </div>
             <% else %>
               <.link href={~p"/users/register"} class="hover:text-zinc-900">Register</.link>
@@ -69,6 +80,34 @@
           langToggle.textContent = currentLang + '/' + (currentLang === 'EN' ? 'MY' : 'EN');
           console.log('Language changed to', currentLang);
           // Add your language switching logic here
+        });
+      }
+
+      // Profile Dropdown Script
+      const profileToggle = document.getElementById('profile-toggle');
+      const dropdownMenu = document.getElementById('dropdown-menu');
+      const dropdownArrow = document.getElementById('dropdown-arrow');
+
+      if (profileToggle && dropdownMenu && dropdownArrow) {
+        profileToggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          const isOpen = !dropdownMenu.classList.contains('hidden');
+          
+          if (isOpen) {
+            dropdownMenu.classList.add('hidden');
+            dropdownArrow.style.transform = 'rotate(0deg)';
+          } else {
+            dropdownMenu.classList.remove('hidden');
+            dropdownArrow.style.transform = 'rotate(180deg)';
+          }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!profileToggle.contains(e.target) && !dropdownMenu.contains(e.target)) {
+            dropdownMenu.classList.add('hidden');
+            dropdownArrow.style.transform = 'rotate(0deg)';
+          }
         });
       }
     </script>

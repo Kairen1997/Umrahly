@@ -80,10 +80,9 @@ defmodule UmrahlyWeb.Router do
   scope "/admin", UmrahlyWeb do
     pipe_through [:browser, :require_authenticated_user, :require_admin_user]
 
-    get "/dashboard", AdminController, :dashboard
-
     live_session :admin_dashboard,
       on_mount: [{UmrahlyWeb.UserAuth, :ensure_authenticated}] do
+      live "/dashboard", AdminDashboardLive, :index
       live "/bookings", AdminBookingsLive, :index
       live "/packages", AdminPackagesLive, :index
       live "/payments", AdminPaymentsLive, :index

@@ -124,8 +124,9 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Packages Available</p>
+            <p class="text-sm font-medium text-gray-600">Active Packages</p>
             <p class="text-4xl font-bold text-gray-900"><%= @admin_stats.packages_available %></p>
+            <p class="text-xs text-gray-500">of <%= @package_stats.total_packages %> total</p>
           </div>
         </div>
       </div>
@@ -144,6 +145,172 @@
             <p class="text-4xl font-bold text-gray-900"><%= @admin_stats.pending_verification %></p>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Packages Overview Section -->
+    <div class="bg-white rounded-lg shadow mb-8">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-900">Packages Overview</h3>
+          <div class="flex items-center space-x-3">
+            <a href="/admin/packages" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+              Manage Packages →
+            </a>
+            <a href="/admin/packages" class="bg-teal-600 text-white px-3 py-1 rounded text-sm hover:bg-teal-700 transition-colors">
+              Add Package
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <!-- Total Packages -->
+          <div class="text-center">
+            <div class="text-3xl font-bold text-gray-900"><%= @package_stats.total_packages %></div>
+            <div class="text-sm text-gray-600">Total Packages</div>
+          </div>
+          
+          <!-- Active Packages -->
+          <div class="text-center">
+            <div class="text-3xl font-bold text-green-600"><%= @package_stats.active_packages %></div>
+            <div class="text-sm text-gray-600">Active Packages</div>
+          </div>
+          
+          <!-- Inactive Packages -->
+          <div class="text-center">
+            <div class="text-3xl font-bold text-red-600"><%= @package_stats.inactive_packages %></div>
+            <div class="text-sm text-gray-600">Inactive Packages</div>
+          </div>
+          
+          <!-- Upcoming Departures -->
+          <div class="text-center">
+            <div class="text-3xl font-bold text-blue-600"><%= @package_stats.upcoming_departures %></div>
+            <div class="text-sm text-gray-600">Upcoming Departures</div>
+          </div>
+        </div>
+        
+        <!-- Total Quota -->
+        <div class="mt-6 pt-6 border-t border-gray-200">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="text-center">
+              <div class="text-2xl font-bold text-purple-600"><%= @package_stats.total_quota %></div>
+              <div class="text-sm text-gray-600">Total Available Quota</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-orange-600"><%= @package_stats.active_packages %></div>
+              <div class="text-sm text-gray-600">Active Package Types</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expiring Soon Warning -->
+    <%= if @package_stats.upcoming_departures > 0 do %>
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-yellow-800">
+              Packages Departing Soon
+            </h3>
+            <div class="mt-2 text-sm text-yellow-700">
+              <p>
+                You have <strong><%= @package_stats.upcoming_departures %></strong> packages with departure dates coming up soon. 
+                <a href="/admin/packages" class="font-medium underline hover:text-yellow-600">
+                  Review and manage packages →
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Low Quota Warning -->
+    <%= if @package_stats.low_quota_packages > 0 do %>
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">
+              Low Quota Alert
+            </h3>
+            <div class="mt-2 text-sm text-red-700">
+              <p>
+                You have <strong><%= @package_stats.low_quota_packages %></strong> packages with low availability (less than 10 spots remaining). 
+                <a href="/admin/packages" class="font-medium underline hover:text-red-600">
+                  Review and update quotas →
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Recent Package Activities -->
+    <div class="bg-white rounded-lg shadow mb-8">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-900">Recent Package Activities</h3>
+          <a href="/admin/packages" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+            View All →
+          </a>
+        </div>
+      </div>
+      <div class="p-6">
+        <%= if length(@recent_package_activities) > 0 do %>
+          <div class="space-y-4">
+            <%= for activity <- @recent_package_activities do %>
+              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center space-x-3">
+                  <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">
+                      Package "<%= activity.package_name %>" was <%= activity.action %>
+                    </p>
+                    <div class="flex items-center space-x-2 mt-1">
+                      <span class={[
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                        case activity.status do
+                          "active" -> "bg-green-100 text-green-800"
+                          "inactive" -> "bg-red-100 text-red-800"
+                          _ -> "bg-gray-100 text-gray-800"
+                        end
+                      ]}>
+                        <%= activity.status %>
+                      </span>
+                      <span class="text-xs text-gray-500">
+                        <%= activity.formatted_time %>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="text-center py-8 text-gray-500">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+            <p class="mt-2 text-sm">No recent package activities</p>
+          </div>
+        <% end %>
       </div>
     </div>
 

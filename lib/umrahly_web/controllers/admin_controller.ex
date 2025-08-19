@@ -2,6 +2,7 @@ defmodule UmrahlyWeb.AdminController do
   use UmrahlyWeb, :controller
 
   alias Umrahly.Profiles
+  alias Umrahly.Packages
 
   def dashboard(conn, _params) do
     current_user = conn.assigns[:current_user]
@@ -13,12 +14,15 @@ defmodule UmrahlyWeb.AdminController do
       {false, nil}
     end
 
-    # Mock data for admin dashboard - in a real app, this would come from your database
+    # Get real data for admin dashboard
+    package_stats = Packages.get_enhanced_package_statistics()
+    recent_package_activities = Packages.get_recent_package_activities(3)
+
     admin_stats = %{
-      total_bookings: 124,
-      total_payments: "RM 300,000",
-      packages_available: 6,
-      pending_verification: 3
+      total_bookings: 124, # TODO: Replace with real bookings count when bookings module is implemented
+      total_payments: "RM 300,000", # TODO: Replace with real payments data when payments module is implemented
+      packages_available: package_stats.active_packages,
+      pending_verification: 3 # TODO: Replace with real verification count when user verification is implemented
     }
 
     recent_activities = [
@@ -44,6 +48,8 @@ defmodule UmrahlyWeb.AdminController do
 
     conn
     |> assign(:admin_stats, admin_stats)
+    |> assign(:package_stats, package_stats)
+    |> assign(:recent_package_activities, recent_package_activities)
     |> assign(:recent_activities, recent_activities)
     |> assign(:current_user, current_user)
     |> assign(:has_profile, has_profile)

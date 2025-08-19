@@ -583,13 +583,6 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     >
                       View
                     </button>
-                    <!--<button
-                      phx-click="edit_package"
-                      phx-value-id={package.id}
-                      class="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
-                    >
-                      Edit
-                    </button>-->
                   </div>
                 </div>
               </div>

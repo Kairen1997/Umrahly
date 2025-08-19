@@ -34,6 +34,12 @@ defmodule UmrahlyWeb.UserSessionController do
     end
   end
 
+  defp create(conn, _params, _info) do
+    conn
+    |> put_flash(:error, "Invalid parameters")
+    |> redirect(to: ~p"/users/log_in")
+  end
+
   def delete(conn, _params) do
     conn
     |> put_flash(:info, "Logged out successfully.")

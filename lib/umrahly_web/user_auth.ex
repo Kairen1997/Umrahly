@@ -28,30 +28,19 @@ defmodule UmrahlyWeb.UserAuth do
   def log_in_user(conn, user, params \\ %{}) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
-
-        # Check if user needs to complete profile or is admin
     redirect_path = if user_return_to do
       user_return_to
     else
-      # Force admin check first
       if Umrahly.Accounts.is_admin?(user) do
-        IO.inspect(user, label: "Admin user logging in")
-        IO.inspect(user.is_admin, label: "Admin flag value")
-        IO.inspect("Redirecting to admin dashboard", label: "Redirect path")
         ~p"/admin/dashboard"
       else
-        # Check profile completion for non-admin users
         if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
-          IO.inspect("User has no profile, redirecting to complete-profile", label: "Redirect path")
           ~p"/complete-profile"
         else
-          IO.inspect("User has profile, redirecting to dashboard", label: "Redirect path")
           ~p"/dashboard"
         end
       end
     end
-
-    IO.inspect(redirect_path, label: "Final redirect path")
 
     conn
     |> renew_session()
@@ -117,7 +106,18 @@ defmodule UmrahlyWeb.UserAuth do
   def fetch_current_user(conn, _opts) do
     {user_token, conn} = ensure_user_token(conn)
     user = user_token && Accounts.get_user_by_session_token(user_token)
-    assign(conn, :current_user, user)
+
+    # Set has_profile assign for the root layout
+    has_profile = if user do
+      profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
+      profile != nil
+    else
+      false
+    end
+
+    conn
+    |> assign(:current_user, user)
+    |> assign(:has_profile, has_profile)
   end
 
   defp ensure_user_token(conn) do
@@ -199,9 +199,19 @@ defmodule UmrahlyWeb.UserAuth do
   end
 
   defp mount_current_user(socket, session) do
-    Phoenix.Component.assign_new(socket, :current_user, fn ->
+    socket = Phoenix.Component.assign_new(socket, :current_user, fn ->
       if user_token = session["user_token"] do
         Accounts.get_user_by_session_token(user_token)
+      end
+    end)
+
+    # Set has_profile assign for LiveViews
+    Phoenix.Component.assign_new(socket, :has_profile, fn ->
+      if user = socket.assigns.current_user do
+        profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
+        profile != nil
+      else
+        false
       end
     end)
   end
@@ -246,6 +256,19 @@ defmodule UmrahlyWeb.UserAuth do
       conn
         |> Phoenix.Controller.put_flash(:error, "You must be an admin to access this page.")
         |> Phoenix.Controller.redirect(to: ~p"/dashboard")
+        |> halt()
+    end
+  end
+
+  def require_regular_user(conn, _opts) do
+    current_user = conn.assigns[:current_user]
+
+    if current_user && !Umrahly.Accounts.is_admin?(current_user) do
+      conn
+    else
+      conn
+        |> Phoenix.Controller.put_flash(:error, "This page is only for regular users.")
+        |> Phoenix.Controller.redirect(to: ~p"/admin/dashboard")
         |> halt()
     end
   end

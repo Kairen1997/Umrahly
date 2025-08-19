@@ -41,10 +41,6 @@ defmodule Umrahly.Accounts do
   def get_user_by_email_and_password(email, password)
       when is_binary(email) and is_binary(password) do
     user = Repo.get_by(User, email: email)
-    IO.inspect(user, label: "User fetched from database")
-    if user do
-      IO.inspect(user.is_admin, label: "User is_admin field from database")
-    end
     if User.valid_password?(user, password), do: user
   end
 
@@ -93,15 +89,10 @@ defmodule Umrahly.Accounts do
 
   """
   def is_admin?(%User{} = user) do
-    IO.inspect(user, label: "Checking if user is admin")
-    IO.inspect(user.is_admin, label: "User is_admin field value")
-    result = user.is_admin == true
-    IO.inspect(result, label: "is_admin? result")
-    result
+    user.is_admin == true
   end
 
   ## User registration
-
   @doc """
   Registers a user.
 

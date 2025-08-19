@@ -402,9 +402,9 @@ defmodule UmrahlyWeb.UserProfileLive do
                       <p>You need to complete your profile to access all features. Please fill out the forms below or complete your profile first.</p>
                     </div>
                     <div class="mt-4">
-                      <a href="/complete-profile" class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors">
+                      <.link href={~p"/complete-profile"} class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors">
                         Complete Profile
-                      </a>
+                      </.link>
                     </div>
                   </div>
                 </div>

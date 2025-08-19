@@ -30,22 +30,20 @@
               <div class="flex items-center gap-3">
                 <!-- Profile Photo -->
                 <div class="relative">
-                  <%= if @has_profile do %>
-                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
-                    </div>
-                  <% else %>
-                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
-                    </div>
-                  <% end %>
+                  <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
+                    <%= String.first(@current_user.email) |> String.upcase() %>
+                  </div>
                 </div>
                 
                 <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
-                <%= if @has_profile do %>
-                  <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
+                <%= if @current_user.is_admin do %>
+                  <.link href={~p"/admin/dashboard"} class="hover:text-zinc-900">Admin Dashboard</.link>
                 <% else %>
-                  <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
+                  <%= if @has_profile do %>
+                    <.link href={~p"/dashboard"} class="hover:text-zinc-900">Dashboard</.link>
+                  <% else %>
+                    <.link href={~p"/complete-profile"} class="hover:text-zinc-900">Complete Profile</.link>
+                  <% end %>
                 <% end %>
                 <.link href={~p"/users/log_out"} method="delete" class="hover:text-zinc-900">Log out</.link>
               </div>

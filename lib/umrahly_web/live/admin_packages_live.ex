@@ -126,9 +126,10 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   end
 
   def handle_event("save_package", %{"package" => package_params}, socket) do
-    # Process picture upload if any
+        # Process picture upload if any
     picture_path = case consume_uploaded_entries(socket, :package_picture, fn entry, _socket ->
-      uploads_dir = Path.join(:code.priv_dir(:umrahly), "static/uploads")
+      # Use a more reliable path for uploads
+      uploads_dir = Path.join(File.cwd!(), "priv/static/images")
       File.mkdir_p!(uploads_dir)
 
       extension = Path.extname(entry.client_name)
@@ -137,14 +138,15 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
       case File.cp(entry.path, dest_path) do
         :ok ->
-          {:ok, "/uploads/#{filename}"}
-
+          {:ok, "/images/#{filename}"}
         {:error, reason} ->
           {:error, reason}
       end
     end) do
-      [path | _] -> path
-      [] -> nil
+      [path | _] ->
+        path
+      [] ->
+        nil
     end
 
     # Add picture path to package params if uploaded
@@ -225,6 +227,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :package_picture, ref)}
+  end
+
+  def handle_event("validate", _params, socket) do
+    # This will be called whenever form fields change, including file uploads
+    {:noreply, socket}
   end
 
   defp filter_packages(packages, search_query, search_status, search_departure_date) do
@@ -328,7 +335,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 </button>
               </div>
 
-              <form phx-submit="save_package" class="space-y-4">
+              <form phx-submit="save_package" phx-change="validate" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
@@ -453,15 +460,15 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
                   <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Package Picture</label>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md" phx-drop-target={@uploads.package_picture.ref}>
                       <div class="space-y-1 text-center">
                         <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                           <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                         <div class="flex text-sm text-gray-600">
-                          <label for="package-picture-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
+                          <label class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500 px-3 py-1 rounded border border-teal-300 hover:bg-teal-50 transition-colors">
                             <span>Upload a file</span>
-                            <input id="package-picture-upload" name="package[picture]" type="file" class="sr-only" phx-hook="UploadHook" accept="image/*" />
+                            <.live_file_input upload={@uploads.package_picture} accept="image/*" class="hidden" />
                           </label>
                           <p class="pl-1">or drag and drop</p>
                         </div>
@@ -470,14 +477,39 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     </div>
                     <div class="mt-2">
                       <%= for entry <- @uploads.package_picture.entries do %>
-                        <div class="flex items-center space-x-2">
-                          <div class="h-20 w-20 bg-gray-200 rounded flex items-center justify-center">
-                            <span class="text-xs text-gray-500">Preview</span>
+                        <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg">
+                          <div class="flex-shrink-0">
+                            <div class="w-20 h-20 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                              <%= if entry.upload_state == :complete do %>
+                                <img src={entry.url} alt="Preview" class="w-full h-full object-cover" />
+                              <% else %>
+                                <span class="text-xs text-gray-500">Preview</span>
+                              <% end %>
+                            </div>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate"><%= entry.client_name %></p>
+                            <p class="text-sm text-gray-500">
+                              <%= case entry.upload_state do %>
+                                <% :uploading -> %>
+                                  Uploading...
+                                <% :complete -> %>
+                                  Ready to save
+                                <% :error -> %>
+                                  Error: <%= entry.errors |> Enum.map(&elem(&1, 1)) |> Enum.join(", ") %>
+                                <% _ -> %>
+                                  Ready
+                              <% end %>
+                            </p>
                           </div>
                           <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-600 hover:text-red-800">
                             Remove
                           </button>
                         </div>
+                      <% end %>
+
+                      <%= for err <- upload_errors(@uploads.package_picture) do %>
+                        <p class="text-red-600 text-sm mt-2"><%= Phoenix.Naming.humanize(err) %></p>
                       <% end %>
                     </div>
                   </div>
@@ -517,7 +549,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 </button>
               </div>
 
-              <form phx-submit="save_package" class="space-y-4">
+              <form phx-submit="save_package" phx-change="validate" class="space-y-4">
                 <input type="hidden" name="package[id]" value={@editing_package_id} />
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -649,15 +681,15 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         <img src={@package_changeset.data.picture} alt="Current package picture" class="h-32 w-32 object-cover rounded border" />
                       </div>
                     <% end %>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md" phx-drop-target={@uploads.package_picture.ref}>
                       <div class="space-y-1 text-center">
                         <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                           <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                         <div class="flex text-sm text-gray-600">
-                          <label for="edit-package-picture-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500">
+                          <label class="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500 px-3 py-1 rounded border border-teal-300 hover:bg-teal-50 transition-colors">
                             <span>Upload a file</span>
-                            <input id="edit-package-picture-upload" name="package[picture]" type="file" class="sr-only" phx-hook="UploadHook" accept="image/*" />
+                            <.live_file_input upload={@uploads.package_picture} accept="image/*" class="hidden" />
                           </label>
                           <p class="pl-1">or drag and drop</p>
                         </div>
@@ -666,14 +698,39 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     </div>
                     <div class="mt-2">
                       <%= for entry <- @uploads.package_picture.entries do %>
-                        <div class="flex items-center space-x-2">
-                          <div class="h-20 w-20 bg-gray-200 rounded flex items-center justify-center">
-                            <span class="text-xs text-gray-500">Preview</span>
+                        <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg">
+                          <div class="flex-shrink-0">
+                            <div class="w-20 h-20 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                              <%= if entry.upload_state == :complete do %>
+                                <img src={entry.url} alt="Preview" class="w-full h-full object-cover" />
+                              <% else %>
+                                <span class="text-xs text-gray-500">Preview</span>
+                              <% end %>
+                            </div>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate"><%= entry.client_name %></p>
+                            <p class="text-sm text-gray-500">
+                              <%= case entry.upload_state do %>
+                                <% :uploading -> %>
+                                  Uploading...
+                                <% :complete -> %>
+                                  Ready to save
+                                <% :error -> %>
+                                  Error: <%= entry.errors |> Enum.map(&elem(&1, 1)) |> Enum.join(", ") %>
+                                <% _ -> %>
+                                  Ready
+                              <% end %>
+                            </p>
                           </div>
                           <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-600 hover:text-red-800">
                             Remove
                           </button>
                         </div>
+                      <% end %>
+
+                      <%= for err <- upload_errors(@uploads.package_picture) do %>
+                        <p class="text-red-600 text-sm mt-2"><%= Phoenix.Naming.humanize(err) %></p>
                       <% end %>
                     </div>
                   </div>

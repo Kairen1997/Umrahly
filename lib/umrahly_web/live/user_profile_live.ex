@@ -6,7 +6,7 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
-   user = socket.assigns.current_user
+    user = socket.assigns.current_user
     profile = Profiles.get_profile_by_user_id(user.id)
 
     socket = assign(socket,
@@ -305,7 +305,7 @@ defmodule UmrahlyWeb.UserProfileLive do
     ~H"""
     <div class="flex min-h-screen bg-gray-100">
       <!-- Sidebar -->
-      <aside class="w-96 bg-gray-800 shadow-lg h-screen flex flex-col justify-between">
+      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
         <!-- Navigation Menu -->
         <div>
           <nav class="mt-0">

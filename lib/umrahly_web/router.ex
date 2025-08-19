@@ -70,7 +70,10 @@ defmodule UmrahlyWeb.Router do
   scope "/", UmrahlyWeb do
     pipe_through [:browser, :require_authenticated_user, :require_regular_user]
 
-    live "/complete-profile", CompleteProfileLive, :new
+    live_session :complete_profile,
+      on_mount: [{UmrahlyWeb.UserAuth, :ensure_authenticated}] do
+      live "/complete-profile", CompleteProfileLive, :new
+    end
   end
 
   # Admin routes
@@ -78,11 +81,15 @@ defmodule UmrahlyWeb.Router do
     pipe_through [:browser, :require_authenticated_user, :require_admin_user]
 
     get "/dashboard", AdminController, :dashboard
-    live "/bookings", AdminBookingsLive, :index
-    live "/packages", AdminPackagesLive, :index
-    live "/payments", AdminPaymentsLive, :index
-    live "/flights", AdminFlightsLive, :index
-    live "/activity-log", AdminActivityLogLive, :index
+
+    live_session :admin_dashboard,
+      on_mount: [{UmrahlyWeb.UserAuth, :ensure_authenticated}] do
+      live "/bookings", AdminBookingsLive, :index
+      live "/packages", AdminPackagesLive, :index
+      live "/payments", AdminPaymentsLive, :index
+      live "/flights", AdminFlightsLive, :index
+      live "/activity-log", AdminActivityLogLive, :index
+    end
   end
 
   scope "/", UmrahlyWeb do
@@ -98,7 +105,10 @@ defmodule UmrahlyWeb.Router do
   scope "/", UmrahlyWeb do
     pipe_through [:browser, :require_authenticated_user, :require_regular_user]
 
-    live "/profile", UserProfileLive, :edit
+    live_session :user_profile,
+      on_mount: [{UmrahlyWeb.UserAuth, :ensure_authenticated}] do
+      live "/profile", UserProfileLive, :edit
+    end
   end
 
   scope "/", UmrahlyWeb do

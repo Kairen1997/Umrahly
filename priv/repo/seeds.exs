@@ -11,6 +11,17 @@
 # and so on) as they will fail if something goes wrong.
 
 alias Umrahly.Accounts
+alias Umrahly.Packages
+
+Packages.create_package(%{
+  name: "Standard Package",
+  price: 2500,
+  duration_days: 7,
+  duration_nights: 6,
+  quota: 50,
+  departure_date: ~D[2025-12-01],
+  status: "active"
+})
 
 # Create admin users
 admin_users = [

@@ -10,6 +10,10 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     socket =
       socket
       |> assign(:packages, packages)
+      |> assign(:filtered_packages, packages)
+      |> assign(:search_query, "")
+      |> assign(:search_status, "")
+      |> assign(:search_departure_date, "")
       |> assign(:current_page, "packages")
       |> assign(:viewing_package_id, nil)
       |> assign(:show_add_form, false)
@@ -18,6 +22,34 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
 
     {:ok, socket}
+  end
+
+  def handle_event("search_packages", %{"search" => search_params}, socket) do
+    search_query = Map.get(search_params, "query", "")
+    search_status = Map.get(search_params, "status", "")
+    search_departure_date = Map.get(search_params, "departure_date", "")
+
+    filtered_packages = filter_packages(socket.assigns.packages, search_query, search_status, search_departure_date)
+
+    socket =
+      socket
+      |> assign(:filtered_packages, filtered_packages)
+      |> assign(:search_query, search_query)
+      |> assign(:search_status, search_status)
+      |> assign(:search_departure_date, search_departure_date)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("clear_search", _params, socket) do
+    socket =
+      socket
+      |> assign(:filtered_packages, socket.assigns.packages)
+      |> assign(:search_query, "")
+      |> assign(:search_status, "")
+      |> assign(:search_departure_date, "")
+
+    {:noreply, socket}
   end
 
   def handle_event("view_package", %{"id" => package_id}, socket) do
@@ -99,6 +131,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             socket =
               socket
               |> assign(:packages, packages)
+              |> assign(:filtered_packages, packages)
               |> assign(:show_add_form, false)
               |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
               |> put_flash(:info, "Package created successfully!")
@@ -123,6 +156,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             socket =
               socket
               |> assign(:packages, packages)
+              |> assign(:filtered_packages, packages)
               |> assign(:show_edit_form, false)
               |> assign(:editing_package_id, nil)
               |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
@@ -149,10 +183,22 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     socket =
       socket
       |> assign(:packages, packages)
+      |> assign(:filtered_packages, packages)
       |> assign(:viewing_package_id, nil)
       |> assign(:current_package, nil)
 
     {:noreply, socket}
+  end
+
+  defp filter_packages(packages, search_query, search_status, search_departure_date) do
+    packages
+    |> Enum.filter(fn package ->
+      name_matches = search_query == "" || String.contains?(String.downcase(package.name), String.downcase(search_query))
+      status_matches = search_status == "" || package.status == search_status
+      date_matches = search_departure_date == "" || to_string(package.departure_date) == search_departure_date
+
+      name_matches && status_matches && date_matches
+    end)
   end
 
   def render(assigns) do
@@ -167,6 +213,66 @@ defmodule UmrahlyWeb.AdminPackagesLive do
               class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
               Add New Package
             </button>
+          </div>
+
+          <!-- Search Bar -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <form phx-change="search_packages" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
+                  <input
+                    type="text"
+                    name="search[query]"
+                    value={@search_query}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="Search by package name..."
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    name="search[status]"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active" selected={@search_status == "active"}>Active</option>
+                    <option value="inactive" selected={@search_status == "inactive"}>Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
+                  <input
+                    type="date"
+                    name="search[departure_date]"
+                    value={@search_departure_date}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div class="flex items-end">
+                  <button
+                    type="button"
+                    phx-click="clear_search"
+                    class="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Search Results Summary -->
+          <div class="mb-4">
+            <p class="text-sm text-gray-600">
+              Showing <%= length(@filtered_packages) %> of <%= length(@packages) %> packages
+              <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" do %>
+                (filtered results)
+              <% end %>
+            </p>
           </div>
 
           <%= if @show_add_form do %>
@@ -536,56 +642,74 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <% end %>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <%= for package <- @packages do %>
-              <div class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div class="p-6">
-                  <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900"><%= package.name %></h3>
-                    <span class={[
-                      "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                      case package.status do
-                        "active" -> "bg-green-100 text-green-800"
-                        "inactive" -> "bg-red-100 text-red-800"
-                        "draft" -> "bg-gray-100 text-gray-800"
-                        _ -> "bg-gray-100 text-gray-800"
-                      end
-                    ]}>
-                      <%= package.status %>
-                    </span>
-                  </div>
-
-                  <p class="text-gray-600 text-sm mb-4">No description available</p>
-
-                  <div class="space-y-2 mb-4">
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Price:</span>
-                      <span class="text-sm font-medium text-gray-900">RM <%= package.price %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Duration:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= package.duration_days %> days / <%= package.duration_nights %> nights</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Quota:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= package.quota %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Departure Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= package.departure_date %></span>
-                    </div>
-                  </div>
-
-                  <div class="flex space-x-2">
-                    <button
-                      phx-click="view_package"
-                      phx-value-id={package.id}
-                      class="flex-1 bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
-                    >
-                      View
-                    </button>
-                  </div>
+            <%= if length(@filtered_packages) == 0 do %>
+              <div class="col-span-full text-center py-12">
+                <div class="text-gray-500">
+                  <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+                  </svg>
+                  <h3 class="mt-2 text-sm font-medium text-gray-900">No packages found</h3>
+                  <p class="mt-1 text-sm text-gray-500">
+                    <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" do %>
+                      Try adjusting your search criteria.
+                    <% else %>
+                      Get started by creating a new package.
+                    <% end %>
+                  </p>
                 </div>
               </div>
+            <% else %>
+              <%= for package <- @filtered_packages do %>
+                <div class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                      <h3 class="text-lg font-semibold text-gray-900"><%= package.name %></h3>
+                      <span class={[
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                        case package.status do
+                          "active" -> "bg-green-100 text-green-800"
+                          "inactive" -> "bg-red-100 text-red-800"
+                          "draft" -> "bg-gray-100 text-gray-800"
+                          _ -> "bg-gray-100 text-gray-800"
+                        end
+                      ]}>
+                        <%= package.status %>
+                      </span>
+                    </div>
+
+                    <p class="text-gray-600 text-sm mb-4">No description available</p>
+
+                    <div class="space-y-2 mb-4">
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Price:</span>
+                        <span class="text-sm font-medium text-gray-900">RM <%= package.price %></span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Duration:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= package.duration_days %> days / <%= package.duration_nights %> nights</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Quota:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= package.quota %></span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Departure Date:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= package.departure_date %></span>
+                      </div>
+                    </div>
+
+                    <div class="flex space-x-2">
+                      <button
+                        phx-click="view_package"
+                        phx-value-id={package.id}
+                        class="flex-1 bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
             <% end %>
           </div>
         </div>

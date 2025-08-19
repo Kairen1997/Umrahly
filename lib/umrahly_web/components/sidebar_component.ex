@@ -5,7 +5,7 @@ defmodule UmrahlyWeb.SidebarComponent do
     ~H"""
     <div class="flex min-h-screen bg-gray-100" style="min-height: calc(100vh - 64px);">
       <!-- Sidebar -->
-      <aside class="w-50 bg-blue-900 shadow-lg h-50 flex flex-col justify-between">
+      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
         <!-- Navigation Menu -->
         <div>
           <nav class="mt-0">

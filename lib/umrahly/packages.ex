@@ -313,4 +313,46 @@ defmodule Umrahly.Packages do
     |> preload([:package])
     |> Repo.all()
   end
+
+  @doc """
+  Returns all package schedules with preloaded packages and booking statistics.
+  This function optimizes database queries by fetching all data in a single query.
+  """
+  def list_package_schedules_with_stats do
+    # Get all schedules with preloaded packages
+    schedules = list_package_schedules()
+
+    # Get all schedule IDs
+    schedule_ids = Enum.map(schedules, & &1.id)
+
+    # Get booking counts for all schedules in a single query
+    booking_counts =
+      from(b in Umrahly.Bookings.Booking,
+        where: b.package_id in ^schedule_ids,
+        group_by: b.package_id,
+        select: {
+          b.package_id,
+          count(b.id),
+          count(fragment("CASE WHEN ? = 'confirmed' THEN 1 END", b.status))
+        }
+      )
+      |> Repo.all()
+      |> Map.new(fn {package_id, total, confirmed} ->
+        {package_id, %{total: total, confirmed: confirmed}}
+      end)
+
+    # Attach booking stats to each schedule
+    Enum.map(schedules, fn schedule ->
+      stats = Map.get(booking_counts, schedule.id, %{total: 0, confirmed: 0})
+      available_slots = schedule.quota - stats.confirmed
+      booking_percentage = if schedule.quota > 0, do: (stats.confirmed / schedule.quota) * 100, else: 0.0
+
+      Map.put(schedule, :booking_stats, %{
+        total_bookings: stats.total,
+        confirmed_bookings: stats.confirmed,
+        available_slots: available_slots,
+        booking_percentage: Float.round(booking_percentage, 1)
+      })
+    end)
+  end
 end

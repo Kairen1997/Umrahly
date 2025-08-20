@@ -7,7 +7,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
   def mount(_params, _session, socket) do
     packages = Packages.list_packages()
-    schedules = Packages.list_package_schedules()
+    schedules = Packages.list_package_schedules_with_stats()
 
     socket =
       socket
@@ -60,14 +60,12 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
   end
 
   def handle_event("view_schedule", %{"id" => schedule_id}, socket) do
-    schedule = Packages.get_package_schedule!(schedule_id)
-    booking_stats = Packages.get_package_schedule_booking_stats(schedule_id)
+    schedule = Enum.find(socket.assigns.schedules, & &1.id == String.to_integer(schedule_id))
 
     socket =
       socket
       |> assign(:viewing_schedule_id, schedule_id)
       |> assign(:current_schedule, schedule)
-      |> assign(:current_schedule_booking_stats, booking_stats)
 
     {:noreply, socket}
   end
@@ -135,7 +133,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
         # Creating new schedule
         case Packages.create_package_schedule(schedule_params) do
           {:ok, _schedule} ->
-            schedules = Packages.list_package_schedules()
+            schedules = Packages.list_package_schedules_with_stats()
 
             socket =
               socket
@@ -160,7 +158,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
         schedule = Packages.get_package_schedule!(schedule_id)
         case Packages.update_package_schedule(schedule, schedule_params) do
           {:ok, _updated_schedule} ->
-            schedules = Packages.list_package_schedules()
+            schedules = Packages.list_package_schedules_with_stats()
 
             socket =
               socket
@@ -187,7 +185,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     schedule = Packages.get_package_schedule!(schedule_id)
     {:ok, _} = Packages.delete_package_schedule(schedule)
 
-    schedules = Packages.list_package_schedules()
+    schedules = Packages.list_package_schedules_with_stats()
 
     socket =
       socket
@@ -203,7 +201,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     schedule = Packages.get_package_schedule!(schedule_id)
     {:ok, _} = Packages.update_package_schedule(schedule, %{status: "cancelled"})
 
-    schedules = Packages.list_package_schedules()
+    schedules = Packages.list_package_schedules_with_stats()
 
     socket =
       socket
@@ -705,11 +703,11 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                     <h4 class="text-sm font-semibold text-blue-900 mb-3">Booking Statistics</h4>
                     <div class="grid grid-cols-2 gap-4">
                       <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600"><%= @current_schedule_booking_stats.confirmed_bookings %></div>
+                        <div class="text-2xl font-bold text-blue-600"><%= @current_schedule.booking_stats.confirmed_bookings %></div>
                         <div class="text-xs text-blue-700">Confirmed Bookings</div>
                       </div>
                       <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600"><%= @current_schedule_booking_stats.available_slots %></div>
+                        <div class="text-2xl font-bold text-green-600"><%= @current_schedule.booking_stats.available_slots %></div>
                         <div class="text-xs text-green-700">Available Slots</div>
                       </div>
                     </div>
@@ -720,11 +718,11 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                       </div>
                       <div class="flex justify-between items-center mt-1">
                         <span class="text-sm text-blue-700">Booking Percentage:</span>
-                        <span class="text-sm font-semibold text-blue-900"><%= @current_schedule_booking_stats.booking_percentage %>%</span>
+                        <span class="text-sm font-semibold text-blue-900"><%= @current_schedule.booking_stats.booking_percentage %>%</span>
                       </div>
                       <div class="mt-2">
                         <div class="w-full bg-blue-200 rounded-full h-2">
-                          <div class="bg-blue-600 h-2 rounded-full" style={"width: #{@current_schedule_booking_stats.booking_percentage}%"}>
+                          <div class="bg-blue-600 h-2 rounded-full" style={"width: #{@current_schedule.booking_stats.booking_percentage}%"}>
                           </div>
                         </div>
                       </div>
@@ -733,31 +731,36 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                 </div>
 
                 <div class="flex flex-col space-y-3">
-                  <button
-                    phx-click="edit_schedule"
-                    phx-value-id={@current_schedule.id}
-                    class="w-full bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
-                  >
-                    Edit Schedule
-                  </button>
-                  <%= if @current_schedule.status == "active" do %>
-                    <button
-                      phx-click="cancel_schedule"
-                      phx-value-id={@current_schedule.id}
-                      data-confirm="Are you sure you want to cancel this schedule?"
-                      class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
-                    >
-                      Cancel Schedule
-                    </button>
-                  <% end %>
-                  <button
-                    phx-click="delete_schedule"
-                    phx-value-id={@current_schedule.id}
-                    data-confirm="Are you sure you want to delete this schedule? This will also delete all associated bookings."
-                    class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    Delete Schedule
-                  </button>
+                  <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h4>
+                    <div class="space-y-2">
+                      <button
+                        phx-click="edit_schedule"
+                        phx-value-id={@current_schedule.id}
+                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                      Edit Schedule
+                      </button>
+                      <%= if @current_schedule.status == "active" do %>
+                        <button
+                          phx-click="cancel_schedule"
+                          phx-value-id={@current_schedule.id}
+                          data-confirm="Are you sure you want to cancel this schedule?"
+                          class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                        >
+                          Cancel Schedule
+                        </button>
+                      <% end %>
+                      <button
+                        phx-click="delete_schedule"
+                        phx-value-id={@current_schedule.id}
+                        data-confirm="Are you sure you want to delete this schedule? This will also delete all associated bookings."
+                        class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                      >
+                        Delete Schedule
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -831,12 +834,12 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                       <div class="flex justify-between items-center">
                         <span class="text-xs text-gray-500">Bookings:</span>
                         <span class="text-xs font-medium text-gray-900">
-                          <%= Packages.get_package_schedule_booking_stats(schedule.id).confirmed_bookings %> / <%= schedule.quota %>
+                          <%= schedule.booking_stats.confirmed_bookings %> / <%= schedule.quota %>
                         </span>
                       </div>
                       <div class="mt-1">
                         <div class="w-full bg-gray-200 rounded-full h-1.5">
-                          <div class="bg-teal-500 h-1.5 rounded-full" style={"width: #{Packages.get_package_schedule_booking_stats(schedule.id).booking_percentage}%"}>
+                          <div class="bg-teal-500 h-1.5 rounded-full" style={"width: #{schedule.booking_stats.booking_percentage}%"}>
                           </div>
                         </div>
                       </div>

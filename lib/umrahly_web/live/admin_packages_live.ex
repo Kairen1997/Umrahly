@@ -14,6 +14,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:search_query, "")
       |> assign(:search_status, "")
       |> assign(:search_departure_date, "")
+      |> assign(:search_return_date, "")
       |> assign(:current_page, "packages")
       |> assign(:viewing_package_id, nil)
       |> assign(:show_add_form, false)
@@ -33,8 +34,9 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     search_query = Map.get(search_params, "query", "")
     search_status = Map.get(search_params, "status", "")
     search_departure_date = Map.get(search_params, "departure_date", "")
+    search_return_date = Map.get(search_params, "return_date", "")
 
-    filtered_packages = filter_packages(socket.assigns.packages, search_query, search_status, search_departure_date)
+    filtered_packages = filter_packages(socket.assigns.packages, search_query, search_status, search_departure_date, search_return_date)
 
     socket =
       socket
@@ -42,6 +44,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:search_query, search_query)
       |> assign(:search_status, search_status)
       |> assign(:search_departure_date, search_departure_date)
+      |> assign(:search_return_date, search_return_date)
 
     {:noreply, socket}
   end
@@ -53,6 +56,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:search_query, "")
       |> assign(:search_status, "")
       |> assign(:search_departure_date, "")
+      |> assign(:search_return_date, "")
 
     {:noreply, socket}
   end
@@ -236,15 +240,16 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
-  defp filter_packages(packages, search_query, search_status, search_departure_date) do
+  defp filter_packages(packages, search_query, search_status, search_departure_date, search_return_date) do
     packages
     |> Enum.filter(fn package ->
       name_matches = search_query == "" || String.contains?(String.downcase(package.name), String.downcase(search_query))
       description_matches = search_query == "" || (package.description && String.contains?(String.downcase(package.description), String.downcase(search_query)))
       status_matches = search_status == "" || package.status == search_status
-      date_matches = search_departure_date == "" || to_string(package.departure_date) == search_departure_date
+      departure_date_matches = search_departure_date == "" || to_string(package.departure_date) == search_departure_date
+      return_date_matches = search_return_date == "" || to_string(package.return_date) == search_return_date
 
-      (name_matches || description_matches) && status_matches && date_matches
+      (name_matches || description_matches) && status_matches && departure_date_matches && return_date_matches
     end)
   end
 
@@ -265,7 +270,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <!-- Search Bar -->
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
             <form phx-change="search_packages" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Package Name or Description</label>
                     <input
@@ -299,6 +304,16 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                   />
                 </div>
 
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
+                  <input
+                    type="date"
+                    name="search[return_date]"
+                    value={@search_return_date}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+
                 <div class="flex items-end">
                   <button
                     type="button"
@@ -316,8 +331,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <div class="mb-4">
             <p class="text-sm text-gray-600">
               Showing <%= length(@filtered_packages) %> of <%= length(@packages) %> packages
-              <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" do %>
-                (filtered by name, description, status, and departure date)
+              <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" || @search_return_date != "" do %>
+                (filtered by name, description, status, departure date, and return date)
               <% end %>
             </p>
           </div>
@@ -524,6 +539,20 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     />
                     <%= if @package_changeset.errors[:departure_date] do %>
                       <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:departure_date], 0) %></p>
+                    <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
+                    <input
+                      type="date"
+                      name="package[return_date]"
+                      value={@package_changeset.changes[:return_date] || @package_changeset.data.return_date || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:return_date] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:return_date], 0) %></p>
                     <% end %>
                   </div>
 
@@ -742,6 +771,20 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <% end %>
                   </div>
 
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
+                    <input
+                      type="date"
+                      name="package[return_date]"
+                      value={@package_changeset.changes[:return_date] || @package_changeset.data.return_date || ""}
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      required
+                    />
+                    <%= if @package_changeset.errors[:return_date] do %>
+                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:return_date], 0) %></p>
+                    <% end %>
+                  </div>
+
                   <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Package Picture</label>
                     <%= if @package_changeset.data.picture do %>
@@ -871,6 +914,10 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <div class="flex justify-between">
                       <span class="text-sm text-gray-500">Departure Date:</span>
                       <span class="text-sm font-medium text-gray-900"><%= @current_package.departure_date %></span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-gray-500">Return Date:</span>
+                      <span class="text-sm font-medium text-gray-900"><%= @current_package.return_date %></span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-sm text-gray-500">Status:</span>
@@ -1012,6 +1059,10 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <div class="flex justify-between">
                       <span class="text-sm text-gray-500">Departure Date:</span>
                       <span class="text-sm font-medium text-gray-900"><%= package.departure_date %></span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-gray-500">Return Date:</span>
+                      <span class="text-sm font-medium text-gray-900"><%= package.return_date %></span>
                     </div>
 
                     <!-- Quick Booking Status -->

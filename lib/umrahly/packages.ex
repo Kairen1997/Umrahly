@@ -7,44 +7,41 @@ defmodule Umrahly.Packages do
   alias Umrahly.Repo
 
   alias Umrahly.Packages.Package
+  alias Umrahly.Packages.PackageSchedule
 
   @doc """
   Returns the list of packages.
-
-  ## Examples
-
-      iex> list_packages()
-      [%Package{}, ...]
-
   """
   def list_packages do
     Repo.all(Package)
   end
 
   @doc """
+  Returns the list of packages with their schedules.
+  """
+  def list_packages_with_schedules do
+    Package
+    |> preload([:package_schedules])
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single package.
-
-  Raises if the Package does not exist.
-
-  ## Examples
-
-      iex> get_package!(123)
-      %Package{}
-
   """
   def get_package!(id), do: Repo.get!(Package, id)
 
   @doc """
+  Gets a single package with schedules.
+  """
+  def get_package_with_schedules!(id) do
+    Package
+    |> where([p], p.id == ^id)
+    |> preload([:package_schedules])
+    |> Repo.one!()
+  end
+
+  @doc """
   Creates a package.
-
-  ## Examples
-
-      iex> create_package(%{field: value})
-      {:ok, %Package{}}
-
-      iex> create_package(%{field: bad_value})
-      {:error, ...}
-
   """
   def create_package(attrs \\ %{}) do
     %Package{}
@@ -54,15 +51,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Updates a package.
-
-  ## Examples
-
-      iex> update_package(package, %{field: new_value})
-      {:ok, %Package{}}
-
-      iex> update_package(package, %{field: bad_value})
-      {:error, ...}
-
   """
   def update_package(%Package{} = package, attrs) do
     package
@@ -72,15 +60,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Deletes a Package.
-
-  ## Examples
-
-      iex> delete_package(package)
-      {:ok, %Package{}}
-
-      iex> delete_package(package)
-      {:error, ...}
-
   """
   def delete_package(%Package{} = package) do
     Repo.delete(package)
@@ -88,12 +67,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns a data structure for tracking package changes.
-
-  ## Examples
-
-      iex> change_package(package)
-      %Todo{...}
-
   """
   def change_package(%Package{} = package, _attrs \\ %{}) do
     Package.changeset(package, %{})
@@ -101,12 +74,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns the total count of packages.
-
-  ## Examples
-
-      iex> count_packages()
-      6
-
   """
   def count_packages do
     Repo.aggregate(Package, :count, :id)
@@ -114,12 +81,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns the count of available (active) packages.
-
-  ## Examples
-
-      iex> count_available_packages()
-      4
-
   """
   def count_available_packages do
     Package
@@ -129,15 +90,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns the count of packages by status.
-
-  ## Examples
-
-      iex> count_packages_by_status("active")
-      4
-
-      iex> count_packages_by_status("inactive")
-      2
-
   """
   def count_packages_by_status(status) do
     Package
@@ -147,32 +99,21 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns comprehensive package statistics for the admin dashboard.
-
-  ## Examples
-
-      iex> get_package_statistics()
-      %{
-        total_packages: 6,
-        active_packages: 4,
-        inactive_packages: 2,
-        upcoming_departures: 3,
-        total_quota: 120
-      }
-
   """
   def get_package_statistics do
     total_packages = count_packages()
     active_packages = count_available_packages()
     inactive_packages = count_packages_by_status("inactive")
 
-    # Count packages with departure dates in the future
-    upcoming_departures = Package
-    |> where([p], p.departure_date > ^Date.utc_today())
+    # Count schedules with departure dates in the future
+    upcoming_departures = PackageSchedule
+    |> where([ps], ps.departure_date > ^Date.utc_today() and ps.status == "active")
     |> Repo.aggregate(:count, :id)
 
-    # Sum total quota across all packages
-    total_quota = Package
-    |> select([p], sum(p.quota))
+    # Sum total quota across all active schedules
+    total_quota = PackageSchedule
+    |> where([ps], ps.status == "active")
+    |> select([ps], sum(ps.quota))
     |> Repo.one() || 0
 
     %{
@@ -186,18 +127,6 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns recent package activities for the admin dashboard.
-
-  ## Examples
-
-      iex> get_recent_package_activities(5)
-      [
-        %{
-          action: "created",
-          package_name: "Premium Umrah Package",
-          timestamp: ~U[2024-08-19 10:00:00Z]
-        }
-      ]
-
   """
   def get_recent_package_activities(limit \\ 5) do
     Package
@@ -211,7 +140,6 @@ defmodule Umrahly.Packages do
     })
     |> Repo.all()
     |> Enum.map(fn activity ->
-      # Format the timestamp for display
       formatted_time = Calendar.strftime(activity.timestamp, "%B %d, %Y at %I:%M %p")
 
       %{
@@ -226,54 +154,30 @@ defmodule Umrahly.Packages do
 
   @doc """
   Returns packages that are expiring soon (departure date within 30 days).
-
-  ## Examples
-
-      iex> get_expiring_soon_packages()
-      [%Package{}, ...]
-
   """
   def get_expiring_soon_packages do
     thirty_days_from_now = Date.add(Date.utc_today(), 30)
 
-    Package
-    |> where([p], p.departure_date <= ^thirty_days_from_now and p.departure_date > ^Date.utc_today())
-    |> order_by([p], [asc: p.departure_date])
+    PackageSchedule
+    |> where([ps], ps.departure_date <= ^thirty_days_from_now and ps.departure_date > ^Date.utc_today() and ps.status == "active")
+    |> order_by([ps], [asc: ps.departure_date])
+    |> preload([:package])
     |> Repo.all()
   end
 
   @doc """
   Returns packages with low quota (less than 10 available spots).
-
-  ## Examples
-
-      iex> get_low_quota_packages()
-      [%Package{}, ...]
-
   """
   def get_low_quota_packages do
-    Package
-    |> where([p], p.quota < 10 and p.status == "active")
-    |> order_by([p], [asc: p.quota])
+    PackageSchedule
+    |> where([ps], ps.quota < 10 and ps.status == "active")
+    |> order_by([ps], [asc: ps.quota])
+    |> preload([:package])
     |> Repo.all()
   end
 
   @doc """
   Returns enhanced package statistics including low quota and expiring packages.
-
-  ## Examples
-
-      iex> get_enhanced_package_statistics()
-      %{
-        total_packages: 6,
-        active_packages: 4,
-        inactive_packages: 2,
-        upcoming_departures: 3,
-        total_quota: 120,
-        low_quota_packages: 2,
-        expiring_soon_count: 3
-      }
-
   """
   def get_enhanced_package_statistics do
     basic_stats = get_package_statistics()
@@ -286,28 +190,67 @@ defmodule Umrahly.Packages do
     })
   end
 
+  # Package Schedule functions
+
   @doc """
-  Returns booking statistics for a specific package.
-
-  ## Examples
-
-      iex> get_package_booking_stats(package_id)
-      %{
-        total_bookings: 15,
-        confirmed_bookings: 12,
-        available_slots: 35,
-        booking_percentage: 25.0
-      }
-
+  Returns the list of package schedules.
   """
-  def get_package_booking_stats(package_id) do
+  def list_package_schedules do
+    PackageSchedule
+    |> preload([:package])
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single package schedule.
+  """
+  def get_package_schedule!(id), do: Repo.get!(PackageSchedule, id)
+
+  @doc """
+  Creates a package schedule.
+  """
+  def create_package_schedule(attrs \\ %{}) do
+    %PackageSchedule{}
+    |> PackageSchedule.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a package schedule.
+  """
+  def update_package_schedule(%PackageSchedule{} = package_schedule, attrs) do
+    package_schedule
+    |> PackageSchedule.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a package schedule.
+  """
+  def delete_package_schedule(%PackageSchedule{} = package_schedule) do
+    Repo.delete(package_schedule)
+  end
+
+  @doc """
+  Returns a data structure for tracking package schedule changes.
+  """
+  def change_package_schedule(%PackageSchedule{} = package_schedule, _attrs \\ %{}) do
+    PackageSchedule.changeset(package_schedule, %{})
+  end
+
+  @doc """
+  Returns booking statistics for a specific package schedule.
+  """
+  def get_package_schedule_booking_stats(schedule_id) do
     alias Umrahly.Bookings
 
-    package = get_package!(package_id)
-    total_bookings = Bookings.count_bookings_for_package(package_id)
-    confirmed_bookings = Bookings.count_confirmed_bookings_for_package(package_id)
-    available_slots = package.quota - confirmed_bookings
-    booking_percentage = if package.quota > 0, do: (confirmed_bookings / package.quota) * 100, else: 0.0
+    package_schedule = get_package_schedule!(schedule_id)
+    total_bookings = Bookings.count_bookings_for_schedule(schedule_id)
+    confirmed_bookings = Bookings.count_confirmed_bookings_for_schedule(schedule_id)
+
+    # Use package_schedule.quota since quota is now in package_schedules
+    available_slots = package_schedule.quota - confirmed_bookings
+    booking_percentage = if package_schedule.quota > 0, do: (confirmed_bookings / package_schedule.quota) * 100, else: 0.0
 
     %{
       total_bookings: total_bookings,
@@ -315,5 +258,59 @@ defmodule Umrahly.Packages do
       available_slots: available_slots,
       booking_percentage: Float.round(booking_percentage, 1)
     }
+  end
+
+  @doc """
+  Returns all schedules for a specific package.
+  """
+  def get_package_schedules(package_id) do
+    PackageSchedule
+    |> where([ps], ps.package_id == ^package_id)
+    |> order_by([ps], [asc: ps.departure_date])
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns booking statistics for a specific package.
+  """
+  def get_package_booking_stats(package_id) do
+    alias Umrahly.Bookings
+
+    # Get all active schedules for this package to calculate total quota
+    active_schedules = get_active_package_schedules(package_id)
+    total_quota = Enum.reduce(active_schedules, 0, fn schedule, acc -> acc + schedule.quota end)
+
+    total_bookings = Bookings.count_bookings_for_package(package_id)
+    confirmed_bookings = Bookings.count_confirmed_bookings_for_package(package_id)
+    available_slots = total_quota - confirmed_bookings
+    booking_percentage = if total_quota > 0, do: (confirmed_bookings / total_quota) * 100, else: 0.0
+
+    %{
+      total_bookings: total_bookings,
+      confirmed_bookings: confirmed_bookings,
+      available_slots: available_slots,
+      booking_percentage: Float.round(booking_percentage, 1)
+    }
+  end
+
+  @doc """
+  Returns active schedules for a specific package.
+  """
+  def get_active_package_schedules(package_id) do
+    PackageSchedule
+    |> where([ps], ps.package_id == ^package_id and ps.status == "active")
+    |> order_by([ps], [asc: ps.departure_date])
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns schedules with departure dates in the future.
+  """
+  def get_upcoming_schedules do
+    PackageSchedule
+    |> where([ps], ps.departure_date > ^Date.utc_today() and ps.status == "active")
+    |> order_by([ps], [asc: ps.departure_date])
+    |> preload([:package])
+    |> Repo.all()
   end
 end

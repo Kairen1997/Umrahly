@@ -5,7 +5,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   alias Umrahly.Packages
 
   def mount(_params, _session, socket) do
-    packages = Packages.list_packages()
+    packages = Packages.list_packages_with_schedules()
 
     socket =
       socket
@@ -13,8 +13,6 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:filtered_packages, packages)
       |> assign(:search_query, "")
       |> assign(:search_status, "")
-      |> assign(:search_departure_date, "")
-      |> assign(:search_return_date, "")
       |> assign(:current_page, "packages")
       |> assign(:viewing_package_id, nil)
       |> assign(:show_add_form, false)
@@ -33,18 +31,14 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   def handle_event("search_packages", %{"search" => search_params}, socket) do
     search_query = Map.get(search_params, "query", "")
     search_status = Map.get(search_params, "status", "")
-    search_departure_date = Map.get(search_params, "departure_date", "")
-    search_return_date = Map.get(search_params, "return_date", "")
 
-    filtered_packages = filter_packages(socket.assigns.packages, search_query, search_status, search_departure_date, search_return_date)
+    filtered_packages = filter_packages(socket.assigns.packages, search_query, search_status)
 
     socket =
       socket
       |> assign(:filtered_packages, filtered_packages)
       |> assign(:search_query, search_query)
       |> assign(:search_status, search_status)
-      |> assign(:search_departure_date, search_departure_date)
-      |> assign(:search_return_date, search_return_date)
 
     {:noreply, socket}
   end
@@ -55,15 +49,34 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:filtered_packages, socket.assigns.packages)
       |> assign(:search_query, "")
       |> assign(:search_status, "")
-      |> assign(:search_departure_date, "")
-      |> assign(:search_return_date, "")
 
     {:noreply, socket}
   end
 
   def handle_event("view_package", %{"id" => package_id}, socket) do
-    package = Packages.get_package!(package_id)
-    booking_stats = Packages.get_package_booking_stats(package_id)
+    package = Packages.get_package_with_schedules!(package_id)
+
+    # Get the first active schedule to calculate booking stats
+    first_schedule = List.first(package.package_schedules) || %{quota: 0}
+
+    # Calculate booking stats from package schedules
+    booking_stats = if first_schedule.quota && first_schedule.quota > 0 do
+      total_confirmed = Packages.get_package_schedule_booking_stats(first_schedule.id).confirmed_bookings
+      available_slots = first_schedule.quota - total_confirmed
+      booking_percentage = if first_schedule.quota > 0, do: (total_confirmed / first_schedule.quota) * 100, else: 0.0
+
+      %{
+        confirmed_bookings: total_confirmed,
+        available_slots: available_slots,
+        booking_percentage: Float.round(booking_percentage, 1)
+      }
+    else
+      %{
+        confirmed_bookings: 0,
+        available_slots: 0,
+        booking_percentage: 0.0
+      }
+    end
 
     socket =
       socket
@@ -240,16 +253,14 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
-  defp filter_packages(packages, search_query, search_status, search_departure_date, search_return_date) do
+  defp filter_packages(packages, search_query, search_status) do
     packages
     |> Enum.filter(fn package ->
       name_matches = search_query == "" || String.contains?(String.downcase(package.name), String.downcase(search_query))
       description_matches = search_query == "" || (package.description && String.contains?(String.downcase(package.description), String.downcase(search_query)))
       status_matches = search_status == "" || package.status == search_status
-      departure_date_matches = search_departure_date == "" || to_string(package.departure_date) == search_departure_date
-      return_date_matches = search_return_date == "" || to_string(package.return_date) == search_return_date
 
-      (name_matches || description_matches) && status_matches && departure_date_matches && return_date_matches
+      (name_matches || description_matches) && status_matches
     end)
   end
 
@@ -270,17 +281,17 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <!-- Search Bar -->
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
             <form phx-change="search_packages" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Package Name or Description</label>
-                    <input
-                      type="text"
-                      name="search[query]"
-                      value={@search_query}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Search by package name or description..."
-                    />
-                  </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name or Description</label>
+                  <input
+                    type="text"
+                    name="search[query]"
+                    value={@search_query}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="Search by package name or description..."
+                  />
+                </div>
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -292,26 +303,6 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <option value="active" selected={@search_status == "active"}>Active</option>
                     <option value="inactive" selected={@search_status == "inactive"}>Inactive</option>
                   </select>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
-                  <input
-                    type="date"
-                    name="search[departure_date]"
-                    value={@search_departure_date}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
-                  <input
-                    type="date"
-                    name="search[return_date]"
-                    value={@search_return_date}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  />
                 </div>
 
                 <div class="flex items-end">
@@ -331,8 +322,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <div class="mb-4">
             <p class="text-sm text-gray-600">
               Showing <%= length(@filtered_packages) %> of <%= length(@packages) %> packages
-              <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" || @search_return_date != "" do %>
-                (filtered by name, description, status, departure date, and return date)
+              <%= if @search_query != "" || @search_status != "" do %>
+                (filtered by name, description, and status)
               <% end %>
             </p>
           </div>
@@ -349,7 +340,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-blue-600">Total Quota</p>
                   <p class="text-2xl font-bold text-blue-900">
-                    <%= @packages |> Enum.reduce(0, fn p, acc -> acc + p.quota end) %>
+                    <%= @packages |> Enum.reduce(0, fn package, acc ->
+                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
+                        schedule_acc + (schedule.quota || 0)
+                      end)
+                    end) %>
                   </p>
                 </div>
               </div>
@@ -365,7 +360,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-green-600">Confirmed Bookings</p>
                   <p class="text-2xl font-bold text-green-900">
-                    <%= @packages |> Enum.reduce(0, fn p, acc -> acc + Packages.get_package_booking_stats(p.id).confirmed_bookings end) %>
+                    <%= @packages |> Enum.reduce(0, fn package, acc ->
+                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
+                        schedule_acc + Packages.get_package_schedule_booking_stats(schedule.id).confirmed_bookings
+                      end)
+                    end) %>
                   </p>
                 </div>
               </div>
@@ -381,7 +380,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-yellow-600">Available Slots</p>
                   <p class="text-2xl font-bold text-yellow-900">
-                    <%= @packages |> Enum.reduce(0, fn p, acc -> acc + Packages.get_package_booking_stats(p.id).available_slots end) %>
+                    <%= @packages |> Enum.reduce(0, fn package, acc ->
+                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
+                        schedule_acc + Packages.get_package_schedule_booking_stats(schedule.id).available_slots
+                      end)
+                    end) %>
                   </p>
                 </div>
               </div>
@@ -397,7 +400,15 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-purple-600">Avg. Occupancy</p>
                   <p class="text-2xl font-bold text-purple-900">
-                    <%= @packages |> Enum.map(fn p -> Packages.get_package_booking_stats(p.id).booking_percentage end) |> Enum.sum() |> Kernel./(length(@packages)) |> Float.round(1) %>%
+                    <% total_percentage = @packages |> Enum.reduce(0, fn package, acc ->
+                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
+                        schedule_acc + Packages.get_package_schedule_booking_stats(schedule.id).booking_percentage
+                      end)
+                    end) %>
+                    <% total_schedules = @packages |> Enum.reduce(0, fn package, acc ->
+                      acc + length(package.package_schedules)
+                    end) %>
+                    <%= if total_schedules > 0, do: Float.round(total_percentage / total_schedules, 1), else: 0.0 %>%
                   </p>
                 </div>
               </div>
@@ -511,49 +522,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <% end %>
                   </div>
 
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Quota</label>
-                    <input
-                      type="number"
-                      name="package[quota]"
-                      value={@package_changeset.changes[:quota] || @package_changeset.data.quota || ""}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Enter quota"
-                      min="1"
-                      max="100"
-                      required
-                    />
-                    <%= if @package_changeset.errors[:quota] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:quota], 0) %></p>
-                    <% end %>
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
-                    <input
-                      type="date"
-                      name="package[departure_date]"
-                      value={@package_changeset.changes[:departure_date] || @package_changeset.data.departure_date || ""}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    />
-                    <%= if @package_changeset.errors[:departure_date] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:departure_date], 0) %></p>
-                    <% end %>
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
-                    <input
-                      type="date"
-                      name="package[return_date]"
-                      value={@package_changeset.changes[:return_date] || @package_changeset.data.return_date || ""}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    />
-                    <%= if @package_changeset.errors[:return_date] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:return_date], 0) %></p>
-                    <% end %>
+                  <div class="md:col-span-2">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p class="text-sm text-blue-800">
+                        <strong>Note:</strong> Quota, departure date, and return date are managed through package schedules.
+                        After creating this package, you can add specific schedules with departure dates, return dates, and quotas.
+                      </p>
+                    </div>
                   </div>
 
                   <div class="md:col-span-2">
@@ -740,49 +715,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <% end %>
                   </div>
 
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Quota</label>
-                    <input
-                      type="number"
-                      name="package[quota]"
-                      value={@package_changeset.changes[:quota] || @package_changeset.data.quota || ""}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Enter quota"
-                      min="1"
-                      max="100"
-                      required
-                    />
-                    <%= if @package_changeset.errors[:quota] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:quota], 0) %></p>
-                    <% end %>
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
-                    <input
-                      type="date"
-                      name="package[departure_date]"
-                      value={@package_changeset.changes[:departure_date] || @package_changeset.data.departure_date || ""}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    />
-                    <%= if @package_changeset.errors[:departure_date] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:departure_date], 0) %></p>
-                    <% end %>
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
-                    <input
-                      type="date"
-                      name="package[return_date]"
-                      value={@package_changeset.changes[:return_date] || @package_changeset.data.return_date || ""}
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    />
-                    <%= if @package_changeset.errors[:return_date] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:return_date], 0) %></p>
-                    <% end %>
+                  <div class="md:col-span-2">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p class="text-sm text-blue-800">
+                        <strong>Note:</strong> Quota, departure date, and return date are managed through package schedules.
+                        You can manage these through the package schedules section.
+                      </p>
+                    </div>
                   </div>
 
                   <div class="md:col-span-2">
@@ -907,18 +846,34 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       <span class="text-sm text-gray-500">Duration:</span>
                       <span class="text-sm font-medium text-gray-900"><%= @current_package.duration_days %> days / <%= @current_package.duration_nights %> nights</span>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Quota:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_package.quota %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Departure Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_package.departure_date %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Return Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_package.return_date %></span>
-                    </div>
+
+                    <!-- Package Schedules Information -->
+                    <%= if length(@current_package.package_schedules) > 0 do %>
+                      <div class="text-sm text-gray-500 mb-2">Package Schedules:</div>
+                      <%= for schedule <- @current_package.package_schedules do %>
+                        <div class="bg-gray-100 p-3 rounded-lg space-y-2">
+                          <div class="flex justify-between">
+                            <span class="text-xs text-gray-500">Quota:</span>
+                            <span class="text-xs font-medium text-gray-900"><%= schedule.quota %></span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span class="text-xs text-gray-500">Departure:</span>
+                            <span class="text-xs font-medium text-gray-900"><%= schedule.departure_date %></span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span class="text-xs text-gray-500">Return:</span>
+                            <span class="text-xs font-medium text-gray-900"><%= schedule.return_date %></span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span class="text-xs text-gray-500">Status:</span>
+                            <span class="text-xs font-medium text-gray-900"><%= schedule.status %></span>
+                          </div>
+                        </div>
+                      <% end %>
+                    <% else %>
+                      <div class="text-sm text-gray-500">No schedules available</div>
+                    <% end %>
+
                     <div class="flex justify-between">
                       <span class="text-sm text-gray-500">Status:</span>
                       <span class={[
@@ -951,7 +906,9 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <div class="mt-3 pt-3 border-t border-blue-200">
                       <div class="flex justify-between items-center">
                         <span class="text-sm text-blue-700">Total Quota:</span>
-                        <span class="text-sm font-semibold text-blue-900"><%= @current_package.quota %></span>
+                        <span class="text-sm font-semibold text-blue-900">
+                          <%= @current_package.package_schedules |> Enum.reduce(0, fn schedule, acc -> acc + (schedule.quota || 0) end) %>
+                        </span>
                       </div>
                       <div class="flex justify-between items-center mt-1">
                         <span class="text-sm text-blue-700">Booking Percentage:</span>
@@ -997,8 +954,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                   </svg>
                   <h3 class="mt-2 text-sm font-medium text-gray-900">No packages found</h3>
                   <p class="mt-1 text-sm text-gray-500">
-                    <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" do %>
-                      Try adjusting your search criteria for name, description, status, or departure date.
+                    <%= if @search_query != "" || @search_status != "" do %>
+                      Try adjusting your search criteria for name, description, or status.
                     <% else %>
                       Get started by creating a new package.
                     <% end %>
@@ -1052,35 +1009,49 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         <span class="text-sm text-gray-500">Duration:</span>
                         <span class="text-sm font-medium text-gray-900"><%= package.duration_days %> days / <%= package.duration_nights %> nights</span>
                       </div>
-                                          <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Quota:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= package.quota %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Departure Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= package.departure_date %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Return Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= package.return_date %></span>
-                    </div>
 
-                    <!-- Quick Booking Status -->
-                    <div class="mt-3 pt-3 border-t border-gray-200">
-                      <div class="flex justify-between items-center">
-                        <span class="text-xs text-gray-500">Bookings:</span>
-                        <span class="text-xs font-medium text-gray-900">
-                          <%= Packages.get_package_booking_stats(package.id).confirmed_bookings %> / <%= package.quota %>
-                        </span>
-                      </div>
-                      <div class="mt-1">
-                        <div class="w-full bg-gray-200 rounded-full h-1.5">
-                          <div class="bg-teal-500 h-1.5 rounded-full" style={"width: #{Packages.get_package_booking_stats(package.id).booking_percentage}%"}>
+                      <!-- Package Schedules Summary -->
+                      <%= if length(package.package_schedules) > 0 do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Schedules:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= length(package.package_schedules) %></span>
+                        </div>
+                        <%= for schedule <- Enum.take(package.package_schedules, 1) do %>
+                          <div class="flex justify-between">
+                            <span class="text-sm text-gray-500">Next Departure:</span>
+                            <span class="text-sm font-medium text-gray-900"><%= schedule.departure_date %></span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span class="text-sm text-gray-500">Quota:</span>
+                            <span class="text-sm font-medium text-gray-900"><%= schedule.quota %></span>
+                          </div>
+                        <% end %>
+                      <% else %>
+                        <div class="text-sm text-gray-500">No schedules available</div>
+                      <% end %>
+
+                      <!-- Quick Booking Status -->
+                      <%= if length(package.package_schedules) > 0 do %>
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                          <% first_schedule = List.first(package.package_schedules) %>
+                          <% total_confirmed = Packages.get_package_schedule_booking_stats(first_schedule.id).confirmed_bookings %>
+                          <% total_quota = first_schedule.quota %>
+                          <% booking_percentage = if total_quota > 0, do: (total_confirmed / total_quota) * 100, else: 0.0 %>
+                          <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500">Bookings:</span>
+                            <span class="text-xs font-medium text-gray-900">
+                              <%= total_confirmed %> / <%= total_quota %>
+                            </span>
+                          </div>
+                          <div class="mt-1">
+                            <div class="w-full bg-gray-200 rounded-full h-1.5">
+                              <div class="bg-teal-500 h-1.5 rounded-full" style={"width: #{Float.round(booking_percentage, 1)}%"}>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      <% end %>
                     </div>
-                  </div>
 
                     <div class="flex space-x-2">
                       <button

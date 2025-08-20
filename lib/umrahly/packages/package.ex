@@ -9,12 +9,10 @@ defmodule Umrahly.Packages.Package do
     field :price, :integer
     field :duration_days, :integer
     field :duration_nights, :integer
-    field :quota, :integer
-    field :departure_date, :date
-    field :return_date, :date
     field :picture, :string
 
-    has_many :bookings, Umrahly.Bookings.Booking
+    has_many :package_schedules, Umrahly.Packages.PackageSchedule
+    has_many :bookings, through: [:package_schedules, :bookings]
 
     timestamps(type: :utc_datetime)
   end
@@ -22,37 +20,11 @@ defmodule Umrahly.Packages.Package do
   @doc false
   def changeset(package, attrs) do
     package
-    |> cast(attrs, [:name, :description, :price, :duration_days, :duration_nights, :quota, :departure_date, :return_date, :status, :picture])
-    |> validate_required([:name, :price, :duration_days, :duration_nights, :quota, :departure_date, :return_date, :status])
+    |> cast(attrs, [:name, :description, :price, :duration_days, :duration_nights, :status, :picture])
+    |> validate_required([:name, :price, :duration_days, :duration_nights, :status])
     |> validate_inclusion(:status, ["active", "inactive"])
     |> validate_inclusion(:duration_days, 1..30)
     |> validate_inclusion(:duration_nights, 1..30)
-    |> validate_inclusion(:quota, 1..100)
-    |> validate_change(:departure_date, fn _, departure_date ->
-      if Date.compare(departure_date, Date.utc_today()) == :lt do
-        [{:departure_date, "Departure date must be in the future"}]
-      else
-        []
-      end
-    end)
-    |> validate_change(:return_date, fn _, return_date ->
-      if Date.compare(return_date, Date.utc_today()) == :lt do
-        [{:return_date, "Return date must be in the future"}]
-      else
-        []
-      end
-    end)
-    |> validate_change(:return_date, fn _, return_date ->
-      case package.departure_date do
-        nil -> []
-        departure_date ->
-          if Date.compare(return_date, departure_date) == :lt do
-            [{:return_date, "Return date must be after departure date"}]
-          else
-            []
-          end
-      end
-    end)
     |> validate_number(:price, greater_than: 0)
     |> validate_length(:picture, max: 255)
   end

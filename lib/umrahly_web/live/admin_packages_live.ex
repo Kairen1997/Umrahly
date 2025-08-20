@@ -145,7 +145,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   end
 
   def handle_event("save_package", %{"package" => package_params}, socket) do
-        # Process picture upload if any
+    # Process picture upload if any
     picture_path = case consume_uploaded_entries(socket, :package_picture, fn entry, _socket ->
       # Use a more reliable path for uploads
       uploads_dir = Path.join(File.cwd!(), "priv/static/images")
@@ -172,15 +172,59 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     package_params = if picture_path do
       Map.put(package_params, "picture", picture_path)
     else
-      package_params
+      # Keep existing picture if no new one uploaded and we're editing
+      if socket.assigns.editing_package_id do
+        existing_package = Packages.get_package!(socket.assigns.editing_package_id)
+        Map.put(package_params, "picture", existing_package.picture)
+      else
+        package_params
+      end
     end
+
+    # Ensure all required fields are present and properly formatted
+    package_params = package_params
+      |> Map.update("price", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
+      |> Map.update("duration_days", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
+      |> Map.update("duration_nights", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
+      |> Map.update("picture", nil, &if(is_binary(&1) && &1 == "", do: nil, else: &1))
+      |> Map.reject(fn {_k, v} -> is_binary(v) && v == "" end)
+
+    # Log package params for debugging
+    IO.inspect(package_params, label: "Package params before save")
+
+    # Check if all required fields are present
+    required_fields = ["name", "price", "duration_days", "duration_nights", "status"]
+    missing_fields = required_fields -- Map.keys(package_params)
+    if length(missing_fields) > 0 do
+      IO.inspect(missing_fields, label: "Missing required fields")
+    end
+
+    # Ensure all required fields have values
+    package_params = package_params
+      |> Map.put_new("name", "")
+      |> Map.put_new("price", 0)
+      |> Map.put_new("duration_days", 1)
+      |> Map.put_new("duration_nights", 1)
+      |> Map.put_new("status", "inactive")
+      |> Map.update("name", "", &if(is_binary(&1) && &1 == "", do: nil, else: &1))
+      |> Map.update("description", "", &if(is_binary(&1) && &1 == "", do: nil, else: &1))
+      |> Map.update("status", "inactive", &if(is_binary(&1) && &1 == "", do: "inactive", else: &1))
+      |> Map.update("price", 0, &if(is_binary(&1) && &1 == "", do: 0, else: &1))
+      |> Map.update("duration_days", 1, &if(is_binary(&1) && &1 == "", do: 1, else: &1))
+      |> Map.update("duration_nights", 1, &if(is_binary(&1) && &1 == "", do: 1, else: &1))
+      |> Map.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.put("name", package_params["name"] || "")
+      |> Map.put("price", package_params["price"] || 0)
+      |> Map.put("duration_days", package_params["duration_days"] || 1)
+      |> Map.put("duration_nights", package_params["duration_nights"] || 1)
+      |> Map.put("status", package_params["status"] || "inactive")
 
     case socket.assigns.editing_package_id do
       nil ->
         # Creating new package
         case Packages.create_package(package_params) do
           {:ok, _package} ->
-            packages = Packages.list_packages()
+            packages = Packages.list_packages_with_schedules()
 
             socket =
               socket
@@ -193,9 +237,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             {:noreply, socket}
 
           {:error, %Ecto.Changeset{} = changeset} ->
+            # Log validation errors for debugging
+            IO.inspect(changeset.errors, label: "Package create validation errors")
+
             socket =
               socket
               |> assign(:package_changeset, changeset)
+              |> put_flash(:error, "Failed to create package. Please check the form for errors.")
 
             {:noreply, socket}
         end
@@ -205,7 +253,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
         package = Packages.get_package!(package_id)
         case Packages.update_package(package, package_params) do
           {:ok, _updated_package} ->
-            packages = Packages.list_packages()
+            packages = Packages.list_packages_with_schedules()
 
             socket =
               socket
@@ -219,9 +267,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             {:noreply, socket}
 
           {:error, %Ecto.Changeset{} = changeset} ->
+            # Log validation errors for debugging
+            IO.inspect(changeset.errors, label: "Package update validation errors")
+
             socket =
               socket
               |> assign(:package_changeset, changeset)
+              |> put_flash(:error, "Failed to update package. Please check the form for errors.")
 
             {:noreply, socket}
         end
@@ -232,7 +284,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     package = Packages.get_package!(package_id)
     {:ok, _} = Packages.delete_package(package)
 
-    packages = Packages.list_packages()
+    packages = Packages.list_packages_with_schedules()
 
     socket =
       socket

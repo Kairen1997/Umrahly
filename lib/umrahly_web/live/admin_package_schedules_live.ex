@@ -216,12 +216,11 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     |> Enum.filter(fn schedule ->
       package = schedule.package
       name_matches = search_query == "" || String.contains?(String.downcase(package.name), String.downcase(search_query))
-      description_matches = search_query == "" || (package.description && String.contains?(String.downcase(package.description), String.downcase(search_query)))
       status_matches = search_status == "" || schedule.status == search_status
       departure_date_matches = search_departure_date == "" || to_string(schedule.departure_date) == search_departure_date
       return_date_matches = search_return_date == "" || to_string(schedule.return_date) == search_return_date
 
-      (name_matches || description_matches) && status_matches && departure_date_matches && return_date_matches
+      name_matches && status_matches && departure_date_matches && return_date_matches
     end)
   end
 
@@ -244,13 +243,13 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
             <form phx-change="search_schedules" class="space-y-4">
               <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name or Description</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
                   <input
                     type="text"
                     name="search[query]"
                     value={@search_query}
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    placeholder="Search by package name or description..."
+                    placeholder="Search by package name..."
                   />
                 </div>
 
@@ -306,13 +305,13 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
             <p class="text-sm text-gray-600">
               Showing <%= length(@filtered_schedules) %> of <%= length(@schedules) %> schedules
               <%= if @search_query != "" || @search_status != "" || @search_departure_date != "" || @search_return_date != "" do %>
-                (filtered by name, description, status, departure date, and return date)
+                (filtered by package name, status, departure date, and return date)
               <% end %>
             </p>
           </div>
 
           <!-- Overall Statistics -->
-          <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -376,6 +375,8 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                 </div>
               </div>
             </div>
+
+
           </div>
 
           <%= if @show_add_form do %>
@@ -690,6 +691,30 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                         <%= @current_schedule.status %>
                       </span>
                     </div>
+                    <%= if @current_schedule.package.accommodation_type && @current_schedule.package.accommodation_type != "" do %>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Accommodation:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.accommodation_type %></span>
+                      </div>
+                      <%= if @current_schedule.package.accommodation_details && @current_schedule.package.accommodation_details != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Accommodation Details:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.accommodation_details %></span>
+                        </div>
+                      <% end %>
+                    <% end %>
+                    <%= if @current_schedule.package.transport_type && @current_schedule.package.transport_type != "" do %>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Transport:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.transport_type %></span>
+                      </div>
+                      <%= if @current_schedule.package.transport_details && @current_schedule.package.transport_details != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Transport Details:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.transport_details %></span>
+                        </div>
+                      <% end %>
+                    <% end %>
                     <%= if @current_schedule.notes && @current_schedule.notes != "" do %>
                       <div class="flex justify-between">
                         <span class="text-sm text-gray-500">Notes:</span>
@@ -827,6 +852,18 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                         <span class="text-sm text-gray-500">Return:</span>
                         <span class="text-sm font-medium text-gray-900"><%= schedule.return_date %></span>
                       </div>
+                      <%= if schedule.package.accommodation_type && schedule.package.accommodation_type != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Accommodation:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= schedule.package.accommodation_type %></span>
+                        </div>
+                      <% end %>
+                      <%= if schedule.package.transport_type && schedule.package.transport_type != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Transport:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= schedule.package.transport_type %></span>
+                        </div>
+                      <% end %>
                     </div>
 
                     <!-- Quick Booking Status -->

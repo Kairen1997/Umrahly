@@ -309,10 +309,9 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     packages
     |> Enum.filter(fn package ->
       name_matches = search_query == "" || String.contains?(String.downcase(package.name), String.downcase(search_query))
-      description_matches = search_query == "" || (package.description && String.contains?(String.downcase(package.description), String.downcase(search_query)))
       status_matches = search_status == "" || package.status == search_status
 
-      (name_matches || description_matches) && status_matches
+      name_matches && status_matches
     end)
   end
 
@@ -335,13 +334,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             <form phx-change="search_packages" class="space-y-4">
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name or Description</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
                   <input
                     type="text"
                     name="search[query]"
                     value={@search_query}
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    placeholder="Search by package name or description..."
+                    placeholder="Search by package name..."
                   />
                 </div>
 
@@ -375,13 +374,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             <p class="text-sm text-gray-600">
               Showing <%= length(@filtered_packages) %> of <%= length(@packages) %> packages
               <%= if @search_query != "" || @search_status != "" do %>
-                (filtered by name, description, and status)
+                (filtered by package name and status)
               <% end %>
             </p>
           </div>
 
           <!-- Overall Booking Statistics -->
-          <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -465,6 +464,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 </div>
               </div>
             </div>
+
+
           </div>
 
           <%= if @show_add_form do %>
@@ -572,6 +573,59 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <%= if @package_changeset.errors[:duration_nights] do %>
                       <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:duration_nights], 0) %></p>
                     <% end %>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Accommodation Type</label>
+                    <select
+                      name="package[accommodation_type]"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value="">Select accommodation type</option>
+                      <option value="3 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "3 Star Hotel" || @package_changeset.data.accommodation_type == "3 Star Hotel"}>3 Star Hotel</option>
+                      <option value="4 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "4 Star Hotel" || @package_changeset.data.accommodation_type == "4 Star Hotel"}>4 Star Hotel</option>
+                      <option value="5 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "5 Star Hotel" || @package_changeset.data.accommodation_type == "5 Star Hotel"}>5 Star Hotel</option>
+                      <option value="Apartment" selected={@package_changeset.changes[:accommodation_type] == "Apartment" || @package_changeset.data.accommodation_type == "Apartment"}>Apartment</option>
+                      <option value="Villa" selected={@package_changeset.changes[:accommodation_type] == "Villa" || @package_changeset.data.accommodation_type == "Villa"}>Villa</option>
+                      <option value="Guest House" selected={@package_changeset.changes[:accommodation_type] == "Guest House" || @package_changeset.data.accommodation_type == "Guest House"}>Guest House</option>
+                      <option value="Not Included" selected={@package_changeset.changes[:accommodation_type] == "Not Included" || @package_changeset.data.accommodation_type == "Not Included"}>Not Included</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transport Type</label>
+                    <select
+                      name="package[transport_type]"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value="">Select transport type</option>
+                      <option value="Flight" selected={@package_changeset.changes[:transport_type] == "Flight" || @package_changeset.data.transport_type == "Flight"}>Flight</option>
+                      <option value="Bus" selected={@package_changeset.changes[:transport_type] == "Bus" || @package_changeset.data.transport_type == "Bus"}>Bus</option>
+                      <option value="Train" selected={@package_changeset.changes[:transport_type] == "Train" || @package_changeset.data.transport_type == "Train"}>Train</option>
+                      <option value="Private Car" selected={@package_changeset.changes[:transport_type] == "Private Car" || @package_changeset.data.transport_type == "Private Car"}>Private Car</option>
+                      <option value="Shared Transport" selected={@package_changeset.changes[:transport_type] == "Shared Transport" || @package_changeset.data.transport_type == "Shared Transport"}>Shared Transport</option>
+                      <option value="Not Included" selected={@package_changeset.changes[:transport_type] == "Not Included" || @package_changeset.data.transport_type == "Not Included"}>Not Included</option>
+                    </select>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Accommodation Details</label>
+                    <textarea
+                      name="package[accommodation_details]"
+                      rows="2"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter accommodation details (e.g., hotel name, room type, amenities)..."
+                    ><%= @package_changeset.changes[:accommodation_details] || @package_changeset.data.accommodation_details || "" %></textarea>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transport Details</label>
+                    <textarea
+                      name="package[transport_details]"
+                      rows="2"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter transport details (e.g., flight details, pickup times, vehicle info)..."
+                    ><%= @package_changeset.changes[:transport_details] || @package_changeset.data.transport_details || "" %></textarea>
                   </div>
 
                   <div class="md:col-span-2">
@@ -767,6 +821,59 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <% end %>
                   </div>
 
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Accommodation Type</label>
+                    <select
+                      name="package[accommodation_type]"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value="">Select accommodation type</option>
+                      <option value="3 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "3 Star Hotel" || @package_changeset.data.accommodation_type == "3 Star Hotel"}>3 Star Hotel</option>
+                      <option value="4 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "4 Star Hotel" || @package_changeset.data.accommodation_type == "4 Star Hotel"}>4 Star Hotel</option>
+                      <option value="5 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "5 Star Hotel" || @package_changeset.data.accommodation_type == "5 Star Hotel"}>5 Star Hotel</option>
+                      <option value="Apartment" selected={@package_changeset.changes[:accommodation_type] == "Apartment" || @package_changeset.data.accommodation_type == "Apartment"}>Apartment</option>
+                      <option value="Villa" selected={@package_changeset.changes[:accommodation_type] == "Villa" || @package_changeset.data.accommodation_type == "Villa"}>Villa</option>
+                      <option value="Guest House" selected={@package_changeset.changes[:accommodation_type] == "Guest House" || @package_changeset.data.accommodation_type == "Guest House"}>Guest House</option>
+                      <option value="Not Included" selected={@package_changeset.changes[:accommodation_type] == "Not Included" || @package_changeset.data.accommodation_type == "Not Included"}>Not Included</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transport Type</label>
+                    <select
+                      name="package[transport_type]"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value="">Select transport type</option>
+                      <option value="Flight" selected={@package_changeset.changes[:transport_type] == "Flight" || @package_changeset.data.transport_type == "Flight"}>Flight</option>
+                      <option value="Bus" selected={@package_changeset.changes[:transport_type] == "Bus" || @package_changeset.data.transport_type == "Bus"}>Bus</option>
+                      <option value="Train" selected={@package_changeset.changes[:transport_type] == "Train" || @package_changeset.data.transport_type == "Train"}>Train</option>
+                      <option value="Private Car" selected={@package_changeset.changes[:transport_type] == "Private Car" || @package_changeset.data.transport_type == "Private Car"}>Private Car</option>
+                      <option value="Shared Transport" selected={@package_changeset.changes[:transport_type] == "Shared Transport" || @package_changeset.data.transport_type == "Shared Transport"}>Shared Transport</option>
+                      <option value="Not Included" selected={@package_changeset.changes[:transport_type] == "Not Included" || @package_changeset.data.transport_type == "Not Included"}>Not Included</option>
+                    </select>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Accommodation Details</label>
+                    <textarea
+                      name="package[accommodation_details]"
+                      rows="2"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter accommodation details (e.g., hotel name, room type, amenities)..."
+                    ><%= @package_changeset.changes[:accommodation_details] || @package_changeset.data.accommodation_details || "" %></textarea>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transport Details</label>
+                    <textarea
+                      name="package[transport_details]"
+                      rows="2"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Enter transport details (e.g., flight details, pickup times, vehicle info)..."
+                    ><%= @package_changeset.changes[:transport_details] || @package_changeset.data.transport_details || "" %></textarea>
+                  </div>
+
                   <div class="md:col-span-2">
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <p class="text-sm text-blue-800">
@@ -898,6 +1005,30 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       <span class="text-sm text-gray-500">Duration:</span>
                       <span class="text-sm font-medium text-gray-900"><%= @current_package.duration_days %> days / <%= @current_package.duration_nights %> nights</span>
                     </div>
+                    <%= if @current_package.accommodation_type && @current_package.accommodation_type != "" do %>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Accommodation:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= @current_package.accommodation_type %></span>
+                      </div>
+                      <%= if @current_package.accommodation_details && @current_package.accommodation_details != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Accommodation Details:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= @current_package.accommodation_details %></span>
+                        </div>
+                      <% end %>
+                    <% end %>
+                    <%= if @current_package.transport_type && @current_package.transport_type != "" do %>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">Transport:</span>
+                        <span class="text-sm font-medium text-gray-900"><%= @current_package.transport_type %></span>
+                      </div>
+                      <%= if @current_package.transport_details && @current_package.transport_details != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Transport Details:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= @current_package.transport_details %></span>
+                        </div>
+                      <% end %>
+                    <% end %>
 
                     <!-- Package Schedules Information -->
                     <%= if length(@current_package.package_schedules) > 0 do %>
@@ -1061,6 +1192,18 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         <span class="text-sm text-gray-500">Duration:</span>
                         <span class="text-sm font-medium text-gray-900"><%= package.duration_days %> days / <%= package.duration_nights %> nights</span>
                       </div>
+                      <%= if package.accommodation_type && package.accommodation_type != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Accommodation:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= package.accommodation_type %></span>
+                        </div>
+                      <% end %>
+                      <%= if package.transport_type && package.transport_type != "" do %>
+                        <div class="flex justify-between">
+                          <span class="text-sm text-gray-500">Transport:</span>
+                          <span class="text-sm font-medium text-gray-900"><%= package.transport_type %></span>
+                        </div>
+                      <% end %>
 
                       <!-- Package Schedules Summary -->
                       <%= if length(package.package_schedules) > 0 do %>

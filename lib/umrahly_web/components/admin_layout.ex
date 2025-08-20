@@ -8,9 +8,10 @@ defmodule UmrahlyWeb.AdminLayout do
       |> assign_new(:current_user, fn -> nil end)
       |> assign_new(:profile, fn -> nil end)
       |> assign_new(:is_admin, fn -> false end)
+      |> assign(:packages_open, assigns.current_page in ["packages", "package_schedules"])
 
     ~H"""
-    <div class="flex min-h-screen bg-gray-100 ">
+    <div class="flex min-h-screen bg-gray-100 " data-packages-open={@packages_open} x-data="{ packagesOpen: false }" x-init="packagesOpen = $el.dataset.packagesOpen === 'true'">
       <!-- Sidebar -->
       <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
         <!-- Navigation Menu -->
@@ -29,26 +30,53 @@ defmodule UmrahlyWeb.AdminLayout do
               <!-- Manage Bookings -->
               <a href="/admin/bookings" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
                 <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 Manage Bookings
               </a>
 
-              <!-- Manage Packages -->
-              <a href="/admin/packages" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
-                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                </svg>
-                Manage Packages
-              </a>
+              <!-- Manage Packages with Submenu -->
+              <div class="space-y-1">
+                <button
+                  @click="packagesOpen = !packagesOpen"
+                  class={"w-full flex items-center justify-between px-4 py-3 rounded-md transition-colors duration-200 #{if @current_page in ["packages", "package_schedules"], do: "bg-gray-700 text-white", else: "text-gray-300 hover:bg-gray-700 hover:text-white"}"}
+                >
+                  <div class="flex items-center">
+                    <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    Manage Packages
+                  </div>
+                  <svg
+                    class="h-4 w-4 transition-transform duration-200"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
 
-              <!-- Manage Package Schedules -->
-              <a href="/admin/package-schedules" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
-                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                Package Schedules
-              </a>
+                <!-- Submenu -->
+                <div
+                  x-show="packagesOpen"
+                  x-cloak
+                  class="ml-4 space-y-1 border-l border-gray-600 pl-2"
+                >
+                  <a href="/admin/packages" class={"flex items-center px-4 py-2 rounded-md transition-colors duration-200 text-sm #{if @current_page == "packages", do: "text-white bg-gray-700", else: "text-gray-400 hover:text-white hover:bg-gray-700"}"}>
+                    <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    All Packages
+                  </a>
+                  <a href="/admin/package-schedules" class={"flex items-center px-4 py-2 rounded-md transition-colors duration-200 text-sm #{if @current_page == "package_schedules", do: "text-white bg-gray-700", else: "text-gray-400 hover:text-white hover:bg-gray-700"}"}>
+                    <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Package Schedules
+                  </a>
+                </div>
+              </div>
 
               <!-- Manage Payments -->
               <a href="/admin/payments" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
@@ -250,6 +278,22 @@ defmodule UmrahlyWeb.AdminLayout do
       /* Dropdown shadow and border */
       details .shadow-xl {
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      }
+
+      /* Submenu enhancements */
+      .border-l {
+        border-left-width: 2px;
+      }
+
+      /* Smooth submenu transitions */
+      [x-cloak] {
+        display: none !important;
+      }
+
+      /* Active state for submenu items */
+      .submenu-active {
+        background-color: rgb(55, 65, 81);
+        color: white;
       }
     </style>
     """

@@ -111,6 +111,25 @@ const PackageDetails = {
   }
 };
 
+// Custom hook for schedule details scrolling
+const ScheduleDetails = {
+  mounted() {
+    console.log("ScheduleDetails hook mounted");
+    
+    // Listen for the scroll event from the server
+    this.handleEvent("scroll_to_schedule_details", () => {
+      console.log("Scrolling to schedule details");
+      
+      // Smooth scroll to the schedule details section
+      this.el.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    });
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -119,7 +138,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     FileUploadHook,
     FormValidationHook,
     AutoDismissFlash,
-    PackageDetails
+    PackageDetails,
+    ScheduleDetails
   }
 })
 

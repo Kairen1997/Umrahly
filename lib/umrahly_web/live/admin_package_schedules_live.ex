@@ -70,7 +70,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
       |> assign(:viewing_schedule_id, schedule_id)
       |> assign(:current_schedule, schedule)
 
-    {:noreply, socket}
+    {:noreply, push_event(socket, "scroll_to_schedule_details", %{})}
   end
 
   def handle_event("close_schedule_view", _params, socket) do
@@ -630,7 +630,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
           <%= if @viewing_schedule_id do %>
             <!-- Schedule Detail View -->
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+            <div id="schedule-details" class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6" phx-hook="ScheduleDetails">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold text-gray-900">Schedule Details</h2>
                 <button

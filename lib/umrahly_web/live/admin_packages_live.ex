@@ -87,7 +87,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:current_package, package)
       |> assign(:current_package_booking_stats, booking_stats)
 
-    {:noreply, socket}
+    {:noreply, push_event(socket, "scroll_to_package_details", %{})}
   end
 
   def handle_event("close_package_view", _params, socket) do
@@ -970,7 +970,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
           <%= if @viewing_package_id do %>
             <!-- Package Detail View -->
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+            <div id="package-details" class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6" phx-hook="PackageDetails">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold text-gray-900">Package Details</h2>
                 <button

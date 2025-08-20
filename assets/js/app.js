@@ -92,6 +92,25 @@ const AutoDismissFlash = {
   }
 };
 
+// Custom hook for package details scrolling
+const PackageDetails = {
+  mounted() {
+    console.log("PackageDetails hook mounted");
+    
+    // Listen for the scroll event from the server
+    this.handleEvent("scroll_to_package_details", () => {
+      console.log("Scrolling to package details");
+      
+      // Smooth scroll to the package details section
+      this.el.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    });
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -99,7 +118,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
   hooks: {
     FileUploadHook,
     FormValidationHook,
-    AutoDismissFlash
+    AutoDismissFlash,
+    PackageDetails
   }
 })
 

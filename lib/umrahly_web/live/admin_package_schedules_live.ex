@@ -163,6 +163,9 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
           {:ok, _updated_schedule} ->
             schedules = Packages.list_package_schedules_with_stats()
 
+            # Debug log
+            IO.puts("Schedule updated successfully, setting flash message...")
+
             socket =
               socket
               |> assign(:schedules, schedules)
@@ -171,6 +174,9 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
               |> assign(:editing_schedule_id, nil)
               |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
               |> put_flash(:info, "Schedule updated successfully!")
+
+            # Debug log
+            IO.puts("Flash message set: #{inspect(Phoenix.Flash.get(socket.assigns.flash, :info))}")
 
             {:noreply, socket}
 

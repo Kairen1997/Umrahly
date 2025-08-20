@@ -39,13 +39,16 @@ defmodule UmrahlyWeb.AdminBookingsLive do
       socket
       |> assign(:bookings, bookings)
       |> assign(:current_page, "bookings")
+      |> assign(:has_profile, true)
+      |> assign(:is_admin, true)
+      |> assign(:profile, socket.assigns.current_user)
 
     {:ok, socket}
   end
 
   def render(assigns) do
     ~H"""
-    <.admin_layout current_page={@current_page}>
+    <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
       <div class="max-w-6xl mx-auto">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between mb-6">

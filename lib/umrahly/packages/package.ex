@@ -16,7 +16,7 @@ defmodule Umrahly.Packages.Package do
     field :transport_details, :string
 
     has_many :package_schedules, Umrahly.Packages.PackageSchedule
-    has_many :bookings, through: [:package_schedules, :bookings]
+    has_many :bookings, Umrahly.Bookings.Booking
 
     timestamps(type: :utc_datetime)
   end

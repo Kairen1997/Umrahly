@@ -89,6 +89,8 @@ defmodule UmrahlyWeb.Router do
       live "/payments", AdminPaymentsLive, :index
       live "/flights", AdminFlightsLive, :index
       live "/activity-log", AdminActivityLogLive, :index
+      live "/profile", AdminProfileLive, :edit
+      live "/settings", AdminSettingsLive, :edit
     end
   end
 

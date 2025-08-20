@@ -63,13 +63,43 @@ const FormValidationHook = {
   }
 };
 
+// Custom hook for auto-dismissing flash messages
+const AutoDismissFlash = {
+  mounted() {
+    console.log("AutoDismissFlash mounted", this.el);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      this.el.style.opacity = "0";
+      this.el.style.transform = "translateX(100%)";
+      
+      // Remove from DOM after transition
+      setTimeout(() => {
+        if (this.el.parentNode) {
+          this.el.parentNode.removeChild(this.el);
+        }
+      }, 300);
+    }, 5000);
+    
+    // Add hover pause functionality
+    this.el.addEventListener("mouseenter", () => {
+      this.el.dataset.paused = "true";
+    });
+    
+    this.el.addEventListener("mouseleave", () => {
+      this.el.dataset.paused = "false";
+    });
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {
     FileUploadHook,
-    FormValidationHook
+    FormValidationHook,
+    AutoDismissFlash
   }
 })
 

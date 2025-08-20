@@ -69,7 +69,7 @@ defmodule UmrahlyWeb.AdminDashboardLive do
 
   def render(assigns) do
     ~H"""
-    <.admin_layout current_page={@current_page}>
+    <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
       <div class="max-w-6xl mx-auto">
 
         <!-- Admin Welcome Banner -->

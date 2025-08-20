@@ -24,6 +24,9 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
       |> assign(:show_edit_form, false)
       |> assign(:editing_schedule_id, nil)
       |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
+      |> assign(:has_profile, true)
+      |> assign(:is_admin, true)
+      |> assign(:profile, socket.assigns.current_user)
 
     {:ok, socket}
   end
@@ -226,7 +229,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
   def render(assigns) do
     ~H"""
-    <.admin_layout current_page={@current_page}>
+    <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
       <div class="max-w-6xl mx-auto">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between mb-6">

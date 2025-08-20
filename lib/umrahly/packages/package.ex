@@ -13,6 +13,8 @@ defmodule Umrahly.Packages.Package do
     field :departure_date, :date
     field :picture, :string
 
+    has_many :bookings, Umrahly.Bookings.Booking
+
     timestamps(type: :utc_datetime)
   end
 

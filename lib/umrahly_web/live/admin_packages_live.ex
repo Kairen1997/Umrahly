@@ -59,11 +59,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
   def handle_event("view_package", %{"id" => package_id}, socket) do
     package = Packages.get_package!(package_id)
+    booking_stats = Packages.get_package_booking_stats(package_id)
 
     socket =
       socket
       |> assign(:viewing_package_id, package_id)
       |> assign(:current_package, package)
+      |> assign(:current_package_booking_stats, booking_stats)
 
     {:noreply, socket}
   end
@@ -318,6 +320,73 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 (filtered by name, description, status, and departure date)
               <% end %>
             </p>
+          </div>
+
+          <!-- Overall Booking Statistics -->
+          <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm font-medium text-blue-600">Total Quota</p>
+                  <p class="text-2xl font-bold text-blue-900">
+                    <%= @packages |> Enum.reduce(0, fn p, acc -> acc + p.quota end) %>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm font-medium text-green-600">Confirmed Bookings</p>
+                  <p class="text-2xl font-bold text-green-900">
+                    <%= @packages |> Enum.reduce(0, fn p, acc -> acc + Packages.get_package_booking_stats(p.id).confirmed_bookings end) %>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm font-medium text-yellow-600">Available Slots</p>
+                  <p class="text-2xl font-bold text-yellow-900">
+                    <%= @packages |> Enum.reduce(0, fn p, acc -> acc + Packages.get_package_booking_stats(p.id).available_slots end) %>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm font-medium text-purple-600">Avg. Occupancy</p>
+                  <p class="text-2xl font-bold text-purple-900">
+                    <%= @packages |> Enum.map(fn p -> Packages.get_package_booking_stats(p.id).booking_percentage end) |> Enum.sum() |> Kernel./(length(@packages)) |> Float.round(1) %>%
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <%= if @show_add_form do %>
@@ -818,6 +887,37 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       </span>
                     </div>
                   </div>
+
+                  <!-- Booking Statistics -->
+                  <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 class="text-sm font-semibold text-blue-900 mb-3">Booking Statistics</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600"><%= @current_package_booking_stats.confirmed_bookings %></div>
+                        <div class="text-xs text-blue-700">Confirmed Bookings</div>
+                      </div>
+                      <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600"><%= @current_package_booking_stats.available_slots %></div>
+                        <div class="text-xs text-green-700">Available Slots</div>
+                      </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-blue-200">
+                      <div class="flex justify-between items-center">
+                        <span class="text-sm text-blue-700">Total Quota:</span>
+                        <span class="text-sm font-semibold text-blue-900"><%= @current_package.quota %></span>
+                      </div>
+                      <div class="flex justify-between items-center mt-1">
+                        <span class="text-sm text-blue-700">Booking Percentage:</span>
+                        <span class="text-sm font-semibold text-blue-900"><%= @current_package_booking_stats.booking_percentage %>%</span>
+                      </div>
+                      <div class="mt-2">
+                        <div class="w-full bg-blue-200 rounded-full h-2">
+                          <div class="bg-blue-600 h-2 rounded-full" style={"width: #{@current_package_booking_stats.booking_percentage}%"}>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="flex flex-col space-y-3">
@@ -905,15 +1005,31 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         <span class="text-sm text-gray-500">Duration:</span>
                         <span class="text-sm font-medium text-gray-900"><%= package.duration_days %> days / <%= package.duration_nights %> nights</span>
                       </div>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Quota:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= package.quota %></span>
+                                          <div class="flex justify-between">
+                      <span class="text-sm text-gray-500">Quota:</span>
+                      <span class="text-sm font-medium text-gray-900"><%= package.quota %></span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-gray-500">Departure Date:</span>
+                      <span class="text-sm font-medium text-gray-900"><%= package.departure_date %></span>
+                    </div>
+
+                    <!-- Quick Booking Status -->
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                      <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-500">Bookings:</span>
+                        <span class="text-xs font-medium text-gray-900">
+                          <%= Packages.get_package_booking_stats(package.id).confirmed_bookings %> / <%= package.quota %>
+                        </span>
                       </div>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Departure Date:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= package.departure_date %></span>
+                      <div class="mt-1">
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                          <div class="bg-teal-500 h-1.5 rounded-full" style={"width: #{Packages.get_package_booking_stats(package.id).booking_percentage}%"}>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  </div>
 
                     <div class="flex space-x-2">
                       <button

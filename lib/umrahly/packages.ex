@@ -285,4 +285,35 @@ defmodule Umrahly.Packages do
       expiring_soon_count: expiring_soon_count
     })
   end
+
+  @doc """
+  Returns booking statistics for a specific package.
+
+  ## Examples
+
+      iex> get_package_booking_stats(package_id)
+      %{
+        total_bookings: 15,
+        confirmed_bookings: 12,
+        available_slots: 35,
+        booking_percentage: 25.0
+      }
+
+  """
+  def get_package_booking_stats(package_id) do
+    alias Umrahly.Bookings
+
+    package = get_package!(package_id)
+    total_bookings = Bookings.count_bookings_for_package(package_id)
+    confirmed_bookings = Bookings.count_confirmed_bookings_for_package(package_id)
+    available_slots = package.quota - confirmed_bookings
+    booking_percentage = if package.quota > 0, do: (confirmed_bookings / package.quota) * 100, else: 0.0
+
+    %{
+      total_bookings: total_bookings,
+      confirmed_bookings: confirmed_bookings,
+      available_slots: available_slots,
+      booking_percentage: Float.round(booking_percentage, 1)
+    }
+  end
 end

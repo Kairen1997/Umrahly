@@ -39,6 +39,11 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
         |> assign(:has_profile, true)
         |> assign(:is_admin, true)
         |> assign(:profile, socket.assigns.current_user)
+        |> allow_upload(:itinerary_photos,
+          accept: ~w(.jpg .jpeg .png .gif),
+          max_entries: 50,
+          max_file_size: 5_000_000
+        )
 
       {:ok, socket}
     rescue
@@ -120,7 +125,7 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
     current_data = socket.assigns.current_itinerary_data
 
     day = Enum.at(current_data, day_index)
-    updated_day = %{day | itinerary_items: day.itinerary_items ++ [%{title: "", description: ""}]}
+    updated_day = %{day | itinerary_items: day.itinerary_items ++ [%{title: "", description: "", photo: nil}]}
 
     updated_data = List.replace_at(current_data, day_index, updated_day)
 
@@ -186,6 +191,81 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
     {:noreply, socket}
   end
 
+  def handle_event("upload_itinerary_photo", %{"day_index" => day_index, "item_index" => item_index}, socket) do
+    day_index = String.to_integer(day_index)
+    item_index = String.to_integer(item_index)
+    current_data = socket.assigns.current_itinerary_data
+
+    # Process the uploaded photo
+    photo_path = case consume_uploaded_entries(socket, :itinerary_photos, fn entry, _socket ->
+      uploads_dir = Path.join(File.cwd!(), "priv/static/uploads/itinerary")
+      File.mkdir_p!(uploads_dir)
+
+      extension = Path.extname(entry.client_name)
+      filename = "itinerary_#{System.system_time()}_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}#{extension}"
+      dest_path = Path.join(uploads_dir, filename)
+
+      case File.cp(entry.path, dest_path) do
+        :ok ->
+          {:ok, "/uploads/itinerary/#{filename}"}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end) do
+      [path | _] ->
+        path
+      [] ->
+        nil
+    end
+
+    if photo_path do
+      # Update the itinerary item with the photo path
+      day = Enum.at(current_data, day_index)
+      item = Enum.at(day.itinerary_items, item_index)
+      updated_item = %{item | photo: photo_path}
+
+      updated_items = List.replace_at(day.itinerary_items, item_index, updated_item)
+      updated_day = %{day | itinerary_items: updated_items}
+
+      updated_data = List.replace_at(current_data, day_index, updated_day)
+
+      socket =
+        socket
+        |> assign(:current_itinerary_data, updated_data)
+        |> put_flash(:info, "Photo uploaded successfully!")
+
+      {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Failed to upload photo")}
+    end
+  end
+
+  def handle_event("remove_itinerary_photo", %{"day_index" => day_index, "item_index" => item_index}, socket) do
+    day_index = String.to_integer(day_index)
+    item_index = String.to_integer(item_index)
+    current_data = socket.assigns.current_itinerary_data
+
+    day = Enum.at(current_data, day_index)
+    item = Enum.at(day.itinerary_items, item_index)
+    updated_item = %{item | photo: nil}
+
+    updated_items = List.replace_at(day.itinerary_items, item_index, updated_item)
+    updated_day = %{day | itinerary_items: updated_items}
+
+    updated_data = List.replace_at(current_data, day_index, updated_day)
+
+    socket =
+      socket
+      |> assign(:current_itinerary_data, updated_data)
+      |> put_flash(:info, "Photo removed successfully!")
+
+    {:noreply, socket}
+  end
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :itinerary_photos, ref)}
+  end
+
   defp parse_itinerary_params(params) do
     # Parse the form parameters to extract itinerary data
     # The form sends data in a nested structure
@@ -217,7 +297,8 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
       item_data = items_params[item_key]
       %{
         "title" => item_data["title"] || "",
-        "description" => item_data["description"] || ""
+        "description" => item_data["description"] || "",
+        "photo" => item_data["photo"] || nil
       }
     end)
   end
@@ -227,12 +308,16 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
   defp convert_itinerary_items_to_atoms(items) when is_list(items) do
     Enum.map(items, fn item ->
       case item do
+        %{"title" => title, "description" => description, "photo" => photo} ->
+          %{title: title, description: description, photo: photo}
         %{"title" => title, "description" => description} ->
-          %{title: title, description: description}
+          %{title: title, description: description, photo: nil}
+        %{title: title, description: description, photo: photo} ->
+          %{title: title, description: description, photo: photo}
         %{title: title, description: description} ->
-          %{title: title, description: description}
+          %{title: title, description: description, photo: nil}
         _ ->
-          %{title: "", description: ""}
+          %{title: "", description: "", photo: nil}
       end
     end)
   end
@@ -414,6 +499,115 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
                                 placeholder="Enter item description"
                               />
                             </div>
+                          </div>
+                          <!-- Photo Upload Section -->
+                          <div class="mt-3">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Photo</label>
+                            <%= if item.photo do %>
+                              <div class="flex items-center space-x-2 mb-2">
+                                <img src={item.photo} alt="Itinerary Photo" class="w-16 h-16 object-cover rounded border">
+                                <div class="flex flex-col space-y-1">
+                                  <button
+                                    type="button"
+                                    phx-click="remove_itinerary_photo"
+                                    phx-value-day_index={day_index}
+                                    phx-value-item_index={item_index}
+                                    class="text-red-600 hover:text-red-800 text-xs font-medium"
+                                  >
+                                    Remove Photo
+                                  </button>
+                                  <span class="text-xs text-gray-500">Current photo</span>
+                                </div>
+                              </div>
+                            <% end %>
+
+                            <!-- Hidden input for photo path -->
+                            <input
+                              type="hidden"
+                              name={"itinerary[days][#{day_index}][items][#{item_index}][photo]"}
+                              value={item.photo || ""}
+                            />
+
+                                                        <!-- Photo upload form -->
+                            <form phx-submit="upload_itinerary_photo" class="mt-2">
+                              <input type="hidden" name="day_index" value={day_index} />
+                              <input type="hidden" name="item_index" value={item_index} />
+
+                              <!-- Drag & Drop Zone -->
+                              <div class="mt-2 flex justify-center px-3 py-2 border-2 border-gray-300 border-dashed rounded-lg" phx-drop-target={@uploads.itinerary_photos.ref}>
+                                <div class="space-y-1 text-center">
+                                  <svg class="mx-auto h-6 w-6 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                                    <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                  </svg>
+                                  <div class="flex text-xs text-gray-600">
+                                    <label class="relative cursor-pointer bg-white rounded font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                      <span>Upload photo</span>
+                                      <.live_file_input
+                                        upload={@uploads.itinerary_photos}
+                                        accept={~w(.jpg .jpeg .png .gif)}
+                                        class="sr-only"
+                                      />
+                                    </label>
+                                    <p class="pl-1">or drag and drop</p>
+                                  </div>
+                                  <p class="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                                </div>
+                              </div>
+
+                              <div class="mt-2 flex justify-center">
+                                <button
+                                  type="submit"
+                                  class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                                >
+                                  Upload Photo
+                                </button>
+                              </div>
+                            </form>
+
+                                                        <!-- Upload preview -->
+                            <%= if @uploads.itinerary_photos.entries != [] do %>
+                              <div class="mt-2">
+                                <%= for entry <- @uploads.itinerary_photos.entries do %>
+                                  <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded text-xs">
+                                    <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                                      <%= if entry.upload_state == :complete do %>
+                                        <img src={entry.url} alt="Preview" class="w-full h-full object-cover" />
+                                      <% else %>
+                                        <span class="text-gray-500">P</span>
+                                      <% end %>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                      <p class="font-medium text-gray-900 truncate"><%= entry.client_name %></p>
+                                      <p class="text-gray-500">
+                                        <%= case entry.upload_state do %>
+                                          <% :uploading -> %>
+                                            Uploading...
+                                          <% :complete -> %>
+                                            Ready
+                                          <% :error -> %>
+                                            Error: <%= entry.errors |> Enum.map(&elem(&1, 1)) |> Enum.join(", ") %>
+                                          <% _ -> %>
+                                            Ready
+                                        <% end %>
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      phx-click="cancel_upload"
+                                      phx-value-ref={entry.ref}
+                                      class="text-red-600 hover:text-red-800"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                <% end %>
+                              </div>
+                            <% end %>
+
+                            <!-- Upload errors -->
+                            <%= for err <- upload_errors(@uploads.itinerary_photos) do %>
+                              <p class="text-red-600 text-xs mt-2"><%= Phoenix.Naming.humanize(err) %></p>
+                            <% end %>
                           </div>
                         </div>
                       <% end %>

@@ -4,16 +4,26 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
 
-  def mount(%{"id" => package_id}, _session, socket) do
+  def mount(%{"id" => package_id}, session, socket) do
+    IO.puts("AdminPackageDetailsLive mount called with package_id: #{package_id}")
+    IO.puts("Socket assigns: #{inspect(socket.assigns)}")
+    IO.puts("Session data: #{inspect(session)}")
+
     try do
       # Get package with schedules and itineraries preloaded
       package = Packages.get_package_with_schedules!(package_id)
+      IO.puts("Package found: #{inspect(package.name)}")
 
       # Convert itinerary items to atom keys for consistent access
       package = %{package | itineraries: convert_itinerary_items_to_atoms(package.itineraries || [])}
 
       # Calculate booking stats for this specific package
       package_booking_stats = calculate_package_booking_stats(package)
+      IO.puts("Package booking stats calculated: #{inspect(package_booking_stats)}")
+
+      # Check if current_user exists in assigns
+      current_user = socket.assigns[:current_user]
+      IO.puts("Current user from assigns: #{inspect(current_user)}")
 
       socket =
         socket
@@ -22,11 +32,16 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
         |> assign(:current_page, "packages")
         |> assign(:has_profile, true)
         |> assign(:is_admin, true)
-        |> assign(:profile, socket.assigns.current_user)
+        |> assign(:current_user, current_user)
+        |> assign(:profile, current_user)
 
+      IO.puts("Socket assigned successfully")
       {:ok, socket}
     rescue
       e ->
+        IO.puts("Error in AdminPackageDetailsLive mount: #{inspect(e)}")
+        IO.puts("Stacktrace: #{Exception.format_stacktrace(__STACKTRACE__)}")
+
         socket =
           socket
           |> put_flash(:error, "Failed to load package details: #{Exception.message(e)}")
@@ -338,12 +353,12 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
                   >
                     Manage Itinerary
                   </a>
-                  <a
-                    href={~p"/admin/packages?edit_id=#{@package.id}"}
+                  <.link
+                    navigate={~p"/admin/packages/#{@package.id}/edit"}
                     class="w-full bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-center block"
                   >
                     Edit Package
-                  </a>
+                  </.link>
                   <button
                     phx-click="delete_package"
                     phx-value-id={@package.id}

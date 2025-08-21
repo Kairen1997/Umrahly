@@ -55,6 +55,8 @@ defmodule UmrahlyWeb do
       use Phoenix.LiveView,
         layout: {UmrahlyWeb.Layouts, :app}
 
+      use UmrahlyWeb.FlashHandler
+
       unquote(html_helpers())
     end
   end

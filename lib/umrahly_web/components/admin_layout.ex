@@ -11,10 +11,9 @@ defmodule UmrahlyWeb.AdminLayout do
       |> assign_new(:profile, fn -> nil end)
       |> assign_new(:is_admin, fn -> false end)
       |> assign_new(:flash, fn -> %{} end)
-      |> assign(:packages_open, assigns.current_page in ["packages", "package_schedules"])
 
     ~H"""
-    <div class="flex min-h-screen bg-gray-100 " data-packages-open={@packages_open} x-data="{ packagesOpen: false }" x-init="packagesOpen = $el.dataset.packagesOpen === 'true'">
+    <div class="flex min-h-screen bg-gray-100">
       <!-- Sidebar -->
       <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
         <!-- Navigation Menu -->
@@ -40,32 +39,17 @@ defmodule UmrahlyWeb.AdminLayout do
 
               <!-- Manage Packages with Submenu -->
               <div class="space-y-1">
-                <button
-                  @click="packagesOpen = !packagesOpen"
-                  class={"w-full flex items-center justify-between px-4 py-3 rounded-md transition-colors duration-200 #{if @current_page in ["packages", "package_schedules"], do: "bg-gray-700 text-white", else: "text-gray-300 hover:bg-gray-700 hover:text-white"}"}
-                >
+                <div class={"w-full flex items-center px-4 py-3 rounded-md transition-colors duration-200 #{if @current_page in ["packages", "package_schedules"], do: "bg-gray-700 text-white", else: "text-gray-300"}"}>
                   <div class="flex items-center">
                     <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
                     Manage Packages
                   </div>
-                  <svg
-                    class="h-4 w-4 transition-transform duration-200"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                  </svg>
-                </button>
+                </div>
 
                 <!-- Submenu -->
-                <div
-                  x-show="packagesOpen"
-                  x-cloak
-                  class="ml-4 space-y-1 border-l border-gray-600 pl-2"
-                >
+                <div class="ml-4 space-y-1 border-l border-gray-600 pl-2">
                   <a href="/admin/packages" class={"flex items-center px-4 py-2 rounded-md transition-colors duration-200 text-sm #{if @current_page == "packages", do: "text-white bg-gray-700", else: "text-gray-400 hover:text-white hover:bg-gray-700"}"}>
                     <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
@@ -189,17 +173,6 @@ defmodule UmrahlyWeb.AdminLayout do
       /* Submenu enhancements */
       .border-l {
         border-left-width: 2px;
-      }
-
-      /* Smooth submenu transitions */
-      [x-cloak] {
-        display: none !important;
-      }
-
-      /* Active state for submenu items */
-      .submenu-active {
-        background-color: rgb(55, 65, 81);
-        color: white;
       }
     </style>
     """

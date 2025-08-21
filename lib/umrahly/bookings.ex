@@ -55,28 +55,22 @@ defmodule Umrahly.Bookings do
   Gets all bookings for a specific package schedule.
   """
   def get_bookings_for_schedule(schedule_id) do
-    # Since we don't have package_schedule_id yet, we'll get bookings by package_id
-    # This is a temporary workaround until the schema is properly migrated
-    Repo.all(from b in Booking, where: b.package_id == ^schedule_id)
+    Repo.all(from b in Booking, where: b.package_schedule_id == ^schedule_id)
   end
 
   @doc """
   Gets confirmed bookings for a specific package schedule.
   """
   def get_confirmed_bookings_for_schedule(schedule_id) do
-    # Since we don't have package_schedule_id yet, we'll get bookings by package_id
-    # This is a temporary workaround until the schema is properly migrated
-    Repo.all(from b in Booking, where: b.package_id == ^schedule_id and b.status == "confirmed")
+    Repo.all(from b in Booking, where: b.package_schedule_id == ^schedule_id and b.status == "confirmed")
   end
 
   @doc """
   Counts total bookings for a package schedule.
   """
   def count_bookings_for_schedule(schedule_id) do
-    # Since we don't have package_schedule_id yet, we'll count bookings by package_id
-    # This is a temporary workaround until the schema is properly migrated
     Repo.aggregate(
-      from(b in Booking, where: b.package_id == ^schedule_id),
+      from(b in Booking, where: b.package_schedule_id == ^schedule_id),
       :count,
       :id
     )
@@ -86,10 +80,8 @@ defmodule Umrahly.Bookings do
   Counts confirmed bookings for a package schedule.
   """
   def count_confirmed_bookings_for_schedule(schedule_id) do
-    # Since we don't have package_schedule_id yet, we'll count bookings by package_id
-    # This is a temporary workaround until the schema is properly migrated
     Repo.aggregate(
-      from(b in Booking, where: b.package_id == ^schedule_id and b.status == "confirmed"),
+      from(b in Booking, where: b.package_schedule_id == ^schedule_id and b.status == "confirmed"),
       :count,
       :id
     )

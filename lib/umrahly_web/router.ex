@@ -21,6 +21,7 @@ defmodule UmrahlyWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/test-flash", PageController, :test_flash
   end
 
   # Other scopes may use custom stacks.
@@ -85,9 +86,13 @@ defmodule UmrahlyWeb.Router do
       live "/dashboard", AdminDashboardLive, :index
       live "/bookings", AdminBookingsLive, :index
       live "/packages", AdminPackagesLive, :index
-      live "/packages/:id", AdminPackageDetailsLive, :show
+      live "/packages/new", AdminPackageNewLive, :new
+      live "/packages/:id/edit", AdminPackageEditLive, :edit
+      live "/packages/details/:id", AdminPackageDetailsLive, :show
       live "/packages/:id/itinerary", AdminPackageItineraryLive, :edit
       live "/package-schedules", AdminPackageSchedulesLive, :index
+      live "/package-schedules/new", AdminPackageScheduleNewLive, :new
+      live "/package-schedules/:id", AdminPackageScheduleViewLive, :show
       live "/payments", AdminPaymentsLive, :index
       live "/flights", AdminFlightsLive, :index
       live "/activity-log", AdminActivityLogLive, :index

@@ -202,7 +202,12 @@ defmodule Umrahly.Packages do
   @doc """
   Gets a single package schedule.
   """
-  def get_package_schedule!(id), do: Repo.get!(PackageSchedule, id)
+  def get_package_schedule!(id) do
+    PackageSchedule
+    |> where([ps], ps.id == ^id)
+    |> preload([:package])
+    |> Repo.one!()
+  end
 
   @doc """
   Creates a package schedule.

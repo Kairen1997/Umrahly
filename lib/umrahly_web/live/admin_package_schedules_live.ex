@@ -19,8 +19,6 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
       |> assign(:search_departure_date, "")
       |> assign(:search_return_date, "")
       |> assign(:current_page, "package_schedules")
-      |> assign(:viewing_schedule_id, nil)
-      |> assign(:show_add_form, false)
       |> assign(:show_edit_form, false)
       |> assign(:editing_schedule_id, nil)
       |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
@@ -62,47 +60,52 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     {:noreply, socket}
   end
 
-  def handle_event("view_schedule", %{"id" => schedule_id}, socket) do
-    schedule = Enum.find(socket.assigns.schedules, & &1.id == String.to_integer(schedule_id))
 
-    socket =
-      socket
-      |> assign(:viewing_schedule_id, schedule_id)
-      |> assign(:current_schedule, schedule)
 
-    {:noreply, push_event(socket, "scroll_to_schedule_details", %{})}
+
+
+  def handle_event("cancel_schedule", %{"id" => schedule_id}, socket) do
+    schedule = Packages.get_package_schedule!(schedule_id)
+
+    case Packages.update_package_schedule(schedule, %{status: "cancelled"}) do
+      {:ok, _updated_schedule} ->
+        schedules = Packages.list_package_schedules_with_stats()
+
+        socket =
+          socket
+          |> assign(:schedules, schedules)
+          |> assign(:filtered_schedules, schedules)
+          |> put_flash(:info, "Schedule cancelled successfully!")
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        socket =
+          socket
+          |> put_flash(:error, "Failed to cancel schedule")
+
+        {:noreply, socket}
+    end
   end
 
-  def handle_event("close_schedule_view", _params, socket) do
+  def handle_event("delete_schedule", %{"id" => schedule_id}, socket) do
+    schedule = Packages.get_package_schedule!(schedule_id)
+    {:ok, _} = Packages.delete_package_schedule(schedule)
+
+    schedules = Packages.list_package_schedules_with_stats()
+
     socket =
       socket
-      |> assign(:viewing_schedule_id, nil)
-      |> assign(:current_schedule, nil)
+      |> assign(:schedules, schedules)
+      |> assign(:filtered_schedules, schedules)
+      |> put_flash(:info, "Schedule deleted successfully!")
 
     {:noreply, socket}
   end
 
-  def handle_event("add_schedule", _params, socket) do
-    socket =
-      socket
-      |> assign(:show_add_form, true)
-      |> assign(:show_edit_form, false)
-      |> assign(:viewing_schedule_id, nil)
-      |> assign(:current_schedule, nil)
-      |> assign(:editing_schedule_id, nil)
-      |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
 
-    {:noreply, socket}
-  end
 
-  def handle_event("close_add_form", _params, socket) do
-    socket =
-      socket
-      |> assign(:show_add_form, false)
-      |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
 
-    {:noreply, socket}
-  end
 
   def handle_event("edit_schedule", %{"id" => schedule_id}, socket) do
     schedule = Packages.get_package_schedule!(schedule_id)
@@ -111,9 +114,6 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     socket =
       socket
       |> assign(:show_edit_form, true)
-      |> assign(:show_add_form, false)
-      |> assign(:viewing_schedule_id, nil)
-      |> assign(:current_schedule, nil)
       |> assign(:editing_schedule_id, schedule_id)
       |> assign(:schedule_changeset, changeset)
 
@@ -131,93 +131,30 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
   end
 
   def handle_event("save_schedule", %{"package_schedule" => schedule_params}, socket) do
-    case socket.assigns.editing_schedule_id do
-      nil ->
-        # Creating new schedule
-        case Packages.create_package_schedule(schedule_params) do
-          {:ok, _schedule} ->
-            schedules = Packages.list_package_schedules_with_stats()
+    # Updating existing schedule
+    schedule = Packages.get_package_schedule!(socket.assigns.editing_schedule_id)
+    case Packages.update_package_schedule(schedule, schedule_params) do
+      {:ok, _updated_schedule} ->
+        schedules = Packages.list_package_schedules_with_stats()
 
-            socket =
-              socket
-              |> assign(:schedules, schedules)
-              |> assign(:filtered_schedules, schedules)
-              |> assign(:show_add_form, false)
-              |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
-              |> put_flash(:info, "Schedule created successfully!")
+        socket =
+          socket
+          |> assign(:schedules, schedules)
+          |> assign(:filtered_schedules, schedules)
+          |> assign(:show_edit_form, false)
+          |> assign(:editing_schedule_id, nil)
+          |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
+          |> put_flash(:info, "Schedule updated successfully!")
 
-            {:noreply, socket}
+        {:noreply, socket}
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            socket =
-              socket
-              |> assign(:schedule_changeset, changeset)
+      {:error, %Ecto.Changeset{} = changeset} ->
+        socket =
+          socket
+          |> assign(:schedule_changeset, changeset)
 
-            {:noreply, socket}
-        end
-
-      schedule_id ->
-        # Updating existing schedule
-        schedule = Packages.get_package_schedule!(schedule_id)
-        case Packages.update_package_schedule(schedule, schedule_params) do
-          {:ok, _updated_schedule} ->
-            schedules = Packages.list_package_schedules_with_stats()
-
-            # Debug log
-            IO.puts("Schedule updated successfully, setting flash message...")
-
-            socket =
-              socket
-              |> assign(:schedules, schedules)
-              |> assign(:filtered_schedules, schedules)
-              |> assign(:show_edit_form, false)
-              |> assign(:editing_schedule_id, nil)
-              |> assign(:schedule_changeset, Packages.change_package_schedule(%PackageSchedule{}))
-              |> put_flash(:info, "Schedule updated successfully!")
-
-            # Debug log
-            IO.puts("Flash message set: #{inspect(Phoenix.Flash.get(socket.assigns.flash, :info))}")
-
-            {:noreply, socket}
-
-          {:error, %Ecto.Changeset{} = changeset} ->
-            socket =
-              socket
-              |> assign(:schedule_changeset, changeset)
-
-            {:noreply, socket}
-        end
+        {:noreply, socket}
     end
-  end
-
-  def handle_event("delete_schedule", %{"id" => schedule_id}, socket) do
-    schedule = Packages.get_package_schedule!(schedule_id)
-    {:ok, _} = Packages.delete_package_schedule(schedule)
-
-    schedules = Packages.list_package_schedules_with_stats()
-
-    socket =
-      socket
-      |> assign(:schedules, schedules)
-      |> assign(:filtered_schedules, schedules)
-      |> assign(:viewing_schedule_id, nil)
-      |> assign(:current_schedule, nil)
-
-    {:noreply, socket}
-  end
-
-  def handle_event("cancel_schedule", %{"id" => schedule_id}, socket) do
-    schedule = Packages.get_package_schedule!(schedule_id)
-    {:ok, _} = Packages.update_package_schedule(schedule, %{status: "cancelled"})
-
-    schedules = Packages.list_package_schedules_with_stats()
-
-    socket =
-      socket
-      |> assign(:schedules, schedules)
-      |> assign(:filtered_schedules, schedules)
-
-    {:noreply, socket}
   end
 
   defp filter_schedules(schedules, search_query, search_status, search_departure_date, search_return_date) do
@@ -240,11 +177,11 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold text-gray-900">Package Schedules Management</h1>
-            <button
-              phx-click="add_schedule"
+            <a
+              href={~p"/admin/package-schedules/new"}
               class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
               Add New Schedule
-            </button>
+            </a>
           </div>
 
           <!-- Search Bar -->
@@ -319,191 +256,11 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
             </p>
           </div>
 
-          <!-- Overall Statistics -->
-          <div class="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                  </svg>
-                </div>
-                <div class="ml-3">
-                  <p class="text-sm font-medium text-blue-600">Total Quota</p>
-                  <p class="text-2xl font-bold text-blue-900">
-                    <%= @schedules |> Enum.filter(&(&1.status == "active")) |> Enum.reduce(0, fn s, acc -> acc + s.quota end) %>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                  </svg>
-                </div>
-                <div class="ml-3">
-                  <p class="text-sm font-medium text-green-600">Active Schedules</p>
-                  <p class="text-2xl font-bold text-green-900">
-                    <%= @schedules |> Enum.filter(&(&1.status == "active")) |> length() %>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <svg class="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                </div>
-                <div class="ml-3">
-                  <p class="text-sm font-medium text-yellow-600">Upcoming Departures</p>
-                  <p class="text-2xl font-bold text-yellow-900">
-                    <%= @schedules |> Enum.filter(fn s -> s.status == "active" and Date.compare(s.departure_date, Date.utc_today()) == :gt end) |> length() %>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <svg class="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                  </svg>
-                </div>
-                <div class="ml-3">
-                  <p class="text-sm font-medium text-purple-600">Total Schedules</p>
-                  <p class="text-2xl font-bold text-purple-900">
-                    <%= length(@schedules) %>
-                  </p>
-                </div>
-              </div>
-            </div>
 
 
-          </div>
 
-          <%= if @show_add_form do %>
-            <!-- Add Schedule Form -->
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-900">Add New Schedule</h2>
-                <button
-                  phx-click="close_add_form"
-                  class="text-gray-500 hover:text-gray-700"
-                >
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
 
-              <form phx-submit="save_schedule" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Package</label>
-                    <select
-                      name="package_schedule[package_id]"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Select a package</option>
-                      <%= for package <- @packages do %>
-                        <option value={package.id}><%= package.name %></option>
-                      <% end %>
-                    </select>
-                  </div>
 
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      name="package_schedule[status]"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Quota</label>
-                    <input
-                      type="number"
-                      name="package_schedule[quota]"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Enter quota"
-                      min="1"
-                      max="100"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Price Override (RM)</label>
-                    <input
-                      type="number"
-                      name="package_schedule[price_override]"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Leave empty to use package price"
-                      min="1"
-                    />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
-                    <input
-                      type="date"
-                      name="package_schedule[departure_date]"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
-                    <input
-                      type="date"
-                      name="package_schedule[return_date]"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      required
-                    />
-                  </div>
-
-                  <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                    <textarea
-                      name="package_schedule[notes]"
-                      rows="3"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Any additional notes about this schedule..."
-                    ></textarea>
-                  </div>
-                </div>
-
-                <div class="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    phx-click="close_add_form"
-                    class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    class="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors"
-                  >
-                    Create Schedule
-                  </button>
-                </div>
-              </form>
-            </div>
-          <% end %>
 
           <%= if @show_edit_form do %>
             <!-- Edit Schedule Form -->
@@ -628,184 +385,6 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
             </div>
           <% end %>
 
-          <%= if @viewing_schedule_id do %>
-            <!-- Schedule Detail View -->
-            <div id="schedule-details" class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6" phx-hook="ScheduleDetails">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-900">Schedule Details</h2>
-                <button
-                  phx-click="close_schedule_view"
-                  class="text-gray-500 hover:text-gray-700"
-                >
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= @current_schedule.package.name %></h3>
-                  <p class="text-gray-600 mb-4">
-                    <%= if @current_schedule.package.description && @current_schedule.package.description != "" do %>
-                      <%= @current_schedule.package.description %>
-                    <% else %>
-                      No description available
-                    <% end %>
-                  </p>
-
-                  <div class="space-y-3">
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Base Price:</span>
-                      <span class="text-sm font-medium text-gray-900">RM <%= @current_schedule.package.price %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Schedule Price:</span>
-                      <span class="text-sm font-medium text-gray-900">
-                        <%= if @current_schedule.price_override do %>
-                          RM <%= @current_schedule.price_override %>
-                        <% else %>
-                          RM <%= @current_schedule.package.price %> (base price)
-                        <% end %>
-                      </span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-200 pt-2">
-                      <span class="text-sm font-semibold text-gray-700">Total Price:</span>
-                      <span class="text-sm font-bold text-gray-900">
-                        RM <%= @current_schedule.package.price + (if @current_schedule.price_override, do: @current_schedule.price_override, else: 0) %>
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Duration:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.duration_days %> days / <%= @current_schedule.package.duration_nights %> nights</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Quota:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_schedule.quota %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Departure Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_schedule.departure_date %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Return Date:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_schedule.return_date %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Status:</span>
-                      <span class={[
-                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                        case @current_schedule.status do
-                          "active" -> "bg-green-100 text-green-800"
-                          "inactive" -> "bg-red-100 text-red-800"
-                          "cancelled" -> "bg-gray-100 text-gray-800"
-                          "completed" -> "bg-blue-100 text-blue-800"
-                          _ -> "bg-gray-100 text-gray-800"
-                        end
-                      ]}>
-                        <%= @current_schedule.status %>
-                      </span>
-                    </div>
-                    <%= if @current_schedule.package.accommodation_type && @current_schedule.package.accommodation_type != "" do %>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Accommodation:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.accommodation_type %></span>
-                      </div>
-                      <%= if @current_schedule.package.accommodation_details && @current_schedule.package.accommodation_details != "" do %>
-                        <div class="flex justify-between">
-                          <span class="text-sm text-gray-500">Accommodation Details:</span>
-                          <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.accommodation_details %></span>
-                        </div>
-                      <% end %>
-                    <% end %>
-                    <%= if @current_schedule.package.transport_type && @current_schedule.package.transport_type != "" do %>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Transport:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.transport_type %></span>
-                      </div>
-                      <%= if @current_schedule.package.transport_details && @current_schedule.package.transport_details != "" do %>
-                        <div class="flex justify-between">
-                          <span class="text-sm text-gray-500">Transport Details:</span>
-                          <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.transport_details %></span>
-                        </div>
-                      <% end %>
-                    <% end %>
-                    <%= if @current_schedule.notes && @current_schedule.notes != "" do %>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Notes:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= @current_schedule.notes %></span>
-                      </div>
-                    <% end %>
-                  </div>
-
-                  <!-- Booking Statistics -->
-                  <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h4 class="text-sm font-semibold text-blue-900 mb-3">Booking Statistics</h4>
-                    <div class="grid grid-cols-2 gap-4">
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600"><%= @current_schedule.booking_stats.confirmed_bookings %></div>
-                        <div class="text-xs text-blue-700">Confirmed Bookings</div>
-                      </div>
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600"><%= @current_schedule.booking_stats.available_slots %></div>
-                        <div class="text-xs text-green-700">Available Slots</div>
-                      </div>
-                    </div>
-                    <div class="mt-3 pt-3 border-t border-blue-200">
-                      <div class="flex justify-between items-center">
-                        <span class="text-sm text-blue-700">Total Quota:</span>
-                        <span class="text-sm font-semibold text-blue-900"><%= @current_schedule.quota %></span>
-                      </div>
-                      <div class="flex justify-between items-center mt-1">
-                        <span class="text-sm text-blue-700">Booking Percentage:</span>
-                        <span class="text-sm font-semibold text-blue-900"><%= @current_schedule.booking_stats.booking_percentage %>%</span>
-                      </div>
-                      <div class="mt-2">
-                        <div class="w-full bg-blue-200 rounded-full h-2">
-                          <div class="bg-blue-600 h-2 rounded-full" style={"width: #{@current_schedule.booking_stats.booking_percentage}%"}>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex flex-col space-y-3">
-                  <div class="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h4>
-                    <div class="space-y-2">
-                      <button
-                        phx-click="edit_schedule"
-                        phx-value-id={@current_schedule.id}
-                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                      >
-                      Edit Schedule
-                      </button>
-                      <%= if @current_schedule.status == "active" do %>
-                        <button
-                          phx-click="cancel_schedule"
-                          phx-value-id={@current_schedule.id}
-                          data-confirm="Are you sure you want to cancel this schedule?"
-                          class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
-                        >
-                          Cancel Schedule
-                        </button>
-                      <% end %>
-                      <button
-                        phx-click="delete_schedule"
-                        phx-value-id={@current_schedule.id}
-                        data-confirm="Are you sure you want to delete this schedule? This will also delete all associated bookings."
-                        class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                      >
-                        Delete Schedule
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          <% end %>
-
           <!-- Schedules List -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <%= if length(@filtered_schedules) == 0 do %>
@@ -894,13 +473,12 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                     </div>
 
                     <div class="flex space-x-2 mt-4">
-                      <button
-                        phx-click="view_schedule"
-                        phx-value-id={schedule.id}
-                        class="flex-1 bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
+                      <a
+                        href={~p"/admin/package-schedules/#{schedule.id}"}
+                        class="flex-1 bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors text-center block"
                       >
                         View
-                      </button>
+                      </a>
                     </div>
                   </div>
                 </div>

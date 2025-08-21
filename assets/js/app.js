@@ -130,6 +130,56 @@ const ScheduleDetails = {
   }
 };
 
+// Custom hook for auto-scrolling to forms and sections
+const AutoScroll = {
+  mounted() {
+    console.log("AutoScroll hook mounted");
+    
+    try {
+      // Check if this element should be scrolled to
+      const scrollableIds = ["itinerary-form", "package-details", "add-package-form", "edit-package-form"];
+      
+      if (scrollableIds.includes(this.el.id)) {
+        // Add a small delay to ensure the element is fully rendered
+        setTimeout(() => {
+          try {
+            console.log(`Auto-scrolling to ${this.el.id}`);
+            
+            // Check if element is still in DOM
+            if (document.contains(this.el)) {
+              // Calculate offset for any fixed headers (adjust as needed)
+              const offset = 20;
+              
+              // Get element position
+              const elementTop = this.el.offsetTop - offset;
+              
+              // Scroll to the element with offset
+              window.scrollTo({
+                top: elementTop,
+                behavior: 'smooth'
+              });
+              
+              // Add highlight effect
+              this.el.classList.add('scroll-target');
+              
+              // Remove highlight class after animation
+              setTimeout(() => {
+                if (document.contains(this.el)) {
+                  this.el.classList.remove('scroll-target');
+                }
+              }, 500);
+            }
+          } catch (error) {
+            console.error(`Error during auto-scroll to ${this.el.id}:`, error);
+          }
+        }, 150); // Increased delay for better reliability
+      }
+    } catch (error) {
+      console.error("Error in AutoScroll hook:", error);
+    }
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -139,7 +189,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     FormValidationHook,
     AutoDismissFlash,
     PackageDetails,
-    ScheduleDetails
+    ScheduleDetails,
+    AutoScroll
   }
 })
 

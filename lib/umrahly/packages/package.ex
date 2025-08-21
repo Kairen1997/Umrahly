@@ -17,6 +17,7 @@ defmodule Umrahly.Packages.Package do
 
     has_many :package_schedules, Umrahly.Packages.PackageSchedule
     has_many :bookings, Umrahly.Bookings.Booking
+    has_many :itineraries, Umrahly.Packages.Itinerary, on_replace: :delete
 
     timestamps(type: :utc_datetime)
   end

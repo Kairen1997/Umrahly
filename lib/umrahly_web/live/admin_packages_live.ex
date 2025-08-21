@@ -4,21 +4,39 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
 
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     packages = Packages.list_packages_with_schedules()
+
+    # Calculate overall statistics once to avoid N+1 queries
+    overall_stats = calculate_overall_statistics(packages)
+
+    # Check if we should automatically open edit form
+    {show_edit_form, editing_package_id, package_changeset, scroll_target} = case params do
+      %{"edit_id" => edit_id} ->
+        try do
+          package = Packages.get_package!(edit_id)
+          changeset = Packages.change_package(package)
+          {true, edit_id, changeset, "edit-package-form"}
+        rescue
+          _ -> {false, nil, Packages.change_package(%Umrahly.Packages.Package{}), nil}
+        end
+      _ ->
+        {false, nil, Packages.change_package(%Umrahly.Packages.Package{}), nil}
+    end
 
     socket =
       socket
       |> assign(:packages, packages)
       |> assign(:filtered_packages, packages)
+      |> assign(:overall_stats, overall_stats)
       |> assign(:search_query, "")
       |> assign(:search_status, "")
       |> assign(:current_page, "packages")
-      |> assign(:viewing_package_id, nil)
       |> assign(:show_add_form, false)
-      |> assign(:show_edit_form, false)
-      |> assign(:editing_package_id, nil)
-      |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+      |> assign(:show_edit_form, show_edit_form)
+      |> assign(:editing_package_id, editing_package_id)
+      |> assign(:package_changeset, package_changeset)
+      |> assign(:scroll_target, scroll_target)
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
@@ -57,46 +75,12 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   end
 
   def handle_event("view_package", %{"id" => package_id}, socket) do
-    package = Packages.get_package_with_schedules!(package_id)
-
-    # Get the first active schedule to calculate booking stats
-    first_schedule = List.first(package.package_schedules) || %{quota: 0}
-
-    # Calculate booking stats from package schedules
-    booking_stats = if first_schedule.quota && first_schedule.quota > 0 do
-      total_confirmed = Packages.get_package_schedule_booking_stats(first_schedule.id).confirmed_bookings
-      available_slots = first_schedule.quota - total_confirmed
-      booking_percentage = if first_schedule.quota > 0, do: (total_confirmed / first_schedule.quota) * 100, else: 0.0
-
-      %{
-        confirmed_bookings: total_confirmed,
-        available_slots: available_slots,
-        booking_percentage: Float.round(booking_percentage, 1)
-      }
-    else
-      %{
-        confirmed_bookings: 0,
-        available_slots: 0,
-        booking_percentage: 0.0
-      }
-    end
-
-    socket =
-      socket
-      |> assign(:viewing_package_id, package_id)
-      |> assign(:current_package, package)
-      |> assign(:current_package_booking_stats, booking_stats)
-
-    {:noreply, push_event(socket, "scroll_to_package_details", %{})}
+    {:noreply, push_navigate(socket, to: ~p"/admin/packages/#{package_id}")}
   end
 
-  def handle_event("close_package_view", _params, socket) do
-    socket =
-      socket
-      |> assign(:viewing_package_id, nil)
-      |> assign(:current_package, nil)
-
-    {:noreply, socket}
+  def handle_event("show_package_details", %{"id" => package_id}, socket) do
+    # Redirect to package details page
+    {:noreply, push_navigate(socket, to: ~p"/admin/packages/#{package_id}")}
   end
 
   def handle_event("add_package", _params, socket) do
@@ -108,6 +92,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:current_package, nil)
       |> assign(:editing_package_id, nil)
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+      |> assign(:scroll_target, "add-package-form")
 
     {:noreply, socket}
   end
@@ -117,6 +102,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       socket
       |> assign(:show_add_form, false)
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+      |> assign(:scroll_target, nil)
 
     {:noreply, socket}
   end
@@ -133,6 +119,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:current_package, nil)
       |> assign(:editing_package_id, package_id)
       |> assign(:package_changeset, changeset)
+      |> assign(:scroll_target, "edit-package-form")
 
     {:noreply, socket}
   end
@@ -143,6 +130,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:show_edit_form, false)
       |> assign(:editing_package_id, nil)
       |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+      |> assign(:scroll_target, nil)
 
     {:noreply, socket}
   end
@@ -192,16 +180,6 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> Map.update("picture", nil, &if(is_binary(&1) && &1 == "", do: nil, else: &1))
       |> Map.reject(fn {_k, v} -> is_binary(v) && v == "" end)
 
-    # Log package params for debugging
-    IO.inspect(package_params, label: "Package params before save")
-
-    # Check if all required fields are present
-    required_fields = ["name", "price", "duration_days", "duration_nights", "status"]
-    missing_fields = required_fields -- Map.keys(package_params)
-    if length(missing_fields) > 0 do
-      IO.inspect(missing_fields, label: "Missing required fields")
-    end
-
     # Ensure all required fields have values
     package_params = package_params
       |> Map.put_new("name", "")
@@ -228,21 +206,21 @@ defmodule UmrahlyWeb.AdminPackagesLive do
         case Packages.create_package(package_params) do
           {:ok, _package} ->
             packages = Packages.list_packages_with_schedules()
+            overall_stats = calculate_overall_statistics(packages)
 
             socket =
               socket
               |> assign(:packages, packages)
               |> assign(:filtered_packages, packages)
+              |> assign(:overall_stats, overall_stats)
               |> assign(:show_add_form, false)
               |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+              |> assign(:scroll_target, nil)
               |> put_flash(:info, "Package created successfully!")
 
             {:noreply, socket}
 
           {:error, %Ecto.Changeset{} = changeset} ->
-            # Log validation errors for debugging
-            IO.inspect(changeset.errors, label: "Package create validation errors")
-
             socket =
               socket
               |> assign(:package_changeset, changeset)
@@ -257,22 +235,22 @@ defmodule UmrahlyWeb.AdminPackagesLive do
         case Packages.update_package(package, package_params) do
           {:ok, _updated_package} ->
             packages = Packages.list_packages_with_schedules()
+            overall_stats = calculate_overall_statistics(packages)
 
             socket =
               socket
               |> assign(:packages, packages)
               |> assign(:filtered_packages, packages)
+              |> assign(:overall_stats, overall_stats)
               |> assign(:show_edit_form, false)
               |> assign(:editing_package_id, nil)
               |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+              |> assign(:scroll_target, nil)
               |> put_flash(:info, "Package updated successfully!")
 
             {:noreply, socket}
 
           {:error, %Ecto.Changeset{} = changeset} ->
-            # Log validation errors for debugging
-            IO.inspect(changeset.errors, label: "Package update validation errors")
-
             socket =
               socket
               |> assign(:package_changeset, changeset)
@@ -288,16 +266,21 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:ok, _} = Packages.delete_package(package)
 
     packages = Packages.list_packages_with_schedules()
+    overall_stats = calculate_overall_statistics(packages)
 
     socket =
       socket
       |> assign(:packages, packages)
       |> assign(:filtered_packages, packages)
+      |> assign(:overall_stats, overall_stats)
       |> assign(:viewing_package_id, nil)
       |> assign(:current_package, nil)
+      |> assign(:scroll_target, nil)
 
     {:noreply, socket}
   end
+
+
 
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :package_picture, ref)}
@@ -308,6 +291,30 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
+  def handle_event("show_itinerary_form", %{"package_id" => package_id}, socket) do
+    # Redirect to itinerary management page
+    {:noreply, push_navigate(socket, to: ~p"/admin/packages/#{package_id}/itinerary")}
+  end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   defp filter_packages(packages, search_query, search_status) do
     packages
     |> Enum.filter(fn package ->
@@ -317,6 +324,44 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       name_matches && status_matches
     end)
   end
+
+
+
+  defp calculate_overall_statistics(packages) do
+    packages
+    |> Enum.reduce(%{total_quota: 0, total_confirmed: 0, total_available: 0, total_percentage: 0, total_schedules: 0}, fn package, acc ->
+      package_stats = package.package_schedules
+      |> Enum.reduce(%{quota: 0, confirmed: 0, available: 0, percentage: 0}, fn schedule, schedule_acc ->
+        if schedule.quota && schedule.quota > 0 do
+          confirmed = Packages.get_package_schedule_booking_stats(schedule.id).confirmed_bookings
+          available = schedule.quota - confirmed
+          percentage = if schedule.quota > 0, do: (confirmed / schedule.quota) * 100, else: 0.0
+
+          %{
+            quota: schedule_acc.quota + schedule.quota,
+            confirmed: schedule_acc.confirmed + confirmed,
+            available: schedule_acc.available + available,
+            percentage: schedule_acc.percentage + percentage
+          }
+        else
+          schedule_acc
+        end
+      end)
+
+      %{
+        total_quota: acc.total_quota + package_stats.quota,
+        total_confirmed: acc.total_confirmed + package_stats.confirmed,
+        total_available: acc.total_available + package_stats.available,
+        total_percentage: acc.total_percentage + package_stats.percentage,
+        total_schedules: acc.total_schedules + length(package.package_schedules)
+      }
+    end)
+    |> Map.update!(:total_percentage, fn total ->
+      if total > 0, do: Float.round(total, 1), else: 0.0
+    end)
+  end
+
+
 
   def render(assigns) do
     ~H"""
@@ -394,11 +439,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-blue-600">Total Quota</p>
                   <p class="text-2xl font-bold text-blue-900">
-                    <%= @packages |> Enum.reduce(0, fn package, acc ->
-                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
-                        schedule_acc + (schedule.quota || 0)
-                      end)
-                    end) %>
+                    <%= @overall_stats.total_quota %>
                   </p>
                 </div>
               </div>
@@ -414,11 +455,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-green-600">Confirmed Bookings</p>
                   <p class="text-2xl font-bold text-green-900">
-                    <%= @packages |> Enum.reduce(0, fn package, acc ->
-                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
-                        schedule_acc + Packages.get_package_schedule_booking_stats(schedule.id).confirmed_bookings
-                      end)
-                    end) %>
+                    <%= @overall_stats.total_confirmed %>
                   </p>
                 </div>
               </div>
@@ -434,11 +471,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-yellow-600">Available Slots</p>
                   <p class="text-2xl font-bold text-yellow-900">
-                    <%= @packages |> Enum.reduce(0, fn package, acc ->
-                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
-                        schedule_acc + Packages.get_package_schedule_booking_stats(schedule.id).available_slots
-                      end)
-                    end) %>
+                    <%= @overall_stats.total_available %>
                   </p>
                 </div>
               </div>
@@ -454,15 +487,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                 <div class="ml-3">
                   <p class="text-sm font-medium text-purple-600">Avg. Occupancy</p>
                   <p class="text-2xl font-bold text-purple-900">
-                    <% total_percentage = @packages |> Enum.reduce(0, fn package, acc ->
-                      package.package_schedules |> Enum.reduce(acc, fn schedule, schedule_acc ->
-                        schedule_acc + Packages.get_package_schedule_booking_stats(schedule.id).booking_percentage
-                      end)
-                    end) %>
-                    <% total_schedules = @packages |> Enum.reduce(0, fn package, acc ->
-                      acc + length(package.package_schedules)
-                    end) %>
-                    <%= if total_schedules > 0, do: Float.round(total_percentage / total_schedules, 1), else: 0.0 %>%
+                    <%= if @overall_stats.total_schedules > 0, do: Float.round(@overall_stats.total_percentage / @overall_stats.total_schedules, 1), else: 0.0 %>%
                   </p>
                 </div>
               </div>
@@ -473,7 +498,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
           <%= if @show_add_form do %>
             <!-- Add Package Form -->
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+            <div id="add-package-form" class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6 form-container" phx-hook="AutoScroll">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold text-gray-900">Add New Package</h2>
                 <button
@@ -718,7 +743,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
           <%= if @show_edit_form do %>
             <!-- Edit Package Form -->
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+            <div id="edit-package-form" class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6 form-container" phx-hook="AutoScroll">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold text-gray-900">Edit Package</h2>
                 <button
@@ -968,168 +993,16 @@ defmodule UmrahlyWeb.AdminPackagesLive do
             </div>
           <% end %>
 
-          <%= if @viewing_package_id do %>
-            <!-- Package Detail View -->
-            <div id="package-details" class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6" phx-hook="PackageDetails">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-900">Package Details</h2>
-                <button
-                  phx-click="close_package_view"
-                  class="text-gray-500 hover:text-gray-700"
-                >
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <%= if @current_package.picture do %>
-                    <div class="mb-4">
-                      <img src={@current_package.picture} alt={"#{@current_package.name} picture"} class="w-full h-64 object-cover rounded-lg" />
-                    </div>
-                  <% end %>
-                  <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= @current_package.name %></h3>
-                  <p class="text-gray-600 mb-4">
-                    <%= if @current_package.description && @current_package.description != "" do %>
-                      <%= @current_package.description %>
-                    <% else %>
-                      No description available
-                    <% end %>
-                  </p>
 
-                  <div class="space-y-3">
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Price:</span>
-                      <span class="text-sm font-medium text-gray-900">RM <%= @current_package.price %></span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Duration:</span>
-                      <span class="text-sm font-medium text-gray-900"><%= @current_package.duration_days %> days / <%= @current_package.duration_nights %> nights</span>
-                    </div>
-                    <%= if @current_package.accommodation_type && @current_package.accommodation_type != "" do %>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Accommodation:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= @current_package.accommodation_type %></span>
-                      </div>
-                      <%= if @current_package.accommodation_details && @current_package.accommodation_details != "" do %>
-                        <div class="flex justify-between">
-                          <span class="text-sm text-gray-500">Accommodation Details:</span>
-                          <span class="text-sm font-medium text-gray-900"><%= @current_package.accommodation_details %></span>
-                        </div>
-                      <% end %>
-                    <% end %>
-                    <%= if @current_package.transport_type && @current_package.transport_type != "" do %>
-                      <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Transport:</span>
-                        <span class="text-sm font-medium text-gray-900"><%= @current_package.transport_type %></span>
-                      </div>
-                      <%= if @current_package.transport_details && @current_package.transport_details != "" do %>
-                        <div class="flex justify-between">
-                          <span class="text-sm text-gray-500">Transport Details:</span>
-                          <span class="text-sm font-medium text-gray-900"><%= @current_package.transport_details %></span>
-                        </div>
-                      <% end %>
-                    <% end %>
 
-                    <!-- Package Schedules Information -->
-                    <%= if length(@current_package.package_schedules) > 0 do %>
-                      <div class="text-sm text-gray-500 mb-2">Package Schedules:</div>
-                      <%= for schedule <- @current_package.package_schedules do %>
-                        <div class="bg-gray-100 p-3 rounded-lg space-y-2">
-                          <div class="flex justify-between">
-                            <span class="text-xs text-gray-500">Quota:</span>
-                            <span class="text-xs font-medium text-gray-900"><%= schedule.quota %></span>
-                          </div>
-                          <div class="flex justify-between">
-                            <span class="text-xs text-gray-500">Departure:</span>
-                            <span class="text-xs font-medium text-gray-900"><%= schedule.departure_date %></span>
-                          </div>
-                          <div class="flex justify-between">
-                            <span class="text-xs text-gray-500">Return:</span>
-                            <span class="text-xs font-medium text-gray-900"><%= schedule.return_date %></span>
-                          </div>
-                          <div class="flex justify-between">
-                            <span class="text-xs text-gray-500">Status:</span>
-                            <span class="text-xs font-medium text-gray-900"><%= schedule.status %></span>
-                          </div>
-                        </div>
-                      <% end %>
-                    <% else %>
-                      <div class="text-sm text-gray-500">No schedules available</div>
-                    <% end %>
 
-                    <div class="flex justify-between">
-                      <span class="text-sm text-gray-500">Status:</span>
-                      <span class={[
-                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                        case @current_package.status do
-                          "active" -> "bg-green-100 text-green-800"
-                          "inactive" -> "bg-red-100 text-red-800"
-                          "draft" -> "bg-gray-100 text-gray-800"
-                          _ -> "bg-gray-100 text-gray-800"
-                        end
-                      ]}>
-                        <%= @current_package.status %>
-                      </span>
-                    </div>
-                  </div>
 
-                  <!-- Booking Statistics -->
-                  <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h4 class="text-sm font-semibold text-blue-900 mb-3">Booking Statistics</h4>
-                    <div class="grid grid-cols-2 gap-4">
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600"><%= @current_package_booking_stats.confirmed_bookings %></div>
-                        <div class="text-xs text-blue-700">Confirmed Bookings</div>
-                      </div>
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600"><%= @current_package_booking_stats.available_slots %></div>
-                        <div class="text-xs text-green-700">Available Slots</div>
-                      </div>
-                    </div>
-                    <div class="mt-3 pt-3 border-t border-blue-200">
-                      <div class="flex justify-between items-center">
-                        <span class="text-sm text-blue-700">Total Quota:</span>
-                        <span class="text-sm font-semibold text-blue-900">
-                          <%= @current_package.package_schedules |> Enum.reduce(0, fn schedule, acc -> acc + (schedule.quota || 0) end) %>
-                        </span>
-                      </div>
-                      <div class="flex justify-between items-center mt-1">
-                        <span class="text-sm text-blue-700">Booking Percentage:</span>
-                        <span class="text-sm font-semibold text-blue-900"><%= @current_package_booking_stats.booking_percentage %>%</span>
-                      </div>
-                      <div class="mt-2">
-                        <div class="w-full bg-blue-200 rounded-full h-2">
-                          <div class="bg-blue-600 h-2 rounded-full" style={"width: #{@current_package_booking_stats.booking_percentage}%"}>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div class="flex flex-col space-y-3">
-                  <button
-                    phx-click="edit_package"
-                    phx-value-id={@current_package.id}
-                    class="w-full bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
-                  >
-                    Edit Package
-                  </button>
-                  <button
-                    phx-click="delete_package"
-                    phx-value-id={@current_package.id}
-                    data-confirm="Are you sure you want to delete this package?"
-                    class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    Delete Package
-                  </button>
-                </div>
-              </div>
-            </div>
-          <% end %>
+
+
+
+
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <%= if length(@filtered_packages) == 0 do %>
@@ -1232,8 +1105,8 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                       <%= if length(package.package_schedules) > 0 do %>
                         <div class="mt-3 pt-3 border-t border-gray-200">
                           <% first_schedule = List.first(package.package_schedules) %>
-                          <% total_confirmed = Packages.get_package_schedule_booking_stats(first_schedule.id).confirmed_bookings %>
-                          <% total_quota = first_schedule.quota %>
+                          <% total_confirmed = if first_schedule && first_schedule.quota && first_schedule.quota > 0, do: Packages.get_package_schedule_booking_stats(first_schedule.id).confirmed_bookings, else: 0 %>
+                          <% total_quota = first_schedule.quota || 0 %>
                           <% booking_percentage = if total_quota > 0, do: (total_confirmed / total_quota) * 100, else: 0.0 %>
                           <div class="flex justify-between items-center">
                             <span class="text-xs text-gray-500">Bookings:</span>
@@ -1253,11 +1126,18 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
                     <div class="flex space-x-2">
                       <button
-                        phx-click="view_package"
-                        phx-value-id={package.id}
-                        class="flex-1 bg-teal-600 text-white px-3 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
+                        phx-click="show_itinerary_form"
+                        phx-value-package_id={package.id}
+                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
                       >
-                        View
+                        Manage Itinerary
+                      </button>
+                      <button
+                        phx-click="show_package_details"
+                        phx-value-id={package.id}
+                        class="flex-1 bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
+                      >
+                        View Details
                       </button>
                     </div>
                   </div>
@@ -1270,4 +1150,5 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     </.admin_layout>
     """
   end
+
 end

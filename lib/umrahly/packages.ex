@@ -5,9 +5,7 @@ defmodule Umrahly.Packages do
 
   import Ecto.Query, warn: false
   alias Umrahly.Repo
-
-  alias Umrahly.Packages.Package
-  alias Umrahly.Packages.PackageSchedule
+  alias Umrahly.Packages.{Package, PackageSchedule, Itinerary}
 
   @doc """
   Returns the list of packages.
@@ -21,7 +19,7 @@ defmodule Umrahly.Packages do
   """
   def list_packages_with_schedules do
     Package
-    |> preload([:package_schedules])
+    |> preload([:package_schedules, :itineraries])
     |> Repo.all()
   end
 
@@ -36,7 +34,7 @@ defmodule Umrahly.Packages do
   def get_package_with_schedules!(id) do
     Package
     |> where([p], p.id == ^id)
-    |> preload([:package_schedules])
+    |> preload([:package_schedules, :itineraries])
     |> Repo.one!()
   end
 
@@ -354,5 +352,85 @@ defmodule Umrahly.Packages do
         booking_percentage: Float.round(booking_percentage, 1)
       })
     end)
+  end
+
+  # Itinerary functions
+
+  @doc """
+  Returns the list of itineraries for a package.
+  """
+  def list_package_itineraries(package_id) do
+    Itinerary
+    |> where([i], i.package_id == ^package_id)
+    |> order_by([i], [asc: i.order_index, asc: i.day_number])
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single itinerary.
+  """
+  def get_itinerary!(id), do: Repo.get!(Itinerary, id)
+
+  @doc """
+  Creates an itinerary.
+  """
+  def create_itinerary(attrs \\ %{}) do
+    %Itinerary{}
+    |> Itinerary.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates an itinerary.
+  """
+  def update_itinerary(%Itinerary{} = itinerary, attrs) do
+    itinerary
+    |> Itinerary.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes an itinerary.
+  """
+  def delete_itinerary(%Itinerary{} = itinerary) do
+    Repo.delete(itinerary)
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking itinerary changes.
+  """
+  def change_itinerary(%Itinerary{} = itinerary, attrs \\ %{}) do
+    Itinerary.changeset(itinerary, attrs)
+  end
+
+  @doc """
+  Creates or updates multiple itineraries for a package.
+  """
+  def upsert_package_itineraries(package_id, itineraries_data) do
+    # Delete existing itineraries
+    Repo.delete_all(from(i in Itinerary, where: i.package_id == ^package_id))
+
+    # Create new itineraries
+    results = Enum.with_index(itineraries_data)
+    |> Enum.map(fn {itinerary_data, index} ->
+      itinerary_data
+      |> Map.put("package_id", package_id)
+      |> Map.put("order_index", index)
+      |> create_itinerary()
+    end)
+
+    # Check if all itineraries were created successfully
+    case Enum.any?(results, fn
+      {:ok, _itinerary} -> false
+      {:error, _changeset} -> true
+    end) do
+      true ->
+        # Some itineraries failed to create
+        {:error, "Failed to create some itineraries"}
+      false ->
+        # All itineraries created successfully
+        created_itineraries = Enum.map(results, fn {:ok, itinerary} -> itinerary end)
+        {:ok, created_itineraries}
+    end
   end
 end

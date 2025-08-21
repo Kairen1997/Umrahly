@@ -5,25 +5,18 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
   alias Umrahly.Packages
 
   def mount(%{"id" => package_id}, session, socket) do
-    IO.puts("AdminPackageDetailsLive mount called with package_id: #{package_id}")
-    IO.puts("Socket assigns: #{inspect(socket.assigns)}")
-    IO.puts("Session data: #{inspect(session)}")
-
     try do
       # Get package with schedules and itineraries preloaded
       package = Packages.get_package_with_schedules!(package_id)
-      IO.puts("Package found: #{inspect(package.name)}")
 
       # Convert itinerary items to atom keys for consistent access
       package = %{package | itineraries: convert_itinerary_items_to_atoms(package.itineraries || [])}
 
       # Calculate booking stats for this specific package
       package_booking_stats = calculate_package_booking_stats(package)
-      IO.puts("Package booking stats calculated: #{inspect(package_booking_stats)}")
 
       # Check if current_user exists in assigns
       current_user = socket.assigns[:current_user]
-      IO.puts("Current user from assigns: #{inspect(current_user)}")
 
       socket =
         socket
@@ -35,13 +28,9 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
         |> assign(:current_user, current_user)
         |> assign(:profile, current_user)
 
-      IO.puts("Socket assigned successfully")
       {:ok, socket}
     rescue
       e ->
-        IO.puts("Error in AdminPackageDetailsLive mount: #{inspect(e)}")
-        IO.puts("Stacktrace: #{Exception.format_stacktrace(__STACKTRACE__)}")
-
         socket =
           socket
           |> put_flash(:error, "Failed to load package details: #{Exception.message(e)}")
@@ -52,16 +41,30 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
   end
 
   def handle_event("delete_package", %{"id" => package_id}, socket) do
-    package = Packages.get_package!(package_id)
-    {:ok, _} = Packages.delete_package(package)
+    try do
+      package = Packages.get_package!(package_id)
 
-    socket =
-      socket
-      |> put_flash(:info, "Package deleted successfully!")
-      |> redirect(to: ~p"/admin/packages")
+      {:ok, _} = Packages.delete_package(package)
 
-    {:noreply, socket}
+      socket =
+        socket
+        |> put_flash(:info, "Package deleted successfully!")
+        |> redirect(to: ~p"/admin/packages")
+
+      {:noreply, socket}
+    rescue
+      e ->
+        socket =
+          socket
+          |> put_flash(:error, "Failed to delete package: #{Exception.message(e)}")
+
+        {:noreply, socket}
+    end
   end
+
+
+
+
 
   defp calculate_package_booking_stats(package) do
     package.package_schedules
@@ -258,38 +261,54 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
                 <% end %>
               </div>
 
-              <!-- Package Itinerary -->
+              <!-- Package Itinerary Summary -->
               <div class="mt-6 bg-gray-50 rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Package Itinerary</h3>
-                <%= if @package.itineraries && length(@package.itineraries) > 0 do %>
-                  <div class="space-y-4">
-                    <%= for itinerary <- @package.itineraries do %>
-                      <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <div class="mb-3">
-                          <h4 class="text-lg font-semibold text-blue-900">
-                            Day <%= itinerary.day_number %>: <%= itinerary.day_title %>
-                          </h4>
-                          <%= if itinerary.day_description && itinerary.day_description != "" do %>
-                            <p class="text-sm text-gray-600 mt-1"><%= itinerary.day_description %></p>
-                          <% end %>
-                        </div>
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-semibold text-gray-900">Package Itinerary</h3>
+                  <a
+                    href={~p"/admin/packages/#{@package.id}/itinerary"}
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    Manage Itinerary
+                  </a>
+                </div>
 
-                        <%= if itinerary.itinerary_items && length(itinerary.itinerary_items) > 0 do %>
-                          <div class="space-y-2">
-                            <%= for item <- itinerary.itinerary_items do %>
-                              <div class="bg-blue-50 p-3 rounded-lg">
-                                <div class="font-medium text-blue-900"><%= item.title %></div>
-                                <%= if item.description && item.description != "" do %>
-                                  <div class="text-sm text-blue-700 mt-1"><%= item.description %></div>
-                                <% end %>
-                              </div>
-                            <% end %>
-                          </div>
-                        <% else %>
-                          <div class="text-sm text-gray-500 italic">No itinerary items for this day</div>
+                <%= if @package.itineraries && length(@package.itineraries) > 0 do %>
+                  <div class="bg-white rounded-lg border border-gray-200 p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div class="text-2xl font-bold text-blue-600"><%= length(@package.itineraries) %></div>
+                        <div class="text-sm text-gray-600">Total Days</div>
+                      </div>
+                      <div>
+                        <div class="text-2xl font-bold text-green-600">
+                          <%= @package.itineraries |> Enum.filter(fn i -> i.day_title && i.day_title != "" end) |> length() %>
+                        </div>
+                        <div class="text-sm text-gray-600">Days with Titles</div>
+                      </div>
+                      <div>
+                        <div class="text-2xl font-bold text-purple-600">
+                          <%= @package.itineraries |> Enum.filter(fn i -> i.day_description && i.day_description != "" end) |> length() %>
+                        </div>
+                        <div class="text-sm text-gray-600">Days with Descriptions</div>
+                      </div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                      <div class="text-sm text-gray-600 mb-2">Recent Days:</div>
+                      <div class="flex flex-wrap gap-2">
+                        <%= for itinerary <- Enum.take(@package.itineraries, 5) do %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Day <%= itinerary.day_number %>: <%= String.slice(itinerary.day_title || "Untitled", 0, 20) %><%= if String.length(itinerary.day_title || "") > 20, do: "...", else: "" %>
+                          </span>
+                        <% end %>
+                        <%= if length(@package.itineraries) > 5 do %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            +<%= length(@package.itineraries) - 5 %> more
+                          </span>
                         <% end %>
                       </div>
-                    <% end %>
+                    </div>
                   </div>
                 <% else %>
                   <div class="text-center py-8 text-gray-500">
@@ -359,9 +378,11 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
                   >
                     Edit Package
                   </.link>
+
                   <button
                     phx-click="delete_package"
                     phx-value-id={@package.id}
+                    phx-debounce="100"
                     data-confirm="Are you sure you want to delete this package? This action cannot be undone."
                     class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
                   >

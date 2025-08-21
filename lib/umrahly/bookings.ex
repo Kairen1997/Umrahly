@@ -77,7 +77,7 @@ defmodule Umrahly.Bookings do
   end
 
   @doc """
-  Counts confirmed bookings for a package schedule.
+  Counts confirmed bookings for a specific package schedule.
   """
   def count_confirmed_bookings_for_schedule(schedule_id) do
     Repo.aggregate(
@@ -91,39 +91,67 @@ defmodule Umrahly.Bookings do
   Gets all bookings for a specific package (across all schedules).
   """
   def get_bookings_for_package(package_id) do
-    # Since we don't have package_schedules yet, we'll get bookings directly by package_id
-    Repo.all(from b in Booking, where: b.package_id == ^package_id)
+    # Get all package schedules for this package, then get bookings for those schedules
+    alias Umrahly.Packages
+
+    package_schedules = Packages.get_package_schedules(package_id)
+    schedule_ids = Enum.map(package_schedules, & &1.id)
+
+    if length(schedule_ids) > 0 do
+      Repo.all(from b in Booking, where: b.package_schedule_id in ^schedule_ids)
+    else
+      []
+    end
   end
 
   @doc """
   Gets confirmed bookings for a specific package (across all schedules).
   """
   def get_confirmed_bookings_for_package(package_id) do
-    # Since we don't have package_schedules yet, we'll get bookings directly by package_id
-    Repo.all(from b in Booking, where: b.package_id == ^package_id and b.status == "confirmed")
+    # Get all package schedules for this package, then get confirmed bookings for those schedules
+    alias Umrahly.Packages
+
+    package_schedules = Packages.get_package_schedules(package_id)
+    schedule_ids = Enum.map(package_schedules, & &1.id)
+
+    if length(schedule_ids) > 0 do
+      Repo.all(from b in Booking, where: b.package_schedule_id in ^schedule_ids and b.status == "confirmed")
+    else
+      []
+    end
   end
 
   @doc """
   Counts total bookings for a package (across all schedules).
   """
   def count_bookings_for_package(package_id) do
-    # Since we don't have package_schedules yet, we'll count bookings directly by package_id
-    Repo.aggregate(
-      from(b in Booking, where: b.package_id == ^package_id),
-      :count,
-      :id
-    )
+    # Get all package schedules for this package, then count bookings for those schedules
+    alias Umrahly.Packages
+
+    package_schedules = Packages.get_package_schedules(package_id)
+    schedule_ids = Enum.map(package_schedules, & &1.id)
+
+    if length(schedule_ids) > 0 do
+      Repo.aggregate(from(b in Booking, where: b.package_schedule_id in ^schedule_ids), :count, :id)
+    else
+      0
+    end
   end
 
   @doc """
   Counts confirmed bookings for a package (across all schedules).
   """
   def count_confirmed_bookings_for_package(package_id) do
-    # Since we don't have package_schedules yet, we'll count bookings directly by package_id
-    Repo.aggregate(
-      from(b in Booking, where: b.package_id == ^package_id and b.status == "confirmed"),
-      :count,
-      :id
-    )
+    # Get all package schedules for this package, then count confirmed bookings for those schedules
+    alias Umrahly.Packages
+
+    package_schedules = Packages.get_package_schedules(package_id)
+    schedule_ids = Enum.map(package_schedules, & &1.id)
+
+    if length(schedule_ids) > 0 do
+      Repo.aggregate(from(b in Booking, where: b.package_schedule_id in ^schedule_ids and b.status == "confirmed"), :count, :id)
+    else
+      0
+    end
   end
 end

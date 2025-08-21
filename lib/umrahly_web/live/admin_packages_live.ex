@@ -10,13 +10,17 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     # Calculate overall statistics once to avoid N+1 queries
     overall_stats = calculate_overall_statistics(packages)
 
+    # Sort packages with recently viewed/edited ones at the top
+    sorted_packages = sort_packages_by_recent_activity(packages)
+
     socket =
       socket
-      |> assign(:packages, packages)
-      |> assign(:filtered_packages, packages)
+      |> assign(:packages, sorted_packages)
+      |> assign(:filtered_packages, sorted_packages)
       |> assign(:overall_stats, overall_stats)
       |> assign(:search_query, "")
       |> assign(:search_status, "")
+      |> assign(:search_sort, "recent")
       |> assign(:current_page, "packages")
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
@@ -28,14 +32,17 @@ defmodule UmrahlyWeb.AdminPackagesLive do
   def handle_event("search_packages", %{"search" => search_params}, socket) do
     search_query = Map.get(search_params, "query", "")
     search_status = Map.get(search_params, "status", "")
+    search_sort = Map.get(search_params, "sort", "recent")
 
     filtered_packages = filter_packages(socket.assigns.packages, search_query, search_status)
+    sorted_packages = sort_packages_by_criteria(filtered_packages, search_sort)
 
     socket =
       socket
-      |> assign(:filtered_packages, filtered_packages)
+      |> assign(:filtered_packages, sorted_packages)
       |> assign(:search_query, search_query)
       |> assign(:search_status, search_status)
+      |> assign(:search_sort, search_sort)
 
     {:noreply, socket}
   end
@@ -46,6 +53,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:filtered_packages, socket.assigns.packages)
       |> assign(:search_query, "")
       |> assign(:search_status, "")
+      |> assign(:search_sort, "recent")
 
     {:noreply, socket}
   end
@@ -69,10 +77,13 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     packages = Packages.list_packages_with_schedules()
     overall_stats = calculate_overall_statistics(packages)
 
+    # Sort packages with recently viewed/edited ones at the top
+    sorted_packages = sort_packages_by_recent_activity(packages)
+
     socket =
       socket
-      |> assign(:packages, packages)
-      |> assign(:filtered_packages, packages)
+      |> assign(:packages, sorted_packages)
+      |> assign(:filtered_packages, sorted_packages)
       |> assign(:overall_stats, overall_stats)
       |> assign(:viewing_package_id, nil)
       |> assign(:current_package, nil)
@@ -116,6 +127,68 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     end)
   end
 
+  defp sort_packages_by_recent_activity(packages) do
+    # Sort packages by updated_at timestamp (most recent first)
+    # This will put recently edited packages at the top
+    packages
+    |> Enum.sort_by(fn package ->
+      # Sort by updated_at timestamp (most recent first)
+      # If updated_at is nil, put at the end
+      package.updated_at || ~N[1970-01-01 00:00:00]
+    end, {:desc, DateTime})
+  end
+
+  defp sort_packages_by_criteria(packages, sort_criteria) do
+    case sort_criteria do
+      "recent" ->
+        # Sort by updated_at timestamp (most recent first)
+        packages
+        |> Enum.sort_by(fn package ->
+          package.updated_at || ~N[1970-01-01 00:00:00]
+        end, {:desc, DateTime})
+
+      "name" ->
+        # Sort by name alphabetically
+        packages
+        |> Enum.sort_by(fn package ->
+          String.downcase(package.name)
+        end, :asc)
+
+      "price_low" ->
+        # Sort by price (low to high)
+        packages
+        |> Enum.sort_by(fn package ->
+          package.price
+        end, :asc)
+
+      "price_high" ->
+        # Sort by price (high to low)
+        packages
+        |> Enum.sort_by(fn package ->
+          package.price
+        end, {:desc, :integer})
+
+      "duration" ->
+        # Sort by duration (shortest to longest)
+        packages
+        |> Enum.sort_by(fn package ->
+          package.duration_days
+        end, :asc)
+
+      _ ->
+        # Default to recent sorting
+        sort_packages_by_recent_activity(packages)
+    end
+  end
+
+  defp is_recently_updated?(package) do
+    # Consider a package "recently updated" if it was updated within the last 24 hours
+    case package.updated_at do
+      nil -> false
+      updated_at ->
+        DateTime.diff(DateTime.utc_now(), updated_at, :hour) < 24
+    end
+  end
 
 
   defp calculate_overall_statistics(packages) do
@@ -171,7 +244,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <!-- Search Bar -->
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
             <form phx-change="search_packages" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
                   <input
@@ -195,11 +268,25 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                   </select>
                 </div>
 
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                  <select
+                    name="search[sort]"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  >
+                    <option value="recent" selected={@search_sort == "recent"}>Recently Updated</option>
+                    <option value="name" selected={@search_sort == "name"}>Name A-Z</option>
+                    <option value="price_low" selected={@search_sort == "price_low"}>Price Low to High</option>
+                    <option value="price_high" selected={@search_sort == "price_high"}>Price High to Low</option>
+                    <option value="duration" selected={@search_sort == "duration"}>Duration</option>
+                  </select>
+                </div>
+
                 <div class="flex items-end">
                   <button
                     type="button"
                     phx-click="clear_search"
-                    class="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                    class="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
                   >
                     Clear Search
                   </button>
@@ -337,17 +424,24 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                   <div class="p-6">
                     <div class="flex items-center justify-between mb-4">
                       <h3 class="text-lg font-semibold text-gray-900"><%= package.name %></h3>
-                      <span class={[
-                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                        case package.status do
-                          "active" -> "bg-green-100 text-green-800"
-                          "inactive" -> "bg-red-100 text-red-800"
-                          "draft" -> "bg-gray-100 text-gray-800"
-                          _ -> "bg-gray-100 text-gray-800"
-                        end
-                      ]}>
-                        <%= package.status %>
-                      </span>
+                      <div class="flex items-center space-x-2">
+                        <%= if is_recently_updated?(package) do %>
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Recently Updated
+                          </span>
+                        <% end %>
+                        <span class={[
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          case package.status do
+                            "active" -> "bg-green-100 text-green-800"
+                            "inactive" -> "bg-red-100 text-red-800"
+                            "draft" -> "bg-gray-100 text-gray-800"
+                            _ -> "bg-gray-100 text-gray-800"
+                          end
+                        ]}>
+                          <%= package.status %>
+                        </span>
+                      </div>
                     </div>
 
                     <p class="text-gray-600 text-sm mb-4">
@@ -357,6 +451,18 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         No description available
                       <% end %>
                     </p>
+
+                    <!-- Last Updated Info -->
+                    <div class="text-xs text-gray-500 mb-4 pb-3 border-b border-gray-100">
+                      <div class="flex items-center space-x-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>
+                          Last updated: <%= Calendar.strftime(package.updated_at, "%b %d, %Y at %I:%M %p") %>
+                        </span>
+                      </div>
+                    </div>
 
                     <div class="space-y-2 mb-4">
                       <div class="flex justify-between">

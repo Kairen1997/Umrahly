@@ -211,7 +211,6 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
       current_data = socket.assigns.current_itinerary_data
 
       if day_index >= 0 and day_index < length(current_data) do
-        day = Enum.at(current_data, day_index)
         # Content will be updated via JavaScript to the hidden input
         # This event is just for validation purposes
         {:noreply, socket}

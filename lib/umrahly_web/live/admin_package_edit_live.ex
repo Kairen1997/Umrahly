@@ -4,7 +4,7 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
 
-  def mount(%{"id" => package_id}, _session, socket) do
+    def mount(%{"id" => package_id}, _session, socket) do
     package = Packages.get_package!(package_id)
     changeset = Packages.change_package(package)
 
@@ -20,33 +20,23 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
     {:ok, socket}
   end
 
-  def handle_event("save_package", %{"package" => package_params}, socket) do
-    # Ensure all required fields are present and properly formatted
+
+
+  def handle_event("validate", %{"package" => package_params}, socket) do
+    changeset =
+      socket.assigns.package
+      |> Packages.change_package(package_params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :package_changeset, changeset)}
+  end
+
+    def handle_event("save_package", %{"package" => package_params}, socket) do
+    # Convert numeric fields from strings to integers
     package_params = package_params
       |> Map.update("price", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
       |> Map.update("duration_days", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
       |> Map.update("duration_nights", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
-      |> Map.reject(fn {_k, v} -> is_binary(v) && v == "" end)
-
-    # Ensure all required fields have values
-    package_params = package_params
-      |> Map.put_new("name", "")
-      |> Map.put_new("price", 0)
-      |> Map.put_new("duration_days", 1)
-      |> Map.put_new("duration_nights", 1)
-      |> Map.put_new("status", "inactive")
-      |> Map.update("name", "", &if(is_binary(&1) && &1 == "", do: nil, else: &1))
-      |> Map.update("description", "", &if(is_binary(&1) && &1 == "", do: nil, else: &1))
-      |> Map.update("status", "inactive", &if(is_binary(&1) && &1 == "", do: "inactive", else: &1))
-      |> Map.update("price", 0, &if(is_binary(&1) && &1 == "", do: 0, else: &1))
-      |> Map.update("duration_days", 1, &if(is_binary(&1) && &1 == "", do: 1, else: &1))
-      |> Map.update("duration_nights", 1, &if(is_binary(&1) && &1 == "", do: 1, else: &1))
-      |> Map.reject(fn {_k, v} -> is_nil(v) end)
-      |> Map.put("name", package_params["name"] || "")
-      |> Map.put("price", package_params["price"] || 0)
-      |> Map.put("duration_days", package_params["duration_days"] || 1)
-      |> Map.put("duration_nights", package_params["duration_nights"] || 1)
-      |> Map.put("status", package_params["status"] || "inactive")
 
     # Updating existing package
     case Packages.update_package(socket.assigns.package, package_params) do
@@ -54,7 +44,7 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
         {:noreply,
          socket
          |> put_flash(:info, "Package updated successfully!")
-         |> push_navigate(to: ~p"/admin/packages")}
+         |> redirect(to: ~p"/admin/packages")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
@@ -69,20 +59,24 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
       <div class="max-w-4xl mx-auto">
         <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold text-gray-900">Edit Package</h1>
-            <.link
-              navigate={~p"/admin/packages"}
-              class="text-gray-600 hover:text-gray-800 flex items-center space-x-2"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-              </svg>
-              <span>Back to Packages</span>
-            </.link>
-          </div>
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Edit Package</h1>
+          <.link
+            navigate={~p"/admin/packages"}
+            class="text-gray-600 hover:text-gray-800 flex items-center space-x-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            <span>Back to Packages</span>
+          </.link>
+        </div>
 
-          <form phx-submit="save_package" class="space-y-6">
+          <form
+            phx-change="validate"
+            phx-submit="save_package"
+            class="space-y-6"
+          >
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Package Name</label>

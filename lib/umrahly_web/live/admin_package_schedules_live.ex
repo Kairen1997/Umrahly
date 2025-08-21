@@ -669,6 +669,12 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                         <% end %>
                       </span>
                     </div>
+                    <div class="flex justify-between border-t border-gray-200 pt-2">
+                      <span class="text-sm font-semibold text-gray-700">Total Price:</span>
+                      <span class="text-sm font-bold text-gray-900">
+                        RM <%= @current_schedule.package.price + (if @current_schedule.price_override, do: @current_schedule.price_override, else: 0) %>
+                      </span>
+                    </div>
                     <div class="flex justify-between">
                       <span class="text-sm text-gray-500">Duration:</span>
                       <span class="text-sm font-medium text-gray-900"><%= @current_schedule.package.duration_days %> days / <%= @current_schedule.package.duration_nights %> nights</span>
@@ -840,13 +846,9 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
                     <div class="space-y-2 mb-4">
                       <div class="flex justify-between">
-                        <span class="text-sm text-gray-500">Price:</span>
-                        <span class="text-sm font-medium text-gray-900">
-                          <%= if schedule.price_override do %>
-                            RM <%= schedule.price_override %>
-                          <% else %>
-                            RM <%= schedule.package.price %>
-                          <% end %>
+                        <span class="text-sm text-gray-500">Total Price:</span>
+                        <span class="text-sm font-bold text-gray-900">
+                          RM <%= schedule.package.price + (if schedule.price_override, do: schedule.price_override, else: 0) %>
                         </span>
                       </div>
                       <div class="flex justify-between">

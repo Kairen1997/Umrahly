@@ -195,7 +195,7 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
                   <div class="space-y-4">
                     <%= for schedule <- @package.package_schedules do %>
                       <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                           <div>
                             <span class="text-sm font-medium text-gray-500">Quota:</span>
                             <span class="text-lg font-bold text-gray-900 ml-2"><%= schedule.quota %></span>
@@ -207,6 +207,12 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
                           <div>
                             <span class="text-sm font-medium text-gray-500">Return:</span>
                             <span class="text-gray-900 ml-2"><%= schedule.return_date %></span>
+                          </div>
+                          <div>
+                            <span class="text-sm font-medium text-gray-500">Total Price:</span>
+                            <span class="text-lg font-bold text-green-600 ml-2">
+                              RM <%= @package.price + (if schedule.price_override, do: schedule.price_override, else: 0) %>
+                            </span>
                           </div>
                           <div>
                             <span class="text-sm font-medium text-gray-500">Status:</span>

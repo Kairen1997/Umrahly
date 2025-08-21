@@ -21,6 +21,7 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import "./flash_config"
 
 // Custom hook for file uploads
 const FileUploadHook = {
@@ -63,15 +64,403 @@ const FormValidationHook = {
   }
 };
 
+// Custom hook for debugging button clicks
+const DebugClick = {
+  mounted() {
+    console.log("DebugClick hook mounted for button:", this.el);
+    console.log("Button data:", this.el.dataset);
+    
+    this.el.addEventListener("click", (e) => {
+      console.log("Button clicked:", e);
+      console.log("Button element:", this.el);
+      console.log("Package ID:", this.el.dataset.packageId);
+    });
+  }
+};
+
+// Custom hook for auto-dismissing flash messages
+const AutoDismissFlash = {
+  mounted() {
+    console.log("AutoDismissFlash mounted for:", this.el.id);
+    
+    // Get configuration
+    this.config = window.FlashConfig || {
+      autoDismissDelay: 5000,
+      showProgressBar: true,
+      animationDuration: 300,
+      maxMessages: 3
+    };
+    
+    // Set initial state
+    this.isPaused = false;
+    this.autoDismissTimer = null;
+    this.progressTimer = null;
+    this.dismissDelay = this.config.autoDismissDelay;
+    
+    // Position this flash message
+    this.positionFlashMessage();
+    
+    // Add progress bar if enabled
+    if (this.config.showProgressBar) {
+      this.addProgressBar();
+    }
+    
+    // Setup close button
+    this.setupCloseButton();
+    
+    // Setup click outside to dismiss
+    this.setupClickOutside();
+    
+    // Setup hover pause functionality
+    this.setupHoverPause();
+    
+    // Start auto-dismiss timer
+    this.startAutoDismiss();
+  },
+  
+  destroyed() {
+    console.log("AutoDismissFlash destroyed for:", this.el.id);
+    this.clearAutoDismissTimer();
+    this.clearProgressTimer();
+  },
+  
+  positionFlashMessage() {
+    // Get all existing flash messages
+    const existingFlashes = document.querySelectorAll('.flash-message');
+    const currentIndex = Array.from(existingFlashes).indexOf(this.el);
+    
+    // Check if we've exceeded the maximum number of messages
+    if (existingFlashes.length > this.config.maxMessages) {
+      // Remove the oldest flash message
+      const oldestFlash = existingFlashes[0];
+      if (oldestFlash && oldestFlash !== this.el) {
+        oldestFlash.remove();
+      }
+    }
+    
+    // Recalculate position after potential removal
+    const updatedFlashes = document.querySelectorAll('.flash-message');
+    const updatedIndex = Array.from(updatedFlashes).indexOf(this.el);
+    
+    // Calculate position based on index
+    const topOffset = 2 + (updatedIndex * 5); // 2rem + (index * 5rem)
+    this.el.style.top = `${topOffset}rem`;
+    
+    // Add a small delay for staggered entrance
+    if (updatedIndex > 0) {
+      this.el.style.opacity = '0';
+      this.el.style.transform = 'translateX(100%)';
+      
+      setTimeout(() => {
+        this.el.style.opacity = '1';
+        this.el.style.transform = 'translateX(0)';
+      }, updatedIndex * 100);
+    }
+  },
+  
+  addProgressBar() {
+    // Create progress bar element
+    const progressBar = document.createElement('div');
+    progressBar.className = 'flash-progress absolute bottom-0 left-0 h-1 bg-current opacity-20 transition-all duration-100';
+    progressBar.style.width = '100%';
+    this.el.appendChild(progressBar);
+    this.progressBar = progressBar;
+  },
+  
+  setupCloseButton() {
+    const closeButton = this.el.querySelector('button[data-debug="close-button"]');
+    if (closeButton) {
+      closeButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dismissFlash();
+      });
+    }
+  },
+  
+  setupClickOutside() {
+    // Allow clicking anywhere on the flash to dismiss it
+    this.el.addEventListener('click', (e) => {
+      // Don't dismiss if clicking on the close button
+      if (e.target.closest('button')) {
+        return;
+      }
+      this.dismissFlash();
+    });
+    
+    // Add touch/swipe functionality for mobile
+    this.setupTouchEvents();
+  },
+  
+  setupTouchEvents() {
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    
+    this.el.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+    }, { passive: true });
+    
+    this.el.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      currentX = touch.clientX;
+      currentY = touch.clientY;
+      
+      // Calculate swipe distance
+      const deltaX = currentX - startX;
+      const deltaY = currentY - startY;
+      
+      // If swiping right (positive deltaX), add visual feedback
+      if (deltaX > 0) {
+        const translateX = Math.min(deltaX * 0.5, 100);
+        this.el.style.transform = `translateX(${translateX}px)`;
+        this.el.style.opacity = Math.max(1 - (deltaX / 200), 0.3);
+      }
+    }, { passive: true });
+    
+    this.el.addEventListener('touchend', (e) => {
+      const deltaX = currentX - startX;
+      const deltaY = currentY - startY;
+      
+      // If swiped right more than 100px, dismiss the flash
+      if (deltaX > 100 && Math.abs(deltaY) < 50) {
+        this.dismissFlash();
+      } else {
+        // Reset position if not swiped enough
+        this.el.style.transform = 'translateX(0)';
+        this.el.style.opacity = '1';
+      }
+    }, { passive: true });
+  },
+  
+  setupHoverPause() {
+    this.el.addEventListener('mouseenter', () => {
+      this.isPaused = true;
+      this.clearAutoDismissTimer();
+      this.clearProgressTimer();
+    });
+    
+    this.el.addEventListener('mouseleave', () => {
+      this.isPaused = false;
+      this.startAutoDismiss();
+    });
+  },
+  
+  startAutoDismiss() {
+    if (this.isPaused) return;
+    
+    // Start progress bar animation if enabled
+    if (this.config.showProgressBar && this.progressBar) {
+      this.startProgressBar();
+    }
+    
+    // Auto-dismiss after specified delay
+    this.autoDismissTimer = setTimeout(() => {
+      if (!this.isPaused) {
+        this.dismissFlash();
+      }
+    }, this.dismissDelay);
+  },
+  
+  startProgressBar() {
+    if (!this.progressBar) return;
+    
+    const startTime = Date.now();
+    
+    this.progressTimer = setInterval(() => {
+      if (this.isPaused) return;
+      
+      const currentTime = Date.now();
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / this.dismissDelay, 1);
+      
+      this.progressBar.style.width = `${(1 - progress) * 100}%`;
+      
+      if (progress >= 1) {
+        this.clearProgressTimer();
+      }
+    }, 50);
+  },
+  
+  clearAutoDismissTimer() {
+    if (this.autoDismissTimer) {
+      clearTimeout(this.autoDismissTimer);
+      this.autoDismissTimer = null;
+    }
+  },
+  
+  clearProgressTimer() {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+  },
+  
+  dismissFlash() {
+    console.log("Dismissing flash:", this.el.id);
+    
+    // Clear timers
+    this.clearAutoDismissTimer();
+    this.clearProgressTimer();
+    
+    // Add dismissing class for CSS animation
+    this.el.classList.add('dismissing');
+    
+    // Remove from DOM after animation
+    setTimeout(() => {
+      if (this.el.parentNode) {
+        this.el.parentNode.removeChild(this.el);
+      }
+      
+      // Reposition remaining flash messages
+      this.repositionRemainingFlashes();
+    }, this.config.animationDuration);
+  },
+  
+  repositionRemainingFlashes() {
+    const remainingFlashes = document.querySelectorAll('.flash-message');
+    remainingFlashes.forEach((flash, index) => {
+      const topOffset = 2 + (index * 5);
+      flash.style.top = `${topOffset}rem`;
+    });
+  }
+};
+
+// Custom hook for package details scrolling
+const PackageDetails = {
+  mounted() {
+    console.log("PackageDetails hook mounted");
+    
+    // Listen for the scroll event from the server
+    this.handleEvent("scroll_to_package_details", () => {
+      console.log("Scrolling to package details");
+      
+      // Smooth scroll to the package details section
+      this.el.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    });
+  }
+};
+
+// Custom hook for schedule details scrolling
+const ScheduleDetails = {
+  mounted() {
+    console.log("ScheduleDetails hook mounted on element:", this.el);
+    console.log("Element ID:", this.el.id);
+    
+    // Listen for the scroll event from the server
+    this.handleEvent("scroll_to_schedule_details", (data) => {
+      console.log("Received scroll_to_schedule_details event with data:", data);
+      console.log("Scrolling to schedule details element:", this.el);
+      
+      // Smooth scroll to the schedule details section
+      this.el.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    });
+  },
+  
+  updated() {
+    console.log("ScheduleDetails hook updated on element:", this.el);
+  }
+};
+
+// Custom hook for auto-scrolling to forms and sections
+const AutoScroll = {
+  mounted() {
+    console.log("AutoScroll hook mounted");
+    
+    try {
+      // Check if this element should be scrolled to
+      const scrollableIds = ["itinerary-form", "package-details", "add-package-form", "edit-package-form"];
+      
+      if (scrollableIds.includes(this.el.id)) {
+        // Add a small delay to ensure the element is fully rendered
+        setTimeout(() => {
+          try {
+            console.log(`Auto-scrolling to ${this.el.id}`);
+            
+            // Check if element is still in DOM
+            if (document.contains(this.el)) {
+              // Calculate offset for any fixed headers (adjust as needed)
+              const offset = 20;
+              
+              // Get element position
+              const elementTop = this.el.offsetTop - offset;
+              
+              // Scroll to the element with offset
+              window.scrollTo({
+                top: elementTop,
+                behavior: 'smooth'
+              });
+              
+              // Add highlight effect
+              this.el.classList.add('scroll-target');
+              
+              // Remove highlight class after animation
+              setTimeout(() => {
+                if (document.contains(this.el)) {
+                  this.el.classList.remove('scroll-target');
+                }
+              }, 500);
+            }
+          } catch (error) {
+            console.error(`Error during auto-scroll to ${this.el.id}:`, error);
+          }
+        }, 150); // Increased delay for better reliability
+      }
+    } catch (error) {
+      console.error("Error in AutoScroll hook:", error);
+    }
+  }
+};
+
+// Custom hook for debugging Add Item button
+const AddItemDebugHook = {
+  mounted() {
+    console.log("AddItemDebugHook mounted on:", this.el);
+    
+    this.el.addEventListener("click", (e) => {
+      console.log("Add Item button clicked!", e);
+      console.log("Button element:", this.el);
+      console.log("phx-click attribute:", this.el.getAttribute("phx-click"));
+      console.log("phx-value-day_index:", this.el.getAttribute("phx-value-day_index"));
+    });
+  }
+};
+
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {
     FileUploadHook,
-    FormValidationHook
+    FormValidationHook,
+    AutoDismissFlash,
+    PackageDetails,
+    ScheduleDetails,
+    AutoScroll,
+    AddItemDebugHook,
+    DebugClick
   }
 })
+
+// Add debug logging for LiveView events
+liveSocket.onMessage((message) => {
+  console.log("LiveView message received:", message);
+});
+
+liveSocket.onError((error) => {
+  console.error("LiveView error:", error);
+});
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
@@ -86,4 +475,213 @@ liveSocket.connect()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
+
+// Initialize flash messages for regular Phoenix controllers (non-LiveView)
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("DOM loaded, checking for flash messages");
+  
+  // Find all flash messages with the data attribute
+  const flashMessages = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+  console.log("Found flash messages:", flashMessages.length);
+  
+  // Initialize each flash message
+  flashMessages.forEach((flashEl, index) => {
+    console.log("Initializing flash message:", flashEl.id, "at index:", index);
+    
+    // Create a mock hook context for regular Phoenix
+    const mockHook = {
+      el: flashEl,
+      config: window.FlashConfig || {
+        autoDismissDelay: 5000,
+        showProgressBar: true,
+        animationDuration: 300,
+        maxMessages: 3
+      },
+      isPaused: false,
+      autoDismissTimer: null,
+      progressTimer: null,
+      dismissDelay: 5000,
+      
+      // Mock methods
+      positionFlashMessage() {
+        // Position this flash message
+        const existingFlashes = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+        const currentIndex = Array.from(existingFlashes).indexOf(this.el);
+        
+        // Check if we've exceeded the maximum number of messages
+        if (existingFlashes.length > this.config.maxMessages) {
+          const oldestFlash = existingFlashes[0];
+          if (oldestFlash && oldestFlash !== this.el) {
+            oldestFlash.remove();
+          }
+        }
+        
+        // Recalculate position after potential removal
+        const updatedFlashes = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+        const updatedIndex = Array.from(updatedFlashes).indexOf(this.el);
+        
+        // Calculate position based on index
+        const topOffset = 2 + (updatedIndex * 5);
+        this.el.style.top = `${topOffset}rem`;
+        
+        // Add a small delay for staggered entrance
+        if (updatedIndex > 0) {
+          this.el.style.opacity = '0';
+          this.el.style.transform = 'translateX(100%)';
+          
+          setTimeout(() => {
+            this.el.style.opacity = '1';
+            this.el.style.transform = 'translateX(0)';
+          }, updatedIndex * 100);
+        }
+      },
+      
+      addProgressBar() {
+        if (!this.config.showProgressBar) return;
+        
+        const progressBar = document.createElement('div');
+        progressBar.className = 'flash-progress absolute bottom-0 left-0 h-1 bg-current opacity-20 transition-all duration-100';
+        progressBar.style.width = '100%';
+        this.el.appendChild(progressBar);
+        this.progressBar = progressBar;
+      },
+      
+      setupCloseButton() {
+        const closeButton = this.el.querySelector('button[data-debug="close-button"]');
+        if (closeButton) {
+          closeButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.dismissFlash();
+          });
+        }
+      },
+      
+      setupClickOutside() {
+        console.log("Setting up click outside for flash message:", this.el.id);
+        
+        // Allow clicking anywhere on the flash to dismiss it
+        this.el.addEventListener('click', (e) => {
+          console.log("Flash message clicked:", this.el.id, e.target);
+          
+          // Don't dismiss if clicking on the close button
+          if (e.target.closest('button')) {
+            console.log("Click was on close button, not dismissing");
+            return;
+          }
+          
+          console.log("Clicking to dismiss flash message:", this.el.id);
+          this.dismissFlash();
+        });
+      },
+      
+      setupHoverPause() {
+        this.el.addEventListener('mouseenter', () => {
+          this.isPaused = true;
+          this.clearAutoDismissTimer();
+          this.clearProgressTimer();
+        });
+        
+        this.el.addEventListener('mouseleave', () => {
+          this.isPaused = false;
+          this.startAutoDismiss();
+        });
+      },
+      
+      startAutoDismiss() {
+        if (this.isPaused) return;
+        
+        // Start progress bar animation if enabled
+        if (this.config.showProgressBar && this.progressBar) {
+          this.startProgressBar();
+        }
+        
+        // Auto-dismiss after specified delay
+        this.autoDismissTimer = setTimeout(() => {
+          if (!this.isPaused) {
+            this.dismissFlash();
+          }
+        }, this.dismissDelay);
+      },
+      
+      startProgressBar() {
+        if (!this.progressBar) return;
+        
+        const startTime = Date.now();
+        
+        this.progressTimer = setInterval(() => {
+          if (this.isPaused) return;
+          
+          const currentTime = Date.now();
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / this.dismissDelay, 1);
+          
+          this.progressBar.style.width = `${(1 - progress) * 100}%`;
+          
+          if (progress >= 1) {
+            this.clearProgressTimer();
+          }
+        }, 50);
+      },
+      
+      clearAutoDismissTimer() {
+        if (this.autoDismissTimer) {
+          clearTimeout(this.autoDismissTimer);
+          this.autoDismissTimer = null;
+        }
+      },
+      
+      clearProgressTimer() {
+        if (this.progressTimer) {
+          clearInterval(this.progressTimer);
+          this.progressTimer = null;
+        }
+      },
+      
+      dismissFlash() {
+        console.log("dismissFlash called for element:", this.el.id);
+        console.log("Element exists:", !!this.el);
+        console.log("Element parent:", this.el.parentNode);
+        
+        // Clear timers
+        this.clearAutoDismissTimer();
+        this.clearProgressTimer();
+        
+        // Add dismissing class for CSS animation
+        console.log("Adding dismissing class");
+        this.el.classList.add('dismissing');
+        
+        // Remove from DOM after animation
+        console.log("Setting timeout to remove element after", this.config.animationDuration, "ms");
+        setTimeout(() => {
+          console.log("Timeout fired, removing element");
+          if (this.el.parentNode) {
+            console.log("Removing element from parent");
+            this.el.parentNode.removeChild(this.el);
+          } else {
+            console.log("Element has no parent, cannot remove");
+          }
+          
+          // Reposition remaining flash messages
+          this.repositionRemainingFlashes();
+        }, this.config.animationDuration);
+      },
+      
+      repositionRemainingFlashes() {
+        const remainingFlashes = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+        remainingFlashes.forEach((flash, index) => {
+          const topOffset = 2 + (index * 5);
+          flash.style.top = `${topOffset}rem`;
+        });
+      }
+    };
+    
+    // Initialize the mock hook
+    mockHook.positionFlashMessage();
+    mockHook.addProgressBar();
+    mockHook.setupCloseButton();
+    mockHook.setupClickOutside();
+    mockHook.setupHoverPause();
+    mockHook.startAutoDismiss();
+  });
+});
 

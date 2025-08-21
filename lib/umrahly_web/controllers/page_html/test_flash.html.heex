@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="csrf-token" content={get_csrf_token()}/>
+    <title>Flash Message Test</title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"}/>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}></script>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-2xl font-bold text-center text-gray-900 mb-6">
+                Flash Message Test
+            </h1>
+            
+            <p class="text-gray-600 text-center mb-6">
+                This page demonstrates the auto-dismissing flash messages.
+                Messages will automatically disappear after 5 seconds.
+            </p>
+            
+            <div class="space-y-4">
+                <button 
+                    onclick="window.location.reload()" 
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    Reload to Test Again
+                </button>
+                
+                <a 
+                    href="/" 
+                    class="block w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors text-center"
+                >
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Flash messages will appear here -->
+    <.flash_group flash={@flash} />
+</body>
+</html> 

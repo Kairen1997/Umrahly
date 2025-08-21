@@ -5,3 +5,131 @@
 
 
 /* This file is for your main application CSS */
+
+/* Smooth scrolling for the entire page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced focus styles for better accessibility */
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: #14b8a6; /* teal-500 */
+  ring-offset: 2px;
+}
+
+/* Smooth transitions for form elements */
+.form-container {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Highlight effect for the target element */
+.scroll-target {
+  animation: highlight 0.5s ease-in-out;
+}
+
+@keyframes highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(20, 184, 166, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+  }
+}
+
+/* Flash message animations and styles */
+.flash-message {
+  animation: slideInRight 0.3s ease-out;
+  touch-action: pan-y; /* Allow vertical scrolling while preventing horizontal */
+  pointer-events: auto; /* Ensure click events work */
+  cursor: pointer; /* Show pointer cursor to indicate clickable */
+}
+
+.flash-message.dismissing {
+  animation: slideOutRight 0.3s ease-in;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Progress bar animation */
+.flash-progress {
+  transition: width 0.1s linear;
+}
+
+/* Flash message hover effects */
+.flash-message:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Close button hover effects */
+.flash-close-btn:hover {
+  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, 0.95);
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  .flash-message {
+    width: calc(100vw - 2rem) !important;
+    max-width: none !important;
+    right: 1rem !important;
+    left: 1rem !important;
+    margin-right: 0 !important;
+  }
+  
+  .flash-message:hover {
+    transform: none; /* Disable hover effects on mobile */
+  }
+}
+
+/* Staggered entrance animation for multiple messages */
+.flash-message:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.flash-message:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+/* Smooth transitions for all flash properties */
+.flash-message {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced shadow and depth */
+.flash-message {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+              0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.flash-message:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+              0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}

@@ -7,17 +7,15 @@ defmodule UmrahlyWeb.UserProfileLive do
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
-    # Profile is now part of the user, so we check if profile fields are filled
-    has_profile = user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
-                  user.monthly_income != nil or user.birthdate != nil or user.gender != nil
+    profile = Profiles.get_profile_by_user_id(user.id)
 
     socket = assign(socket,
       user: user,
-      has_profile: has_profile,
+      profile: profile,
       page_title: "Profile",
       last_updated: nil
     )
-    socket = if not has_profile do
+    socket = if is_nil(profile) do
       put_flash(socket, :error, "Please complete your profile first. Some features may not be available.")
     else
       socket
@@ -25,7 +23,8 @@ defmodule UmrahlyWeb.UserProfileLive do
 
     socket =
       socket
-      |> assign(:changeset, Profiles.change_profile(user))
+      |> assign(:profile, profile)
+      |> assign(:changeset, Profiles.change_profile(profile))
       |> allow_upload(:profile_photo,
         accept: ~w(.jpg .jpeg .png),
         max_entries: 1,
@@ -37,19 +36,20 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   def handle_event("save-profile", %{"profile" => profile_params}, socket) do
     user = socket.assigns.user
+    profile = socket.assigns.profile
     user_attrs = %{
       "full_name" => profile_params["full_name"]
     }
     profile_attrs =
       profile_params
       |> Map.drop(["full_name"])
-
+      |> Map.put(:user_id, user.id)
     with {:ok, updated_user} <- Accounts.update_user(user, user_attrs),
-         {:ok, updated_user_with_profile} <- Profiles.update_profile(updated_user, profile_attrs) do
+         {:ok, updated_profile} <- Profiles.upsert_profile(profile, profile_attrs) do
 
       {:noreply,
        socket
-       |> assign(user: updated_user_with_profile, has_profile: true, last_updated: DateTime.utc_now())
+       |> assign(user: updated_user, profile: updated_profile, last_updated: DateTime.utc_now())
        |> put_flash(:info, "Profile updated successfully")}
     else
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -193,16 +193,16 @@ defmodule UmrahlyWeb.UserProfileLive do
 
       case uploaded_files do
         [photo_path | _] ->
-          case Profiles.update_profile(user, %{profile_photo: photo_path}) do
-            {:ok, updated_user} ->
-              updated_user =
-                Map.update!(updated_user, :profile_photo, fn path ->
+          case Profiles.update_profile(profile, %{profile_photo: photo_path}) do
+            {:ok, updated_profile} ->
+              updated_profile =
+                Map.update!(updated_profile, :profile_photo, fn path ->
                   path <> "?v=#{DateTime.to_unix(DateTime.utc_now())}"
                 end)
 
               {:noreply,
                socket
-               |> assign(user: updated_user)
+               |> assign(profile: updated_profile)
                |> put_flash(:info, "Profile photo uploaded successfully")}
 
             {:error, changeset} ->
@@ -217,13 +217,13 @@ defmodule UmrahlyWeb.UserProfileLive do
 
 
   def handle_event("remove-photo", _params, socket) do
-    user = socket.assigns.user
+    profile = socket.assigns.profile
 
-    case Profiles.update_profile(user, %{profile_photo: nil}) do
-      {:ok, updated_user} ->
+    case Profiles.update_profile(profile, %{profile_photo: nil}) do
+      {:ok, updated_profile} ->
         {:noreply,
          socket
-         |> assign(user: updated_user)
+         |> assign(profile: updated_profile)
          |> put_flash(:info, "Profile photo removed successfully")}
 
       {:error, _changeset} ->
@@ -257,15 +257,14 @@ defmodule UmrahlyWeb.UserProfileLive do
 
 
   # Private functions
-  defp continue_profile_update(socket, user, profile_attrs) do
+  defp continue_profile_update(socket, _user, profile_attrs) do
+    profile = socket.assigns.profile
     # Update profile
-    case Profiles.update_profile(user, profile_attrs) do
-      {:ok, updated_user} ->
-        # Determine if this is a new profile or an update
-        has_profile = user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
-                      user.monthly_income != nil or user.birthdate != nil or user.gender != nil
+    case Profiles.upsert_profile(profile, profile_attrs) do
+      {:ok, updated_profile} ->
 
-        message = if not has_profile do
+        # Determine if this is a new profile or an update
+        message = if is_nil(profile) do
           "Profile created successfully! Welcome to Umrahly!"
         else
           "Identity and contact information updated successfully!"
@@ -273,7 +272,7 @@ defmodule UmrahlyWeb.UserProfileLive do
 
         {:noreply,
          socket
-         |> assign(user: updated_user, has_profile: true, last_updated: DateTime.utc_now())
+         |> assign(profile: updated_profile, last_updated: DateTime.utc_now())
          |> put_flash(:info, message)}
 
       {:error, %Ecto.Changeset{} = changeset} ->

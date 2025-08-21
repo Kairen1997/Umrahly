@@ -11,7 +11,7 @@ defmodule Umrahly.Accounts.User do
     field :confirmed_at, :utc_datetime
     field :is_admin, :boolean, default: false
 
-    # Profile fields (merged from profiles table)
+    # Profile fields merged from profiles table
     field :address, :string
     field :identity_card_number, :string
     field :phone_number, :string
@@ -136,6 +136,35 @@ defmodule Umrahly.Accounts.User do
       |> unique_constraint(:email)
     else
       changeset
+    end
+  end
+
+  @doc """
+  A user changeset for updating profile information.
+  """
+  def profile_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> validate_identity_card_number()
+    |> validate_phone_number()
+    |> validate_monthly_income()
+    |> validate_gender()
+    |> validate_length(:profile_photo, max: 255)
+  end
+
+  defp validate_identity_card_number(changeset) do
+    case get_field(changeset, :identity_card_number) do
+      nil -> changeset
+      ic_number when is_binary(ic_number) and byte_size(ic_number) > 0 -> changeset
+      _ -> add_error(changeset, :identity_card_number, "must be a valid identity card number")
+    end
+  end
+
+  defp validate_phone_number(changeset) do
+    case get_field(changeset, :phone_number) do
+      nil -> changeset
+      phone when is_binary(phone) and byte_size(phone) > 0 -> changeset
+      _ -> add_error(changeset, :phone_number, "must be a valid phone number")
     end
   end
 

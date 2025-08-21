@@ -100,7 +100,7 @@ defmodule UmrahlyWeb.CoreComponents do
   attr :id, :string, doc: "the optional id of flash container"
   attr :flash, :map, default: %{}, doc: "the map of flash messages to display"
   attr :title, :string, default: nil
-  attr :kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup"
+  attr :kind, :atom, values: [:info, :error, :warning, :success], doc: "used for styling and flash lookup"
   attr :rest, :global, doc: "the arbitrary HTML attributes to add to the flash container"
 
   slot :inner_block, doc: "the optional inner block that renders the flash message"
@@ -112,23 +112,33 @@ defmodule UmrahlyWeb.CoreComponents do
     <div
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
-      phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
+      phx-hook="AutoDismissFlash"
+      data-flash-auto-dismiss="true"
       role="alert"
       class={[
-        "fixed top-2 right-2 mr-2 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
-        @kind == :info && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
-        @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900"
+        "flash-message fixed top-2 right-2 mr-2 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1 transition-all duration-300 ease-in-out transform translate-x-0 opacity-100 shadow-lg",
+        @kind == :info && "bg-blue-50 text-blue-800 ring-blue-500 fill-blue-900",
+        @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900",
+        @kind == :warning && "bg-amber-50 text-amber-800 ring-amber-500 fill-amber-900",
+        @kind == :success && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-emerald-900"
       ]}
       {@rest}
     >
       <p :if={@title} class="flex items-center gap-1.5 text-sm font-semibold leading-6">
         <.icon :if={@kind == :info} name="hero-information-circle-mini" class="h-4 w-4" />
         <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="h-4 w-4" />
+        <.icon :if={@kind == :warning} name="hero-exclamation-triangle-mini" class="h-4 w-4" />
+        <.icon :if={@kind == :success} name="hero-check-circle-mini" class="h-4 w-4" />
         {@title}
       </p>
       <p class="mt-2 text-sm leading-5">{msg}</p>
-      <button type="button" class="group absolute top-1 right-1 p-2" aria-label={gettext("close")}>
-        <.icon name="hero-x-mark-solid" class="h-5 w-5 opacity-40 group-hover:opacity-70" />
+      <button
+        type="button"
+        class="flash-close-btn group absolute top-1 right-1 p-2 z-10 bg-white/80 hover:bg-white rounded-full shadow-sm transition-all duration-200"
+        aria-label={gettext("close")}
+        data-debug="close-button"
+      >
+        <.icon name="hero-x-mark-solid" class="h-5 w-5 opacity-60 group-hover:opacity-100 text-gray-600" />
       </button>
     </div>
     """
@@ -147,7 +157,9 @@ defmodule UmrahlyWeb.CoreComponents do
   def flash_group(assigns) do
     ~H"""
     <div id={@id}>
-      <.flash kind={:info} title={gettext("Success!")} flash={@flash} />
+      <.flash kind={:info} title={gettext("Information")} flash={@flash} />
+      <.flash kind={:success} title={gettext("Success!")} flash={@flash} />
+      <.flash kind={:warning} title={gettext("Warning")} flash={@flash} />
       <.flash kind={:error} title={gettext("Error!")} flash={@flash} />
       <.flash
         id="client-error"
@@ -165,7 +177,6 @@ defmodule UmrahlyWeb.CoreComponents do
         id="server-error"
         kind={:error}
         title={gettext("Something went wrong!")}
-        phx-disconnected={show(".phx-server-error #server-error")}
         phx-connected={hide("#server-error")}
         hidden
       >

@@ -9,6 +9,9 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
       # Get package with schedules and itineraries preloaded
       package = Packages.get_package_with_schedules!(package_id)
 
+      # Convert itinerary items to atom keys for consistent access
+      package = %{package | itineraries: convert_itinerary_items_to_atoms(package.itineraries || [])}
+
       # Calculate booking stats for this specific package
       package_booking_stats = calculate_package_booking_stats(package)
 
@@ -67,6 +70,27 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
       if total > 0, do: Float.round(total, 1), else: 0.0
     end)
   end
+
+  defp convert_itinerary_items_to_atoms(itineraries) when is_list(itineraries) do
+    Enum.map(itineraries, fn itinerary ->
+      %{itinerary | itinerary_items: convert_items_to_atoms(itinerary.itinerary_items || [])}
+    end)
+  end
+  defp convert_itinerary_items_to_atoms(_), do: []
+
+  defp convert_items_to_atoms(items) when is_list(items) do
+    Enum.map(items, fn item ->
+      case item do
+        %{"title" => title, "description" => description} ->
+          %{title: title, description: description}
+        %{title: title, description: description} ->
+          %{title: title, description: description}
+        _ ->
+          %{title: "", description: ""}
+      end
+    end)
+  end
+  defp convert_items_to_atoms(_), do: []
 
   def render(assigns) do
     ~H"""

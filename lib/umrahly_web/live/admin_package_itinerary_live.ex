@@ -16,7 +16,7 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
             day_number: itinerary.day_number,
             day_title: itinerary.day_title,
             day_description: itinerary.day_description || "",
-            itinerary_items: itinerary.itinerary_items || []
+            itinerary_items: convert_itinerary_items_to_atoms(itinerary.itinerary_items || [])
           }
         end)
       else
@@ -223,6 +223,20 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
   end
 
   defp parse_itinerary_items(_), do: []
+
+  defp convert_itinerary_items_to_atoms(items) when is_list(items) do
+    Enum.map(items, fn item ->
+      case item do
+        %{"title" => title, "description" => description} ->
+          %{title: title, description: description}
+        %{title: title, description: description} ->
+          %{title: title, description: description}
+        _ ->
+          %{title: "", description: ""}
+      end
+    end)
+  end
+  defp convert_itinerary_items_to_atoms(_), do: []
 
   def render(assigns) do
     ~H"""

@@ -291,10 +291,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
-  def handle_event("show_itinerary_form", %{"package_id" => package_id}, socket) do
-    # Redirect to itinerary management page
-    {:noreply, push_navigate(socket, to: ~p"/admin/packages/#{package_id}/itinerary")}
-  end
+
 
 
 
@@ -1126,16 +1123,9 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
                     <div class="flex space-x-2">
                       <button
-                        phx-click="show_itinerary_form"
-                        phx-value-package_id={package.id}
-                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
-                      >
-                        Manage Itinerary
-                      </button>
-                      <button
                         phx-click="show_package_details"
                         phx-value-id={package.id}
-                        class="flex-1 bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
+                        class="w-full bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 transition-colors"
                       >
                         View Details
                       </button>

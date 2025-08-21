@@ -6,9 +6,8 @@ defmodule UmrahlyWeb.ProfileController do
   def create(conn, %{"identity_card_number" => _identity_card_number} = profile_params) do
     current_user = conn.assigns.current_user
 
-    # Update the user with profile information
-    case Accounts.update_user_profile(current_user, profile_params) do
-      {:ok, _user} ->
+    case Profiles.create_profile(profile_params) do
+      {:ok, _profile} ->
         conn
         |> put_status(:created)
         |> json(%{message: "Profile created successfully"})

@@ -34,8 +34,7 @@ defmodule UmrahlyWeb.UserAuth do
       if Umrahly.Accounts.is_admin?(user) do
         ~p"/admin/dashboard"
       else
-        # Check if user has profile information directly
-        if user.address == nil and user.phone_number == nil and user.identity_card_number == nil do
+        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
           ~p"/complete-profile"
         else
           ~p"/dashboard"
@@ -110,8 +109,8 @@ defmodule UmrahlyWeb.UserAuth do
 
     # Set has_profile assign for the root layout
     has_profile = if user do
-      # Check if user has profile information directly
-      user.address != nil or user.phone_number != nil or user.identity_card_number != nil
+      profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
+      profile != nil
     else
       false
     end
@@ -209,8 +208,8 @@ defmodule UmrahlyWeb.UserAuth do
     # Set has_profile assign for LiveViews
     Phoenix.Component.assign_new(socket, :has_profile, fn ->
       if user = socket.assigns.current_user do
-        # Check if user has profile information directly
-        user.address != nil or user.phone_number != nil or user.identity_card_number != nil
+        profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
+        profile != nil
       else
         false
       end
@@ -293,8 +292,7 @@ defmodule UmrahlyWeb.UserAuth do
       if Umrahly.Accounts.is_admin?(user) do
         ~p"/admin/dashboard"
       else
-        # Check if user has profile information directly
-        if user.address == nil and user.phone_number == nil and user.identity_card_number == nil do
+        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
           ~p"/complete-profile"
         else
           ~p"/dashboard"

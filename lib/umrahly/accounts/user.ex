@@ -11,14 +11,7 @@ defmodule Umrahly.Accounts.User do
     field :confirmed_at, :utc_datetime
     field :is_admin, :boolean, default: false
 
-    # Profile fields merged from profiles table
-    field :address, :string
-    field :identity_card_number, :string
-    field :phone_number, :string
-    field :monthly_income, :integer
-    field :birthdate, :date
-    field :gender, :string
-    field :profile_photo, :string
+    has_one :profile, Umrahly.Profiles.Profile
 
     timestamps(type: :utc_datetime)
   end
@@ -48,11 +41,12 @@ defmodule Umrahly.Accounts.User do
   """
   def registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:full_name, :email, :password, :is_admin])
+    |> cast(attrs, [:full_name, :email, :password, :is_admin, :address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
     |> validate_full_name(opts)
     |> validate_email(opts)
     |> validate_password(opts)
     |> validate_admin_role()
+    |> validate_profile_fields()
   end
 
   defp validate_full_name(changeset, _opts) do
@@ -86,6 +80,30 @@ defmodule Umrahly.Accounts.User do
       changeset |> put_change(:is_admin, false)
     else
       changeset
+    end
+  end
+
+  # Profile field validations
+  defp validate_profile_fields(changeset) do
+    changeset
+    |> validate_monthly_income()
+    |> validate_gender()
+    |> validate_length(:profile_photo, max: 255)
+  end
+
+  defp validate_monthly_income(changeset) do
+    case get_field(changeset, :monthly_income) do
+      nil -> changeset
+      income when is_integer(income) and income > 0 -> changeset
+      _ -> add_error(changeset, :monthly_income, "must be a positive integer")
+    end
+  end
+
+  defp validate_gender(changeset) do
+    case get_field(changeset, :gender) do
+      nil -> changeset
+      gender when gender in ["male", "female"] -> changeset
+      _ -> add_error(changeset, :gender, "must be either male or female")
     end
   end
 
@@ -206,8 +224,18 @@ defmodule Umrahly.Accounts.User do
   """
   def update_changeset(user, attrs) do
     user
-    |> cast(attrs, [:full_name])
+    |> cast(attrs, [:full_name, :address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
     |> validate_full_name(validate_email: false)
+    |> validate_profile_fields()
+  end
+
+  @doc """
+  A user changeset for updating profile information only.
+  """
+  def profile_update_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> validate_profile_fields()
   end
 
   @doc """

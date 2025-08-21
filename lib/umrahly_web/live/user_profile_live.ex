@@ -6,14 +6,15 @@ defmodule UmrahlyWeb.UserProfileLive do
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
+    profile = Profiles.get_profile_by_user_id(user.id)
 
     socket = assign(socket,
       user: user,
-      profile: user,
+      profile: profile,
       page_title: "Profile",
       last_updated: nil
     )
-    socket = if user.address == nil and user.phone_number == nil and user.identity_card_number == nil do
+    socket = if is_nil(profile) do
       put_flash(socket, :error, "Please complete your profile first. Some features may not be available.")
     else
       socket
@@ -21,8 +22,8 @@ defmodule UmrahlyWeb.UserProfileLive do
 
     socket =
       socket
-      |> assign(:profile, user)
-      |> assign(:changeset, Accounts.change_user_profile(user))
+      |> assign(:profile, profile)
+      |> assign(:changeset, Profiles.change_profile(profile))
       |> allow_upload(:profile_photo,
         accept: ~w(.jpg .jpeg .png),
         max_entries: 1,
@@ -37,20 +38,18 @@ defmodule UmrahlyWeb.UserProfileLive do
     user_attrs = %{
       "full_name" => profile_params["full_name"]
     }
+    profile_attrs =
+      profile_params
+      |> Map.drop(["full_name"])
+      |> Map.put(:user_id, user.id)
+    with {:ok, updated_user} <- Accounts.update_user(user, user_attrs),
+         {:ok, updated_profile} <- Profiles.upsert_profile(profile, profile_attrs) do
 
-    # Extract profile fields and update user directly
-    profile_attrs = profile_params
-    |> Map.drop(["full_name"])
-
-    # Combine user and profile updates
-    combined_attrs = Map.merge(user_attrs, profile_attrs)
-
-    case Accounts.update_user_profile(user, combined_attrs) do
-      {:ok, updated_user} ->
-        {:noreply,
-         socket
-         |> assign(user: updated_user, profile: updated_user, last_updated: DateTime.utc_now())
-         |> put_flash(:info, "Profile updated successfully")}
+      {:noreply,
+       socket
+       |> assign(user: updated_user, profile: updated_profile, last_updated: DateTime.utc_now())
+       |> put_flash(:info, "Profile updated successfully")}
+    else
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
          socket
@@ -61,13 +60,9 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   def handle_event("save-identity-contact", %{"profile" => profile_params}, socket) do
     user = socket.assigns.user
-    profile = socket.assigns.profile
-
-
 
     # Start with a clean map using only string keys from the form
     profile_attrs = %{
-      "user_id" => user.id,
       "identity_card_number" => profile_params["identity_card_number"],
       "phone_number" => profile_params["phone_number"],
       "address" => profile_params["address"],
@@ -83,7 +78,7 @@ defmodule UmrahlyWeb.UserProfileLive do
     |> Map.update("address", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
     |> Map.update("monthly_income", nil, &if(&1 == "" or is_nil(&1), do: nil, else: &1))
     |> Map.update("gender", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
-    |> Map.update("birthdate", nil, &if(&1 == "" or is_nil(&1), do: nil, else: &1))
+    |> Map.update("birthdate", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
 
     # Convert monthly_income to integer if it's a string
     profile_attrs = case profile_attrs["monthly_income"] do
@@ -107,27 +102,25 @@ defmodule UmrahlyWeb.UserProfileLive do
       _ -> Map.put(profile_attrs, "birthdate", nil)
     end
 
-
-
     # Check if at least one field has a value (for new profiles)
-    if is_nil(profile) do
+    has_profile = user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
+                  user.monthly_income != nil or user.birthdate != nil or user.gender != nil
+
+    if not has_profile do
       has_values = profile_attrs
       |> Map.take(["identity_card_number", "phone_number", "address", "monthly_income", "gender", "birthdate"])
       |> Map.values()
       |> Enum.any?(&(&1 != nil))
 
       if not has_values do
-
         {:noreply,
          socket
          |> put_flash(:error, "Please fill in at least one field to create your profile.")}
       else
-
-        continue_profile_update(socket, profile, profile_attrs)
+        continue_profile_update(socket, user, profile_attrs)
       end
     else
-
-      continue_profile_update(socket, profile, profile_attrs)
+      continue_profile_update(socket, user, profile_attrs)
     end
   end
 
@@ -198,16 +191,16 @@ defmodule UmrahlyWeb.UserProfileLive do
 
       case uploaded_files do
         [photo_path | _] ->
-          case Accounts.update_user_profile(profile, %{profile_photo: photo_path}) do
-            {:ok, updated_user} ->
-              updated_user =
-                Map.update!(updated_user, :profile_photo, fn path ->
+          case Profiles.update_profile(profile, %{profile_photo: photo_path}) do
+            {:ok, updated_profile} ->
+              updated_profile =
+                Map.update!(updated_profile, :profile_photo, fn path ->
                   path <> "?v=#{DateTime.to_unix(DateTime.utc_now())}"
                 end)
 
               {:noreply,
                socket
-               |> assign(profile: updated_user)
+               |> assign(profile: updated_profile)
                |> put_flash(:info, "Profile photo uploaded successfully")}
 
             {:error, changeset} ->
@@ -222,13 +215,13 @@ defmodule UmrahlyWeb.UserProfileLive do
 
 
   def handle_event("remove-photo", _params, socket) do
-    profile = socket.assigns.profile
+    user = socket.assigns.user
 
-    case Accounts.update_user_profile(profile, %{profile_photo: nil}) do
-      {:ok, updated_user} ->
+    case Profiles.update_profile(profile, %{profile_photo: nil}) do
+      {:ok, updated_profile} ->
         {:noreply,
          socket
-         |> assign(profile: updated_user)
+         |> assign(profile: updated_profile)
          |> put_flash(:info, "Profile photo removed successfully")}
 
       {:error, _changeset} ->
@@ -262,13 +255,13 @@ defmodule UmrahlyWeb.UserProfileLive do
 
 
   # Private functions
-  defp continue_profile_update(socket, profile, profile_attrs) do
+  defp continue_profile_update(socket, user, profile_attrs) do
     # Update profile
-    case Accounts.update_user_profile(profile, profile_attrs) do
-      {:ok, updated_user} ->
+    case Profiles.upsert_profile(profile, profile_attrs) do
+      {:ok, updated_profile} ->
 
         # Determine if this is a new profile or an update
-        message = if profile.address == nil and profile.phone_number == nil and profile.identity_card_number == nil do
+        message = if is_nil(profile) do
           "Profile created successfully! Welcome to Umrahly!"
         else
           "Identity and contact information updated successfully!"
@@ -276,11 +269,10 @@ defmodule UmrahlyWeb.UserProfileLive do
 
         {:noreply,
          socket
-         |> assign(profile: updated_user, last_updated: DateTime.utc_now())
+         |> assign(profile: updated_profile, last_updated: DateTime.utc_now())
          |> put_flash(:info, message)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-
         # Create a more informative error message
         error_message = case changeset.errors do
           [] -> "Failed to update identity and contact information. Please check the form and try again."

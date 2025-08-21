@@ -3,7 +3,8 @@ defmodule UmrahlyWeb.CompleteProfileLive do
 
   on_mount {UmrahlyWeb.UserAuth, :ensure_authenticated}
 
-  alias Umrahly.Accounts
+  alias Umrahly.Profiles
+  alias Umrahly.Profiles.Profile
 
   def mount(_params, _session, socket) do
     current_user = socket.assigns.current_user
@@ -16,8 +17,10 @@ defmodule UmrahlyWeb.CompleteProfileLive do
          |> push_navigate(to: ~p"/admin/dashboard")}
 
       true ->
-        # Check if user has profile information directly
-        has_profile = current_user.address != nil or current_user.phone_number != nil or current_user.identity_card_number != nil
+        case Profiles.get_profile_by_user_id(current_user.id) do
+          nil ->
+            changeset = Profiles.change_profile(%Profile{user_id: current_user.id})
+            {:ok, assign(socket, changeset: changeset, current_user: current_user)}
 
         if has_profile do
           {:ok,
@@ -34,8 +37,8 @@ defmodule UmrahlyWeb.CompleteProfileLive do
   def handle_event("save", %{"profile" => profile_params}, socket) do
     current_user = socket.assigns.current_user
 
-    case Accounts.update_user_profile(current_user, profile_params) do
-      {:ok, _user} ->
+    case Profiles.create_profile(profile_params) do
+      {:ok, _profile} ->
         {:noreply,
          socket
          |> put_flash(:info, "Profile completed successfully!")

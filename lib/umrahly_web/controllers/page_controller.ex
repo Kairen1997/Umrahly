@@ -9,8 +9,8 @@ defmodule UmrahlyWeb.PageController do
       has_profile = if is_admin do
         true  # Admin users are considered to have "complete" profiles
       else
-        # Check if user has profile information directly
-        current_user.address != nil or current_user.phone_number != nil or current_user.identity_card_number != nil
+        profile = Profiles.get_profile_by_user_id(current_user.id)
+        profile != nil
       end
       {has_profile, is_admin}
     else
@@ -32,8 +32,8 @@ defmodule UmrahlyWeb.PageController do
       has_profile = if is_admin do
         true  # Admin users are considered to have "complete" profiles
       else
-        # Check if user has profile information directly
-        current_user.address != nil or current_user.phone_number != nil or current_user.identity_card_number != nil
+        profile = Profiles.get_profile_by_user_id(current_user.id)
+        profile != nil
       end
       {has_profile, is_admin}
     else

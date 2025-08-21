@@ -1,6 +1,8 @@
 defmodule UmrahlyWeb.PageController do
   use UmrahlyWeb, :controller
 
+  alias Umrahly.Profiles
+
   def home(conn, _params) do
     current_user = conn.assigns[:current_user]
 

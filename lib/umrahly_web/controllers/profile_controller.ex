@@ -1,10 +1,10 @@
 defmodule UmrahlyWeb.ProfileController do
   use UmrahlyWeb, :controller
 
-  alias Umrahly.Accounts
+  alias Umrahly.Profiles
 
   def create(conn, %{"identity_card_number" => _identity_card_number} = profile_params) do
-    current_user = conn.assigns.current_user
+    _current_user = conn.assigns.current_user
 
     case Profiles.create_profile(profile_params) do
       {:ok, _profile} ->

@@ -2,6 +2,7 @@ defmodule UmrahlyWeb.UserProfileLive do
   use UmrahlyWeb, :live_view
 
   alias Umrahly.Accounts
+  alias Umrahly.Profiles
 
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
@@ -35,6 +36,7 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   def handle_event("save-profile", %{"profile" => profile_params}, socket) do
     user = socket.assigns.user
+    profile = socket.assigns.profile
     user_attrs = %{
       "full_name" => profile_params["full_name"]
     }
@@ -215,7 +217,7 @@ defmodule UmrahlyWeb.UserProfileLive do
 
 
   def handle_event("remove-photo", _params, socket) do
-    user = socket.assigns.user
+    profile = socket.assigns.profile
 
     case Profiles.update_profile(profile, %{profile_photo: nil}) do
       {:ok, updated_profile} ->
@@ -255,7 +257,8 @@ defmodule UmrahlyWeb.UserProfileLive do
 
 
   # Private functions
-  defp continue_profile_update(socket, user, profile_attrs) do
+  defp continue_profile_update(socket, _user, profile_attrs) do
+    profile = socket.assigns.profile
     # Update profile
     case Profiles.upsert_profile(profile, profile_attrs) do
       {:ok, updated_profile} ->

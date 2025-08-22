@@ -4,14 +4,26 @@ defmodule UmrahlyWeb.UserPackagesLive do
   import UmrahlyWeb.SidebarComponent
   alias Umrahly.Packages
 
+  # Add authentication mount to ensure current_user is available
+  on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
+
   def mount(_params, _session, socket) do
     # Get all active packages with schedules
     packages = Packages.list_active_packages_with_schedules()
 
+    # Get current user for income-based recommendations
+    current_user = socket.assigns.current_user
+
+    # Mark packages as recommended based on user income
+    packages_with_recommendations = mark_recommended_packages(packages, current_user)
+
+    # Apply initial sorting by name (default sort)
+    sorted_packages = sort_packages_by_criteria(packages_with_recommendations, "name")
+
     socket =
       socket
-      |> assign(:packages, packages)
-      |> assign(:filtered_packages, packages)
+      |> assign(:packages, packages_with_recommendations)
+      |> assign(:filtered_packages, sorted_packages)
       |> assign(:search_query, "")
       |> assign(:search_sort, "name")
       |> assign(:current_page, "packages")
@@ -20,12 +32,14 @@ defmodule UmrahlyWeb.UserPackagesLive do
     {:ok, socket}
   end
 
-  def handle_event("search_packages", %{"search" => search_params}, socket) do
-    search_query = Map.get(search_params, "query", "")
-    search_sort = Map.get(search_params, "sort", "name")
-
+  def handle_event("search_packages", %{"query" => search_query, "sort" => search_sort}, socket) do
+    # First filter, then sort the filtered results
     filtered_packages = filter_packages(socket.assigns.packages, search_query)
     sorted_packages = sort_packages_by_criteria(filtered_packages, search_sort)
+
+    # Debug: Log the sorting operation
+    IO.inspect("Sorting #{length(filtered_packages)} packages by: #{search_sort}")
+    IO.inspect("First package after sorting: #{inspect(List.first(sorted_packages))}")
 
     socket =
       socket
@@ -37,9 +51,12 @@ defmodule UmrahlyWeb.UserPackagesLive do
   end
 
   def handle_event("clear_search", _params, socket) do
+    # Apply default sorting when clearing
+    sorted_packages = sort_packages_by_criteria(socket.assigns.packages, "name")
+
     socket =
       socket
-      |> assign(:filtered_packages, socket.assigns.packages)
+      |> assign(:filtered_packages, sorted_packages)
       |> assign(:search_query, "")
       |> assign(:search_sort, "name")
 
@@ -63,6 +80,43 @@ defmodule UmrahlyWeb.UserPackagesLive do
       "duration" -> Enum.sort_by(packages, & &1.duration_days)
       "recent" -> Enum.sort_by(packages, & &1.inserted_at, :desc)
       _ -> packages
+    end
+  end
+
+  # Mark packages as recommended based on user's monthly income
+  defp mark_recommended_packages(packages, current_user) do
+    case current_user && current_user.monthly_income do
+      nil ->
+        # If no user or no income info, no packages are recommended
+        Enum.map(packages, &Map.put(&1, :is_recommended, false))
+
+      monthly_income when is_integer(monthly_income) and monthly_income > 0 ->
+        Enum.map(packages, fn package ->
+          is_recommended = is_package_recommended_for_income?(package, monthly_income)
+          Map.put(package, :is_recommended, is_recommended)
+        end)
+
+      _ ->
+        # Invalid income data, no packages are recommended
+        Enum.map(packages, &Map.put(&1, :is_recommended, false))
+    end
+  end
+
+  # Determine if a package is recommended based on user's monthly income
+  defp is_package_recommended_for_income?(package, monthly_income) do
+    # Calculate affordability ratio: package price / monthly income
+    affordability_ratio = package.price / monthly_income
+
+    # Package is recommended if:
+    # 1. Price is less than 50% of monthly income (very affordable)
+    # 2. Price is less than 80% of monthly income (affordable)
+    # 3. Price is less than 120% of monthly income (manageable with savings)
+
+    cond do
+      affordability_ratio <= 0.5 -> true    # Very affordable
+      affordability_ratio <= 0.8 -> true    # Affordable
+      affordability_ratio <= 1.2 -> true    # Manageable with savings
+      true -> false                          # May be too expensive
     end
   end
 
@@ -112,7 +166,19 @@ defmodule UmrahlyWeb.UserPackagesLive do
         <!-- Packages Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <%= for package <- @filtered_packages do %>
-            <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 relative">
+              <!-- Recommended Package Badge -->
+              <%= if package.is_recommended do %>
+                <div class="absolute top-3 left-3 z-10">
+                  <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    Recommended
+                  </div>
+                </div>
+              <% end %>
+
               <!-- Package Image -->
               <div class="h-48 bg-gray-200 relative">
                 <%= if package.picture do %>

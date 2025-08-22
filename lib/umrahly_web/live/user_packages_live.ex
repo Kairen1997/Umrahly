@@ -28,8 +28,35 @@ defmodule UmrahlyWeb.UserPackagesLive do
       |> assign(:search_sort, "name")
       |> assign(:current_page, "packages")
       |> assign(:page_title, "Available Packages")
+      |> assign(:current_page_number, 1)
+      |> assign(:packages_per_page, 6)
+      |> assign(:total_pages, :math.ceil(length(sorted_packages) / 6) |> trunc)
 
     {:ok, socket}
+  end
+
+  def handle_params(params, _url, socket) do
+    # Read requested page from URL params, default to 1
+    requested_page =
+      case Map.get(params, "page") do
+        nil -> 1
+        page_str when is_binary(page_str) ->
+          case Integer.parse(page_str) do
+            {num, _} -> num
+            :error -> 1
+          end
+      end
+
+    total_pages = socket.assigns.total_pages
+    safe_total_pages = if is_integer(total_pages) and total_pages > 0 do
+      total_pages
+    else
+      1
+    end
+
+    valid_page = max(1, min(requested_page, safe_total_pages))
+
+    {:noreply, assign(socket, :current_page_number, valid_page)}
   end
 
   def handle_event("search_packages", %{"query" => search_query, "sort" => search_sort}, socket) do
@@ -37,39 +64,111 @@ defmodule UmrahlyWeb.UserPackagesLive do
     filtered_packages = filter_packages(socket.assigns.packages, search_query)
     sorted_packages = sort_packages_by_criteria(filtered_packages, search_sort)
 
-    # Debug: Log the sorting operation
-    IO.inspect("Sorting #{length(filtered_packages)} packages by: #{search_sort}")
-    IO.inspect("First package after sorting: #{inspect(List.first(sorted_packages))}")
+    # Debug: Log the search operation
+    IO.inspect("Search query: '#{search_query}'")
+    IO.inspect("Total packages: #{length(socket.assigns.packages)}")
+    IO.inspect("Filtered packages: #{length(filtered_packages)}")
+    IO.inspect("Sorting by: #{search_sort}")
+
+    # Reset to first page when searching
+    total_pages = :math.ceil(length(sorted_packages) / socket.assigns.packages_per_page) |> trunc
 
     socket =
       socket
       |> assign(:filtered_packages, sorted_packages)
       |> assign(:search_query, search_query)
       |> assign(:search_sort, search_sort)
+      |> assign(:current_page_number, 1)
+      |> assign(:total_pages, total_pages)
 
-    {:noreply, socket}
+    {:noreply, push_patch(socket, to: ~p"/packages?page=1")}
+  end
+
+    # Handle case where only query is provided (when typing in search box)
+  def handle_event("search_packages", %{"query" => search_query}, socket) do
+    # Use current sort value from socket
+    current_sort = socket.assigns.search_sort
+
+    # First filter, then sort the filtered results
+    filtered_packages = filter_packages(socket.assigns.packages, search_query)
+    sorted_packages = sort_packages_by_criteria(filtered_packages, current_sort)
+
+    # Debug: Log the search operation
+    IO.inspect("Search query (query only): '#{search_query}'")
+    IO.inspect("Total packages: #{length(socket.assigns.packages)}")
+    IO.inspect("Total packages: #{length(socket.assigns.packages)}")
+    IO.inspect("Filtered packages: #{length(filtered_packages)}")
+    IO.inspect("Using current sort: #{current_sort}")
+
+    # Reset to first page when searching
+    total_pages = :math.ceil(length(sorted_packages) / socket.assigns.packages_per_page) |> trunc
+
+    socket =
+      socket
+      |> assign(:filtered_packages, sorted_packages)
+      |> assign(:search_query, search_query)
+      |> assign(:current_page_number, 1)
+      |> assign(:total_pages, total_pages)
+
+    {:noreply, push_patch(socket, to: ~p"/packages?page=1")}
   end
 
   def handle_event("clear_search", _params, socket) do
     # Apply default sorting when clearing
     sorted_packages = sort_packages_by_criteria(socket.assigns.packages, "name")
 
+    # Reset to first page when clearing
+    total_pages = :math.ceil(length(sorted_packages) / socket.assigns.packages_per_page) |> trunc
+
     socket =
       socket
       |> assign(:filtered_packages, sorted_packages)
       |> assign(:search_query, "")
       |> assign(:search_sort, "name")
+      |> assign(:current_page_number, 1)
+      |> assign(:total_pages, total_pages)
 
-    {:noreply, socket}
+    {:noreply, push_patch(socket, to: ~p"/packages?page=1")}
+  end
+
+  def handle_event("change_page", %{"page" => page}, socket) do
+    page_number = String.to_integer(page)
+
+    # Debug: Log the page change
+    IO.inspect("Changing to page: #{page_number}")
+    IO.inspect("Current page before change: #{socket.assigns.current_page_number}")
+    IO.inspect("Total pages: #{socket.assigns.total_pages}")
+    IO.inspect("Filtered packages count: #{length(socket.assigns.filtered_packages)}")
+    IO.inspect("Packages per page: #{socket.assigns.packages_per_page}")
+
+    # Ensure page number is within valid range
+    valid_page = max(1, min(page_number, socket.assigns.total_pages))
+
+    # Navigate via URL patch so the browser shows the page number
+    {:noreply, push_patch(socket, to: ~p"/packages?page=#{valid_page}")}
   end
 
   defp filter_packages(packages, search_query) do
-    packages
+    # Debug: Log the filtering operation
+    IO.inspect("Filtering packages with query: '#{search_query}'")
+    IO.inspect("Total packages to filter: #{length(packages)}")
+
+    filtered = packages
     |> Enum.filter(fn package ->
-      search_query == "" ||
-      String.contains?(String.downcase(package.name), String.downcase(search_query)) ||
-      (package.description && String.contains?(String.downcase(package.description), String.downcase(search_query)))
+      cond do
+        search_query == "" ->
+          true
+        package.name && String.contains?(String.downcase(package.name), String.downcase(search_query)) ->
+          IO.inspect("Package '#{package.name}' matches query '#{search_query}'")
+          true
+        true ->
+          IO.inspect("Package '#{package.name}' does not match query '#{search_query}'")
+          false
+      end
     end)
+
+    IO.inspect("Filtered result: #{length(filtered)} packages")
+    filtered
   end
 
   defp sort_packages_by_criteria(packages, sort_criteria) do
@@ -134,6 +233,26 @@ defmodule UmrahlyWeb.UserPackagesLive do
     end
   end
 
+    # Get paginated packages for the current page
+  defp get_paginated_packages(packages, current_page, packages_per_page) do
+    start_index = (current_page - 1) * packages_per_page
+
+    # Debug: Log pagination details
+    IO.inspect("Pagination debug:")
+    IO.inspect("  Total packages: #{length(packages)}")
+    IO.inspect("  Current page: #{current_page}")
+    IO.inspect("  Packages per page: #{packages_per_page}")
+    IO.inspect("  Start index: #{start_index}")
+    IO.inspect("  End index: #{start_index + packages_per_page - 1}")
+
+    result = packages
+    |> Enum.slice(start_index, packages_per_page)
+
+    IO.inspect("  Result packages count: #{length(result)}")
+    IO.inspect("  Result packages: #{Enum.map(result, & &1.name)}")
+    result
+  end
+
   def render(assigns) do
     ~H"""
     <.sidebar page_title={@page_title}>
@@ -148,7 +267,7 @@ defmodule UmrahlyWeb.UserPackagesLive do
                     type="text"
                     name="query"
                     value={@search_query}
-                    placeholder="Search packages by name or description..."
+                    placeholder="Search packages by name..."
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -178,8 +297,9 @@ defmodule UmrahlyWeb.UserPackagesLive do
         </div>
 
         <!-- Packages Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <%= for package <- @filtered_packages do %>
+        <!-- Debug: current_page_number = <%= @current_page_number %>, total_pages = <%= @total_pages %>, packages_count = <%= length(@filtered_packages) %> -->
+        <div id={"packages-grid-page-#{@current_page_number}"} class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <%= for package <- get_paginated_packages(@filtered_packages, @current_page_number, @packages_per_page) do %>
             <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 relative">
               <!-- Recommended Package Badge -->
               <%= if package.is_recommended do %>
@@ -294,6 +414,71 @@ defmodule UmrahlyWeb.UserPackagesLive do
             </div>
           <% end %>
         </div>
+
+        <!-- Pagination Controls -->
+        <!-- Debug: total_pages = <%= @total_pages %>, current_page_number = <%= @current_page_number %> -->
+        <%= if @total_pages > 1 do %>
+          <div class="flex items-center justify-center space-x-2 py-6">
+            <!-- Previous Page Button -->
+            <button
+              phx-click="change_page"
+              phx-value-page={@current_page_number - 1}
+              disabled={@current_page_number <= 1}
+              class={[
+                "px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                if @current_page_number <= 1 do
+                  "bg-gray-200 text-gray-400 cursor-not-allowed"
+                else
+                  "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                end
+              ]}
+            >
+              Previous
+            </button>
+
+            <!-- Page Numbers -->
+            <div class="flex items-center space-x-1">
+              <%= for page_num <- 1..@total_pages do %>
+                <button
+                  phx-click="change_page"
+                  phx-value-page={page_num}
+                  class={[
+                    "px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    if page_num == @current_page_number do
+                      "bg-blue-600 text-white"
+                    else
+                      "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                    end
+                  ]}
+                >
+                  <%= page_num %>
+                </button>
+              <% end %>
+            </div>
+
+            <!-- Next Page Button -->
+            <button
+              phx-click="change_page"
+              phx-value-page={@current_page_number + 1}
+              disabled={@current_page_number >= @total_pages}
+              class={[
+                "px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                if @current_page_number >= @total_pages do
+                  "bg-gray-200 text-gray-400 cursor-not-allowed"
+                else
+                  "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                end
+              ]}
+            >
+              Next
+            </button>
+          </div>
+
+          <!-- Page Info -->
+          <div class="text-center text-sm text-gray-600">
+            Showing <%= (@current_page_number - 1) * @packages_per_page + 1 %> to <%= if @current_page_number * @packages_per_page > length(@filtered_packages), do: length(@filtered_packages), else: @current_page_number * @packages_per_page %> of <%= length(@filtered_packages) %> packages
+          </div>
+        <% end %>
 
         <!-- No Packages Message -->
         <%= if length(@filtered_packages) == 0 do %>

@@ -417,9 +417,18 @@ defmodule UmrahlyWeb.UserPackagesLive do
                   >
                     View Details
                   </a>
-                  <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium">
-                    Book Now
-                  </button>
+                  <%= if length(package.package_schedules) > 0 do %>
+                    <a
+                      href={~p"/book/#{package.id}/#{List.first(package.package_schedules).id}"}
+                      class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-center"
+                    >
+                      Book Now
+                    </a>
+                  <% else %>
+                    <button disabled class="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed font-medium text-center">
+                      No Schedules
+                    </button>
+                  <% end %>
                 </div>
               </div>
             </div>

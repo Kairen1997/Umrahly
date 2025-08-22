@@ -229,9 +229,18 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
               <!-- Action Buttons -->
               <div class="lg:ml-6 mt-4 lg:mt-0">
                 <div class="space-y-3">
-                  <button class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-base">
-                    Book Now
-                  </button>
+                  <%= if length(@ranked_schedules) > 0 do %>
+                    <a
+                      href={~p"/book/#{@package.id}/#{List.first(@ranked_schedules).id}"}
+                      class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-base text-center block"
+                    >
+                      Book This Date
+                    </a>
+                  <% else %>
+                    <button disabled class="w-full bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed font-medium text-base">
+                      No Available Schedules
+                    </button>
+                  <% end %>
                   <button class="w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm">
                     Download Brochure
                   </button>
@@ -432,9 +441,12 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                             <span class="font-medium"><%= schedule.quota %></span> spots
                           </div>
                         </div>
-                        <button class="mt-3 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium">
+                        <a
+                          href={~p"/book/#{@package.id}/#{schedule.id}"}
+                          class="mt-3 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium text-center block"
+                        >
                           Book This Date
-                        </button>
+                        </a>
                       </div>
                     </div>
                   <% end %>
@@ -534,9 +546,12 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                       </div>
                     <% end %>
 
-                    <button class="mt-2 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium">
-                      Select This Date
-                    </button>
+                    <a
+                      href={~p"/book/#{@package.id}/#{schedule.id}"}
+                      class="mt-2 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium text-center block"
+                    >
+                      Book This Date
+                    </a>
                   </div>
                 </div>
               <% end %>
@@ -626,14 +641,23 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
           <p class="text-base mb-4 opacity-90">
             Don't miss out on this amazing opportunity. Book now and secure your spot!
           </p>
-          <div class="flex flex-col sm:flex-row gap-3 justify-center">
-            <button class="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm">
-              Book This Package
-            </button>
-            <button class="border-2 border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors text-sm">
-              Contact Us
-            </button>
-          </div>
+                                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
+              <%= if length(@ranked_schedules) > 0 do %>
+                <a
+                  href={~p"/book/#{@package.id}/#{List.first(@ranked_schedules).id}"}
+                  class="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm"
+                >
+                  Book This Package
+                </a>
+              <% else %>
+                <button disabled class="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-semibold cursor-not-allowed text-sm">
+                  No Schedules Available
+                </button>
+              <% end %>
+              <button class="border-2 border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors text-sm">
+                Contact Us
+              </button>
+            </div>
         </div>
       </div>
     </.sidebar>

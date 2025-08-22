@@ -24,6 +24,16 @@ defmodule Umrahly.Packages do
   end
 
   @doc """
+  Returns the list of active packages with their schedules for users.
+  """
+  def list_active_packages_with_schedules do
+    Package
+    |> where([p], p.status == "active")
+    |> preload([:package_schedules, :itineraries])
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single package.
   """
   def get_package!(id), do: Repo.get!(Package, id)

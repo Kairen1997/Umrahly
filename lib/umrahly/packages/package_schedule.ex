@@ -29,15 +29,24 @@ defmodule Umrahly.Packages.PackageSchedule do
   end
 
   defp validate_future_dates(changeset) do
-    departure = get_field(changeset, :departure_date)
-    return = get_field(changeset, :return_date)
+    # Only validate future dates if this is a new record or if dates are being changed
+    is_new_record = changeset.data.id == nil
+    has_departure_change = Map.has_key?(changeset.changes, :departure_date)
+    has_return_change = Map.has_key?(changeset.changes, :return_date)
 
-    departure_error = if departure, do: Date.compare(departure, Date.utc_today()) == :lt, else: false
-    return_error = if return, do: Date.compare(return, Date.utc_today()) == :lt, else: false
+    if is_new_record or has_departure_change or has_return_change do
+      departure = get_field(changeset, :departure_date)
+      return = get_field(changeset, :return_date)
 
-    changeset
-    |> maybe_add_error(:departure_date, departure_error, "Departure date must be in the future")
-    |> maybe_add_error(:return_date, return_error, "Return date must be in the future")
+      departure_error = if departure, do: Date.compare(departure, Date.utc_today()) == :lt, else: false
+      return_error = if return, do: Date.compare(return, Date.utc_today()) == :lt, else: false
+
+      changeset
+      |> maybe_add_error(:departure_date, departure_error, "Departure date must be in the future")
+      |> maybe_add_error(:return_date, return_error, "Return date must be in the future")
+    else
+      changeset
+    end
   end
 
   defp validate_dates(changeset) do

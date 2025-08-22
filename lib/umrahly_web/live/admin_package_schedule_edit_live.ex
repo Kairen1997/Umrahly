@@ -3,7 +3,6 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
 
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
-  alias Umrahly.Packages.PackageSchedule
 
   def mount(%{"id" => schedule_id}, _session, socket) do
     schedule = Packages.get_package_schedule!(String.to_integer(schedule_id))
@@ -18,22 +17,48 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
       |> assign(:current_page, "package_schedules")
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
-      |> assign(:profile, socket.assigns.current_user)
+      |> assign(:profile, socket.assigns[:current_user])
+      |> assign(:current_user, socket.assigns[:current_user])
 
     {:ok, socket}
   end
 
+  def handle_event("validate", %{"package_schedule" => schedule_params}, socket) do
+    changeset =
+      socket.assigns.schedule
+      |> Packages.change_package_schedule(schedule_params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :changeset, changeset)}
+  end
+
   def handle_event("save", %{"package_schedule" => schedule_params}, socket) do
+    IO.puts("=== FORM SUBMISSION DEBUG ===")
+    IO.inspect(schedule_params, label: "Raw schedule_params")
+
+    # Convert numeric fields from strings to appropriate types
+    schedule_params = schedule_params
+      |> Map.update("quota", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
+      |> Map.update("price_override", nil, &if(is_binary(&1) && &1 != "", do: String.to_float(&1), else: &1))
+
+    IO.inspect(schedule_params, label: "Processed schedule_params")
+    IO.inspect(socket.assigns.schedule, label: "Current schedule")
+
     case Packages.update_package_schedule(socket.assigns.schedule, schedule_params) do
-      {:ok, _updated_schedule} ->
+      {:ok, updated_schedule} ->
+        IO.puts("SUCCESS: Schedule updated successfully")
+        IO.inspect(updated_schedule, label: "Updated schedule")
         socket =
           socket
           |> put_flash(:info, "Schedule updated successfully!")
-          |> push_navigate(to: ~p"/admin/package-schedules/#{socket.assigns.schedule.id}")
+          |> push_navigate(to: ~p"/admin/package-schedules/#{updated_schedule.id}")
 
         {:noreply, socket}
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        IO.puts("ERROR: Failed to update schedule")
+        IO.inspect(changeset.errors, label: "Changeset errors")
+        IO.inspect(changeset.changes, label: "Changeset changes")
         socket = assign(socket, :changeset, changeset)
         {:noreply, socket}
     end
@@ -65,7 +90,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
 
         <div class="max-w-4xl">
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
-            <form phx-submit="save" class="space-y-6">
+            <form phx-submit="save" phx-change="validate" class="space-y-6">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Package</label>
@@ -75,7 +100,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                     required
                   >
                     <%= for package <- @packages do %>
-                      <option value={package.id} selected={@changeset.data.package_id == package.id}><%= package.name %></option>
+                      <option value={package.id} selected={(@changeset.changes[:package_id] || @changeset.data.package_id) == package.id}><%= package.name %></option>
                     <% end %>
                   </select>
                   <%= if @changeset.errors[:package_id] do %>
@@ -90,10 +115,10 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     required
                   >
-                    <option value="active" selected={@changeset.data.status == "active"}>Active</option>
-                    <option value="inactive" selected={@changeset.data.status == "inactive"}>Inactive</option>
-                    <option value="cancelled" selected={@changeset.data.status == "cancelled"}>Cancelled</option>
-                    <option value="completed" selected={@changeset.data.status == "completed"}>Completed</option>
+                    <option value="active" selected={(@changeset.changes[:status] || @changeset.data.status) == "active"}>Active</option>
+                    <option value="inactive" selected={(@changeset.changes[:status] || @changeset.data.status) == "inactive"}>Inactive</option>
+                    <option value="cancelled" selected={(@changeset.changes[:status] || @changeset.data.status) == "cancelled"}>Cancelled</option>
+                    <option value="completed" selected={(@changeset.changes[:status] || @changeset.data.status) == "completed"}>Completed</option>
                   </select>
                   <%= if @changeset.errors[:status] do %>
                     <p class="mt-1 text-sm text-red-600"><%= elem(@changeset.errors[:status], 0) %></p>
@@ -105,7 +130,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                   <input
                     type="number"
                     name="package_schedule[quota]"
-                    value={@changeset.data.quota}
+                    value={@changeset.changes[:quota] || @changeset.data.quota}
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     placeholder="Enter quota"
                     min="1"
@@ -122,10 +147,11 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                   <input
                     type="number"
                     name="package_schedule[price_override]"
-                    value={@changeset.data.price_override}
+                    value={@changeset.changes[:price_override] || @changeset.data.price_override}
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     placeholder="Leave empty to use package price"
                     min="1"
+                    step="0.01"
                   />
                   <%= if @changeset.errors[:price_override] do %>
                     <p class="mt-1 text-sm text-red-600"><%= elem(@changeset.errors[:price_override], 0) %></p>
@@ -137,7 +163,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                   <input
                     type="date"
                     name="package_schedule[departure_date]"
-                    value={@changeset.data.departure_date}
+                    value={@changeset.changes[:departure_date] || @changeset.data.departure_date}
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     required
                   />
@@ -151,7 +177,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                   <input
                     type="date"
                     name="package_schedule[return_date]"
-                    value={@changeset.data.return_date}
+                    value={@changeset.changes[:return_date] || @changeset.data.return_date}
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     required
                   />
@@ -168,7 +194,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                   rows="4"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Any additional notes about this schedule..."
-                ><%= @changeset.data.notes || "" %></textarea>
+                ><%= @changeset.changes[:notes] || @changeset.data.notes || "" %></textarea>
                 <%= if @changeset.errors[:notes] do %>
                   <p class="mt-1 text-sm text-red-600"><%= elem(@changeset.errors[:notes], 0) %></p>
                 <% end %>

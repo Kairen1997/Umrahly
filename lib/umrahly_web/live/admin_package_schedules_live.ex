@@ -27,7 +27,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
       |> assign(:profile, socket.assigns.current_user)
       |> assign(:page, 1)
       |> assign(:per_page, 10)
-      |> assign(:total_pages, ceil(length(schedules) / 10))
+      |> assign(:total_pages, Float.ceil(length(schedules) / 10.0, 0) |> trunc)
 
     {:ok, socket}
   end
@@ -48,7 +48,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
       |> assign(:search_departure_date, search_departure_date)
       |> assign(:search_return_date, search_return_date)
       |> assign(:page, 1)
-      |> assign(:total_pages, ceil(length(filtered_schedules) / socket.assigns.per_page))
+      |> assign(:total_pages, Float.ceil(length(filtered_schedules) / socket.assigns.per_page, 0) |> trunc)
 
     {:noreply, socket}
   end
@@ -62,7 +62,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
       |> assign(:search_departure_date, "")
       |> assign(:search_return_date, "")
       |> assign(:page, 1)
-      |> assign(:total_pages, ceil(length(socket.assigns.schedules) / socket.assigns.per_page))
+      |> assign(:total_pages, Float.ceil(length(socket.assigns.schedules) / socket.assigns.per_page, 0) |> trunc)
 
     {:noreply, socket}
   end
@@ -91,7 +91,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
         # Recalculate filtered schedules and pagination
         filtered_schedules = filter_schedules(schedules, socket.assigns.search_query, socket.assigns.search_status, socket.assigns.search_departure_date, socket.assigns.search_return_date)
-        total_pages = ceil(length(filtered_schedules) / socket.assigns.per_page)
+        total_pages = Float.ceil(length(filtered_schedules) / socket.assigns.per_page, 0) |> trunc
 
         # Reset to page 1 if current page is beyond the new total
         new_page = if socket.assigns.page > total_pages, do: 1, else: socket.assigns.page
@@ -123,7 +123,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
     # Recalculate filtered schedules and pagination
     filtered_schedules = filter_schedules(schedules, socket.assigns.search_query, socket.assigns.search_status, socket.assigns.search_departure_date, socket.assigns.search_return_date)
-    total_pages = ceil(length(filtered_schedules) / socket.assigns.per_page)
+    total_pages = Float.ceil(length(filtered_schedules) / socket.assigns.per_page, 0) |> trunc
 
     # Reset to page 1 if current page is beyond the new total
     new_page = if socket.assigns.page > total_pages, do: 1, else: socket.assigns.page
@@ -175,7 +175,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
 
         # Recalculate filtered schedules and pagination
         filtered_schedules = filter_schedules(schedules, socket.assigns.search_query, socket.assigns.search_status, socket.assigns.search_departure_date, socket.assigns.search_return_date)
-        total_pages = ceil(length(filtered_schedules) / socket.assigns.per_page)
+        total_pages = Float.ceil(length(filtered_schedules) / socket.assigns.per_page, 0) |> trunc
 
         # Reset to page 1 if current page is beyond the new total
         new_page = if socket.assigns.page > total_pages, do: 1, else: socket.assigns.page
@@ -215,10 +215,8 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     end)
   end
 
-    defp get_paginated_schedules(schedules, page, per_page) do
+  defp get_paginated_schedules(schedules, page, per_page) do
     start_index = (page - 1) * per_page
-    end_index = start_index + per_page - 1
-
     schedules
     |> Enum.slice(start_index, per_page)
   end
@@ -490,10 +488,10 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                   Transport
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  Remarks
+                  Actions
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  Actions
+                  Remarks
                 </th>
               </tr>
             </thead>
@@ -583,11 +581,6 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                         <% end %>
                       </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm text-gray-900">
-                        <%= get_schedule_remarks(schedule) %>
-                      </div>
-                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <a
                         href={~p"/admin/package-schedules/#{schedule.id}"}
@@ -595,6 +588,11 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                       >
                         View Details
                       </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-900">
+                        <%= get_schedule_remarks(schedule) %>
+                      </div>
                     </td>
                   </tr>
                 <% end %>

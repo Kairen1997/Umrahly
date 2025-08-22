@@ -311,6 +311,17 @@ defmodule UmrahlyWeb.UserPackagesLive do
                     Recommended
                   </div>
                 </div>
+              <% else %>
+                <%= if @current_user && is_integer(@current_user.monthly_income) && @current_user.monthly_income > 0 do %>
+                  <div class="absolute top-3 left-3 z-10">
+                    <div class="bg-gradient-to-r from-yellow-400 to-amber-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.721-1.36 3.486 0l6.518 11.59c.75 1.334-.213 2.991-1.742 2.991H3.48c-1.53 0-2.492-1.657-1.743-2.991l6.52-11.59zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V7a1 1 0 112 0v3a1 1 0 01-1 1z" clip-rule="evenodd" />
+                      </svg>
+                      May exceed your income
+                    </div>
+                  </div>
+                <% end %>
               <% end %>
 
               <!-- Package Image -->

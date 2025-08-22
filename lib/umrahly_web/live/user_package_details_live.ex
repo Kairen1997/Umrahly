@@ -1,24 +1,138 @@
 defmodule UmrahlyWeb.UserPackageDetailsLive do
   use UmrahlyWeb, :live_view
 
+  on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
+
   import UmrahlyWeb.SidebarComponent
   alias Umrahly.Packages
 
-  def mount(%{"id" => package_id}, _session, socket) do
+    def mount(_params, _session, socket) do
+    # Initialize socket with current user from assigns
+    current_user = socket.assigns[:current_user]
+    {:ok, assign(socket, :current_user, current_user)}
+  end
+
+    def handle_params(%{"id" => package_id}, _url, socket) do
     package = Packages.get_package_with_schedules!(package_id)
 
-    # Only show active packages to users
-    if package.status != "active" do
-      {:ok, push_navigate(socket, to: ~p"/packages")}
-    else
+          # Validate package has required fields
+      if is_nil(package.price) do
+        socket =
+          socket
+          |> put_flash(:error, "Package data is incomplete (missing price). Please contact support.")
+          |> push_navigate(to: ~p"/packages")
+
+        {:noreply, socket}
+      else
+      # Only show active packages to users
+      if package.status != "active" do
+        {:noreply, push_navigate(socket, to: ~p"/packages")}
+      else
+                        # Get current user for income-based recommendations
+        current_user = socket.assigns[:current_user]
+
+        # Analyze schedules and rank them by affordability
+        ranked_schedules = rank_schedules_by_affordability(package.package_schedules || [], current_user, package)
+
+        socket =
+          socket
+          |> assign(:package, package)
+          |> assign(:current_user, current_user)
+          |> assign(:ranked_schedules, ranked_schedules)
+          |> assign(:current_page, "packages")
+          |> assign(:page_title, package.name)
+
+        {:noreply, socket}
+      end
+    end
+  rescue
+    e ->
+      # Handle any errors gracefully
       socket =
         socket
-        |> assign(:package, package)
-        |> assign(:current_page, "packages")
-        |> assign(:page_title, package.name)
+        |> put_flash(:error, "Failed to load package details: #{Exception.message(e)}")
+        |> push_navigate(to: ~p"/packages")
 
-      {:ok, socket}
+      {:noreply, socket}
+  end
+
+    # Rank schedules by affordability based on user's monthly income
+  defp rank_schedules_by_affordability(schedules, current_user, package) do
+    # Always ensure all schedules have the required fields
+    base_schedules = Enum.map(schedules, fn schedule ->
+      total_price = calculate_schedule_price(schedule, package)
+      schedule
+      |> Map.put(:total_price, total_price)
+      |> Map.put(:affordability_ratio, nil)
+      |> Map.put(:affordability_score, 0)
+      |> Map.put(:affordability_level, "unknown")
+      |> Map.put(:is_recommended, false)
+    end)
+
+    case current_user && current_user.monthly_income do
+      nil ->
+        # If no user or no income info, return schedules with base fields
+        base_schedules
+
+      monthly_income when is_integer(monthly_income) and monthly_income > 0 ->
+        Enum.map(base_schedules, fn schedule ->
+          # Calculate affordability metrics
+          affordability_ratio = schedule.total_price / monthly_income
+          affordability_score = calculate_affordability_score(affordability_ratio)
+          affordability_level = get_affordability_level(affordability_ratio)
+          is_recommended = is_schedule_recommended?(affordability_ratio, schedule)
+
+          schedule
+          |> Map.put(:affordability_ratio, affordability_ratio)
+          |> Map.put(:affordability_score, affordability_score)
+          |> Map.put(:affordability_level, affordability_level)
+          |> Map.put(:is_recommended, is_recommended)
+        end)
+        |> Enum.sort_by(& &1.affordability_score, :desc)
+
+      _ ->
+        # Invalid income data, return schedules with base fields
+        base_schedules
     end
+  end
+
+  # Calculate total price for a schedule (base price + override)
+  defp calculate_schedule_price(schedule, package) do
+    base_price = package.price
+    override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
+    base_price + override_price
+  end
+
+  # Calculate affordability score (higher is better)
+  defp calculate_affordability_score(affordability_ratio) do
+    cond do
+      affordability_ratio <= 0.3 -> 100    # Very affordable (≤30% of income)
+      affordability_ratio <= 0.5 -> 90     # Highly affordable (≤50% of income)
+      affordability_ratio <= 0.8 -> 80     # Affordable (≤80% of income)
+      affordability_ratio <= 1.0 -> 70     # Manageable (≤100% of income)
+      affordability_ratio <= 1.5 -> 50     # Challenging (≤150% of income)
+      affordability_ratio <= 2.0 -> 30     # Difficult (≤200% of income)
+      true -> 10                            # Very difficult (>200% of income)
+    end
+  end
+
+  # Get affordability level description
+  defp get_affordability_level(affordability_ratio) do
+    cond do
+      affordability_ratio <= 0.3 -> "very_affordable"
+      affordability_ratio <= 0.5 -> "highly_affordable"
+      affordability_ratio <= 0.8 -> "affordable"
+      affordability_ratio <= 1.0 -> "manageable"
+      affordability_ratio <= 1.5 -> "challenging"
+      affordability_ratio <= 2.0 -> "difficult"
+      true -> "very_difficult"
+    end
+  end
+
+  # Determine if a schedule should be recommended
+  defp is_schedule_recommended?(affordability_ratio, schedule) do
+    # Recommend if affordable and has good quota
+    affordability_ratio <= 1.0 and schedule.quota > 5
   end
 
   def render(assigns) do
@@ -95,6 +209,21 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                     <div class="text-xs text-gray-500">Available Schedules</div>
                   </div>
                 </div>
+
+                <!-- Income-Based Note -->
+                <%= if @current_user && @current_user.monthly_income do %>
+                  <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="flex items-center text-sm text-blue-800">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>
+                        <strong>Smart Recommendation:</strong> Based on your monthly income of RM <%= @current_user.monthly_income %>,
+                        we'll show you the most suitable departure dates below.
+                      </span>
+                    </div>
+                  </div>
+                <% end %>
               </div>
 
               <!-- Action Buttons -->
@@ -167,20 +296,206 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
           </div>
         </div>
 
+        <!-- Income-Based Recommendations -->
+        <%= if @current_user && @current_user.monthly_income do %>
+          <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-5">
+            <div class="flex items-center mb-4">
+              <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 class="text-lg font-semibold text-gray-900">Personalized Date Recommendations</h3>
+            </div>
+
+            <div class="mb-4">
+              <p class="text-sm text-gray-600 mb-2">
+                Based on your monthly income of <span class="font-semibold text-green-700">RM <%= @current_user.monthly_income %></span>,
+                we've analyzed all available dates and ranked them by affordability:
+              </p>
+
+              <!-- Affordability Legend -->
+              <div class="flex flex-wrap gap-2 mb-4">
+                <div class="flex items-center text-xs">
+                  <div class="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
+                  <span class="text-gray-600">Very Affordable (≤30% of income)</span>
+                </div>
+                <div class="flex items-center text-xs">
+                  <div class="w-3 h-3 bg-blue-500 rounded-full mr-1"></div>
+                  <span class="text-gray-600">Affordable (≤80% of income)</span>
+                </div>
+                <div class="flex items-center text-xs">
+                  <div class="w-3 h-3 bg-yellow-500 rounded-full mr-1"></div>
+                  <span class="text-gray-600">Manageable (≤100% of income)</span>
+                </div>
+                <div class="flex items-center text-xs">
+                  <div class="w-3 h-3 bg-orange-500 rounded-full mr-1"></div>
+                  <span class="text-gray-600">Challenging (≤150% of income)</span>
+                </div>
+                <div class="flex items-center text-xs">
+                  <div class="w-3 h-3 bg-red-500 rounded-full mr-1"></div>
+                  <span class="text-gray-600">Difficult (>150% of income)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Top Recommended Dates -->
+            <%= if Enum.any?(@ranked_schedules, & &1.is_recommended) do %>
+              <div class="mb-4">
+                <h4 class="text-md font-semibold text-gray-800 mb-3">🌟 Top Recommendations for You</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <%= for schedule <- Enum.take(Enum.filter(@ranked_schedules, & &1.is_recommended), 3) do %>
+                    <div class="bg-white border-2 border-green-300 rounded-lg p-3 shadow-sm">
+                      <div class="text-center">
+                        <div class="flex items-center justify-center mb-2">
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 mr-2">
+                            Recommended
+                          </span>
+                                                  <span class={[
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          case schedule.affordability_level do
+                            "very_affordable" -> "bg-green-100 text-green-800"
+                            "highly_affordable" -> "bg-blue-100 text-blue-800"
+                            "affordable" -> "bg-blue-100 text-blue-800"
+                            "manageable" -> "bg-yellow-100 text-yellow-800"
+                            "challenging" -> "bg-orange-100 text-orange-800"
+                            "difficult" -> "bg-red-100 text-red-800"
+                            "very_difficult" -> "bg-red-100 text-red-800"
+                            "unknown" -> "bg-gray-100 text-gray-600"
+                            _ -> "bg-gray-100 text-gray-800"
+                          end
+                        ]}>
+                          <%= if schedule.affordability_level == "unknown" do %>
+                            Not Available
+                          <% else %>
+                            <%= String.replace(schedule.affordability_level, "_", " ") |> String.capitalize() %>
+                          <% end %>
+                        </span>
+                        </div>
+                        <div class="text-base font-semibold text-gray-900">
+                          <%= Calendar.strftime(schedule.departure_date, "%B %d, %Y") %>
+                        </div>
+                                            <div class="text-xs text-gray-500 mt-1">
+                      <%= Calendar.strftime(schedule.departure_date, "%A") %>
+                    </div>
+
+                    <!-- Affordability Indicator -->
+                    <%= if @current_user && @current_user.monthly_income do %>
+                      <div class="mt-2 mb-2">
+                        <span class={[
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          case schedule.affordability_level do
+                            "very_affordable" -> "bg-green-100 text-green-800"
+                            "highly_affordable" -> "bg-blue-100 text-blue-800"
+                            "affordable" -> "bg-blue-100 text-blue-800"
+                            "manageable" -> "bg-yellow-100 text-yellow-800"
+                            "challenging" -> "bg-orange-100 text-orange-800"
+                            "difficult" -> "bg-red-100 text-red-800"
+                            "very_difficult" -> "bg-red-100 text-red-800"
+                            "unknown" -> "bg-gray-100 text-gray-600"
+                            _ -> "bg-gray-100 text-gray-800"
+                          end
+                        ]}>
+                          <%= if schedule.affordability_level == "unknown" do %>
+                            Not Available
+                          <% else %>
+                            <%= String.replace(schedule.affordability_level, "_", " ") |> String.capitalize() %>
+                          <% end %>
+                        </span>
+                      </div>
+                    <% end %>
+                                                <div class="mt-2 space-y-1">
+                          <div class="text-xs text-gray-600">
+                            <span class="font-medium">Price:</span>
+                            <span class="font-bold text-green-700">RM <%= schedule.total_price %></span>
+                          </div>
+                                                    <div class="text-xs text-gray-600">
+                            <span class="font-medium">Affordability:</span>
+                            <span class="font-medium">
+                              <%= if schedule.affordability_ratio do %>
+                                <%= Float.round(schedule.affordability_ratio * 100, 1) %>%
+                              <% else %>
+                                Not available
+                              <% end %>
+                            </span> of monthly income
+                          </div>
+                                                    <div class="text-xs text-gray-600">
+                            <span class="font-medium">Score:</span>
+                            <span class="font-medium text-blue-600">
+                              <%= if schedule.affordability_score > 0 do %>
+                                <%= schedule.affordability_score %>/100
+                              <% else %>
+                                Not available
+                              <% end %>
+                            </span>
+                          </div>
+                          <div class="text-xs text-gray-600">
+                            <span class="font-medium">Quota:</span>
+                            <span class="font-medium"><%= schedule.quota %></span> spots
+                          </div>
+                        </div>
+                        <button class="mt-3 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium">
+                          Book This Date
+                        </button>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <!-- No Income Information Available -->
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-5">
+            <div class="flex items-center mb-4">
+              <svg class="w-6 h-6 mr-3 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <h3 class="text-lg font-semibold text-gray-900">Complete Your Profile for Personalized Recommendations</h3>
+            </div>
+
+            <p class="text-sm text-gray-600 mb-4">
+              To get personalized date recommendations based on your budget, please complete your profile with your monthly income information.
+            </p>
+
+            <a href="/profile" class="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Complete Profile
+            </a>
+          </div>
+        <% end %>
+
         <!-- Available Schedules -->
-        <%= if length(@package.package_schedules) > 0 do %>
+        <%= if @ranked_schedules && length(@ranked_schedules) > 0 do %>
           <div class="bg-white rounded-lg shadow-lg p-5">
             <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <svg class="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              Available Departure Dates
+              All Available Departure Dates
+              <%= if @current_user && @current_user.monthly_income do %>
+                <span class="ml-2 text-sm font-normal text-gray-500">(Ranked by affordability)</span>
+              <% end %>
             </h3>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <%= for schedule <- @package.package_schedules do %>
-                <div class="border border-gray-200 rounded-lg p-3 hover:border-blue-300 transition-colors">
+              <%= for schedule <- @ranked_schedules do %>
+                <div class={[
+                  "border rounded-lg p-3 transition-colors",
+                  if schedule.is_recommended do
+                    "border-2 border-green-300 bg-green-50"
+                  else
+                    "border-gray-200 hover:border-blue-300"
+                  end
+                ]}>
                   <div class="text-center">
+                    <%= if schedule.is_recommended do %>
+                      <div class="mb-2">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          ⭐ Recommended
+                        </span>
+                      </div>
+                    <% end %>
                     <div class="text-base font-semibold text-gray-900">
                       <%= Calendar.strftime(schedule.departure_date, "%B %d, %Y") %>
                     </div>
@@ -192,19 +507,58 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                         Quota: <%= schedule.quota %>
                       </span>
                       <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        RM <%=
-                          base_price = @package.price
-                          override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-                          base_price + override_price
-                        %>
+                        RM <%= schedule.total_price %>
                       </span>
                     </div>
+
+                                        <%= if @current_user && @current_user.monthly_income do %>
+                                            <div class="mt-2 text-xs text-gray-600">
+                        <span class="font-medium">Affordability:</span>
+                        <span class="font-medium">
+                          <%= if schedule.affordability_ratio do %>
+                            <%= Float.round(schedule.affordability_ratio * 100, 1) %>%
+                          <% else %>
+                            Not available
+                          <% end %>
+                        </span> of monthly income
+                      </div>
+                                            <div class="mt-1 text-xs text-gray-600">
+                        <span class="font-medium">Score:</span>
+                        <span class="font-medium text-blue-600">
+                          <%= if schedule.affordability_score > 0 do %>
+                            <%= schedule.affordability_score %>/100
+                          <% else %>
+                            Not available
+                          <% end %>
+                        </span>
+                      </div>
+                    <% end %>
+
                     <button class="mt-2 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium">
                       Select This Date
                     </button>
                   </div>
                 </div>
               <% end %>
+            </div>
+          </div>
+        <% else %>
+          <!-- No Schedules Available -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-5">
+            <div class="text-center">
+              <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2v12a2 2 0 002 2z" />
+              </svg>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">No Departure Dates Available</h3>
+              <p class="text-gray-600 mb-4">
+                This package currently doesn't have any available departure dates. Please check back later or contact us for more information.
+              </p>
+              <a href="/packages" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Browse Other Packages
+              </a>
             </div>
           </div>
         <% end %>

@@ -73,6 +73,20 @@ defmodule UmrahlyWeb.UserPackagesLive do
   end
 
   defp sort_packages_by_criteria(packages, sort_criteria) do
+    # First, separate recommended and non-recommended packages
+    {recommended_packages, non_recommended_packages} =
+      Enum.split_with(packages, & &1.is_recommended)
+
+    # Sort each group by the selected criteria
+    sorted_recommended = sort_packages_by_criteria_internal(recommended_packages, sort_criteria)
+    sorted_non_recommended = sort_packages_by_criteria_internal(non_recommended_packages, sort_criteria)
+
+    # Combine: recommended packages first, then non-recommended packages
+    sorted_recommended ++ sorted_non_recommended
+  end
+
+  # Internal sorting function for packages within each group
+  defp sort_packages_by_criteria_internal(packages, sort_criteria) do
     case sort_criteria do
       "name" -> Enum.sort_by(packages, &String.downcase(&1.name))
       "price_low" -> Enum.sort_by(packages, & &1.price)

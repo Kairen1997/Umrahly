@@ -7,7 +7,7 @@ defmodule Umrahly.Repo.Migrations.CreateBookings do
       add :amount, :decimal, precision: 10, scale: 2, null: false
       add :booking_date, :date, null: false
       add :travel_date, :date, null: false
-      add :notes, :text
+      add :notes, :text, null: true
       add :user_id, references(:users, on_delete: :nothing), null: false
       add :package_id, references(:packages, on_delete: :nothing), null: false
 

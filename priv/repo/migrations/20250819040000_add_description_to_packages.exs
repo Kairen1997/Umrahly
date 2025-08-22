@@ -3,7 +3,7 @@ defmodule Umrahly.Repo.Migrations.AddDescriptionToPackages do
 
   def change do
     alter table(:packages) do
-      add :description, :text
+      add :description, :text, null: true
     end
   end
 end

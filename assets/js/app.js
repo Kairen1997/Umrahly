@@ -97,6 +97,9 @@ const AutoDismissFlash = {
     this.progressTimer = null;
     this.dismissDelay = this.config.autoDismissDelay;
     
+    // Mark as initialized to prevent double initialization
+    this.el.setAttribute('data-hook-initialized', 'true');
+    
     // Position this flash message
     this.positionFlashMessage();
     
@@ -116,6 +119,8 @@ const AutoDismissFlash = {
     
     // Start auto-dismiss timer
     this.startAutoDismiss();
+    
+    console.log("AutoDismissFlash initialization completed for:", this.el.id);
   },
   
   destroyed() {
@@ -251,6 +256,8 @@ const AutoDismissFlash = {
   startAutoDismiss() {
     if (this.isPaused) return;
     
+    console.log("Starting auto-dismiss timer for:", this.el.id, "Delay:", this.dismissDelay);
+    
     // Start progress bar animation if enabled
     if (this.config.showProgressBar && this.progressBar) {
       this.startProgressBar();
@@ -259,6 +266,7 @@ const AutoDismissFlash = {
     // Auto-dismiss after specified delay
     this.autoDismissTimer = setTimeout(() => {
       if (!this.isPaused) {
+        console.log("Auto-dismiss timer fired for:", this.el.id);
         this.dismissFlash();
       }
     }, this.dismissDelay);
@@ -476,6 +484,209 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Global function to manually initialize flash messages
+window.initializeFlashMessages = function() {
+  console.log("Manually initializing flash messages");
+  
+  const flashMessages = document.querySelectorAll('[data-flash-auto-dismiss="true"]:not([data-hook-initialized])');
+  console.log("Found uninitialized flash messages:", flashMessages.length);
+  
+  if (flashMessages.length === 0) {
+    console.log("No uninitialized flash messages found");
+    return;
+  }
+  
+  flashMessages.forEach((flashEl, index) => {
+    console.log("Manually initializing flash message:", flashEl.id, "Element:", flashEl);
+    console.log("Element classes:", flashEl.className);
+    console.log("Element data attributes:", flashEl.dataset);
+    
+    // Create a mock hook context
+    const mockHook = {
+      el: flashEl,
+      config: window.FlashConfig || {
+        autoDismissDelay: 5000,
+        showProgressBar: true,
+        animationDuration: 300,
+        maxMessages: 3
+      },
+      isPaused: false,
+      autoDismissTimer: null,
+      progressTimer: null,
+      dismissDelay: 5000,
+      
+      // Mock methods
+      positionFlashMessage() {
+        console.log("Positioning flash message:", this.el.id);
+        const existingFlashes = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+        const currentIndex = Array.from(existingFlashes).indexOf(this.el);
+        
+        if (existingFlashes.length > this.config.maxMessages) {
+          const oldestFlash = existingFlashes[0];
+          if (oldestFlash && oldestFlash !== this.el) {
+            oldestFlash.remove();
+          }
+        }
+        
+        const updatedFlashes = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+        const updatedIndex = Array.from(updatedFlashes).indexOf(this.el);
+        
+        const topOffset = 2 + (updatedIndex * 5);
+        this.el.style.top = `${topOffset}rem`;
+        console.log("Set top offset to:", topOffset, "rem");
+        
+        if (updatedIndex > 0) {
+          this.el.style.opacity = '0';
+          this.el.style.transform = 'translateX(100%)';
+          
+          setTimeout(() => {
+            this.el.style.opacity = '1';
+            this.el.style.transform = 'translateX(0)';
+          }, updatedIndex * 100);
+        }
+      },
+      
+      addProgressBar() {
+        if (!this.config.showProgressBar) return;
+        
+        console.log("Adding progress bar to:", this.el.id);
+        const progressBar = document.createElement('div');
+        progressBar.className = 'flash-progress absolute bottom-0 left-0 h-1 bg-current opacity-20 transition-all duration-100';
+        progressBar.style.width = '100%';
+        this.el.appendChild(progressBar);
+        this.progressBar = progressBar;
+      },
+      
+      setupCloseButton() {
+        const closeButton = this.el.querySelector('button[data-debug="close-button"]');
+        if (closeButton) {
+          console.log("Setting up close button for:", this.el.id);
+          closeButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.dismissFlash();
+          });
+        } else {
+          console.log("No close button found for:", this.el.id);
+        }
+      },
+      
+      setupClickOutside() {
+        console.log("Setting up click outside for:", this.el.id);
+        this.el.addEventListener('click', (e) => {
+          if (e.target.closest('button')) {
+            return;
+          }
+          this.dismissFlash();
+        });
+      },
+      
+      setupHoverPause() {
+        console.log("Setting up hover pause for:", this.el.id);
+        this.el.addEventListener('mouseenter', () => {
+          this.isPaused = true;
+          this.clearAutoDismissTimer();
+          this.clearProgressTimer();
+        });
+        
+        this.el.addEventListener('mouseleave', () => {
+          this.isPaused = false;
+          this.startAutoDismiss();
+        });
+      },
+      
+      startAutoDismiss() {
+        if (this.isPaused) return;
+        
+        console.log("Starting auto-dismiss for:", this.el.id, "Delay:", this.dismissDelay);
+        
+        if (this.config.showProgressBar && this.progressBar) {
+          this.startProgressBar();
+        }
+        
+        this.autoDismissTimer = setTimeout(() => {
+          if (!this.isPaused) {
+            console.log("Auto-dismiss timer fired for:", this.el.id);
+            this.dismissFlash();
+          }
+        }, this.dismissDelay);
+      },
+      
+      startProgressBar() {
+        if (!this.progressBar) return;
+        
+        console.log("Starting progress bar for:", this.el.id);
+        const startTime = Date.now();
+        
+        this.progressTimer = setInterval(() => {
+          if (this.isPaused) return;
+          
+          const currentTime = Date.now();
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / this.dismissDelay, 1);
+          
+          this.progressBar.style.width = `${(1 - progress) * 100}%`;
+          
+          if (progress >= 1) {
+            this.clearProgressTimer();
+          }
+        }, 50);
+      },
+      
+      clearAutoDismissTimer() {
+        if (this.autoDismissTimer) {
+          clearTimeout(this.autoDismissTimer);
+          this.autoDismissTimer = null;
+        }
+      },
+      
+      clearProgressTimer() {
+        if (this.progressTimer) {
+          clearInterval(this.progressTimer);
+          this.progressTimer = null;
+        }
+      },
+      
+      dismissFlash() {
+        console.log("Dismissing flash:", this.el.id);
+        
+        this.clearAutoDismissTimer();
+        this.clearProgressTimer();
+        
+        this.el.classList.add('dismissing');
+        
+        setTimeout(() => {
+          if (this.el.parentNode) {
+            this.el.parentNode.removeChild(this.el);
+          }
+          
+          this.repositionRemainingFlashes();
+        }, this.config.animationDuration);
+      },
+      
+      repositionRemainingFlashes() {
+        const remainingFlashes = document.querySelectorAll('[data-flash-auto-dismiss="true"]');
+        remainingFlashes.forEach((flash, index) => {
+          const topOffset = 2 + (index * 5);
+          flash.style.top = `${topOffset}rem`;
+        });
+      }
+    };
+    
+    // Initialize the mock hook
+    console.log("Initializing mock hook for:", flashEl.id);
+    mockHook.positionFlashMessage();
+    mockHook.addProgressBar();
+    mockHook.setupCloseButton();
+    mockHook.setupClickOutside();
+    mockHook.setupHoverPause();
+    mockHook.startAutoDismiss();
+    
+    // Mark as initialized
+    flashEl.setAttribute('data-hook-initialized', 'true');
+    console.log("Flash message initialized:", flashEl.id);
+  });
+};
+
 // Initialize flash messages for regular Phoenix controllers (non-LiveView)
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, checking for flash messages");
@@ -682,6 +893,61 @@ document.addEventListener('DOMContentLoaded', function() {
     mockHook.setupClickOutside();
     mockHook.setupHoverPause();
     mockHook.startAutoDismiss();
+    
+    // Mark as initialized
+    flashEl.setAttribute('data-hook-initialized', 'true');
   });
+  
+  // Also set up a fallback timer to check for new flash messages
+  setTimeout(() => {
+    window.initializeFlashMessages();
+  }, 1000);
+});
+
+// Set up a mutation observer to automatically detect new flash messages
+const flashObserver = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.type === 'childList') {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Check if the added node is a flash message
+          if (node.matches && node.matches('[data-flash-auto-dismiss="true"]')) {
+            console.log("Mutation observer detected new flash message:", node.id);
+            // Small delay to ensure the element is fully rendered
+            setTimeout(() => {
+              window.initializeFlashMessages();
+            }, 100);
+          }
+          
+          // Check if any child elements are flash messages
+          const childFlashes = node.querySelectorAll ? node.querySelectorAll('[data-flash-auto-dismiss="true"]') : [];
+          if (childFlashes.length > 0) {
+            console.log("Mutation observer detected flash messages in added node:", childFlashes.length);
+            setTimeout(() => {
+              window.initializeFlashMessages();
+            }, 100);
+          }
+        }
+      });
+    }
+  });
+});
+
+// Start observing the document body for changes
+flashObserver.observe(document.body, {
+  childList: true,
+  subtree: true
+});
+
+console.log("Flash message mutation observer started");
+
+// Also check for flash messages after LiveView navigation
+document.addEventListener('phx:page-loading-stop', function() {
+  console.log("LiveView navigation completed, checking for new flash messages");
+  
+  // Small delay to ensure DOM is updated
+  setTimeout(() => {
+    window.initializeFlashMessages();
+  }, 100);
 });
 

@@ -4,7 +4,7 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
 
-  def mount(%{"id" => package_id}, session, socket) do
+  def mount(%{"id" => package_id}, _session, socket) do
     try do
       # Get package with schedules and itineraries preloaded
       package = Packages.get_package_with_schedules!(package_id)

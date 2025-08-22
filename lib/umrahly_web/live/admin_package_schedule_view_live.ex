@@ -57,7 +57,50 @@ defmodule UmrahlyWeb.AdminPackageScheduleViewLive do
     end
   end
 
+  def handle_event("cancel_schedule", %{"id" => schedule_id}, socket) do
+    schedule = Packages.get_package_schedule!(String.to_integer(schedule_id))
 
+    case Packages.update_package_schedule(schedule, %{status: "cancelled"}) do
+      {:ok, updated_schedule} ->
+        # Refresh the schedule data with updated status
+        updated_schedule = Map.put(updated_schedule, :booking_stats, socket.assigns.current_schedule.booking_stats)
+
+        socket =
+          socket
+          |> assign(:current_schedule, updated_schedule)
+          |> put_flash(:info, "Schedule cancelled successfully!")
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        socket =
+          socket
+          |> put_flash(:error, "Failed to cancel schedule")
+
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("delete_schedule", %{"id" => schedule_id}, socket) do
+    schedule = Packages.get_package_schedule!(String.to_integer(schedule_id))
+
+    case Packages.delete_package_schedule(schedule) do
+      {:ok, _} ->
+        socket =
+          socket
+          |> put_flash(:info, "Schedule deleted successfully!")
+          |> push_navigate(to: ~p"/admin/package-schedules")
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        socket =
+          socket
+          |> put_flash(:error, "Failed to delete schedule")
+
+        {:noreply, socket}
+    end
+  end
 
   def render(assigns) do
     ~H"""
@@ -109,7 +152,11 @@ defmodule UmrahlyWeb.AdminPackageScheduleViewLive do
                   <div class="flex justify-between border-t border-gray-200 pt-2">
                     <span class="text-sm font-semibold text-gray-700">Total Price:</span>
                     <span class="text-sm font-bold text-gray-900">
-                      RM <%= @current_schedule.package.price + (if @current_schedule.price_override, do: @current_schedule.price_override, else: 0) %>
+                      RM <%=
+                        base_price = @current_schedule.package.price
+                        override_price = if @current_schedule.price_override, do: Decimal.to_integer(@current_schedule.price_override), else: 0
+                        base_price + override_price
+                      %>
                     </span>
                   </div>
                   <div class="flex justify-between">
@@ -212,33 +259,29 @@ defmodule UmrahlyWeb.AdminPackageScheduleViewLive do
                   <h4 class="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h4>
                   <div class="space-y-2">
                     <a
-                      href={~p"/admin/package-schedules"}
-                      phx-click="edit_schedule"
-                      phx-value-id={@current_schedule.id}
+                      href={~p"/admin/package-schedules/#{@current_schedule.id}/edit"}
                       class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium text-center block"
                     >
                       Edit Schedule
                     </a>
                     <%= if @current_schedule.status == "active" do %>
-                      <a
-                        href={~p"/admin/package-schedules"}
+                      <button
                         phx-click="cancel_schedule"
                         phx-value-id={@current_schedule.id}
                         data-confirm="Are you sure you want to cancel this schedule?"
-                        class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium text-center block"
+                        class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium text-center"
                       >
                         Cancel Schedule
-                      </a>
+                      </button>
                     <% end %>
-                    <a
-                      href={~p"/admin/package-schedules"}
+                    <button
                       phx-click="delete_schedule"
                       phx-value-id={@current_schedule.id}
                       data-confirm="Are you sure you want to delete this schedule? This will also delete all associated bookings."
-                      class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium text-center block"
+                      class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium text-center"
                     >
                       Delete Schedule
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>

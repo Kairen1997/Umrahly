@@ -4,7 +4,7 @@ defmodule Umrahly.Repo.Migrations.AddReturnDateToPackages do
   def change do
     # First add the column as nullable
     alter table(:packages) do
-      add :return_date, :date
+      add :return_date, :date, null: true
     end
 
     # Update existing packages to have a return date (departure date + duration days)

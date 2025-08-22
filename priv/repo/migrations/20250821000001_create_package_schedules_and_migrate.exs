@@ -9,7 +9,7 @@ defmodule Umrahly.Repo.Migrations.CreatePackageSchedulesAndMigrate do
       add :return_date, :date, null: false
       add :quota, :integer, null: false
       add :status, :string, default: "active"
-      add :price_override, :integer
+      add :price_override, :decimal
       add :notes, :text
 
       timestamps(type: :utc_datetime)

@@ -40,7 +40,7 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
         |> assign(:current_page, "packages")
         |> assign(:has_profile, true)
         |> assign(:is_admin, true)
-        |> assign(:profile, socket.assigns.current_user)
+        |> assign(:profile, socket.assigns[:current_user])
         |> allow_upload(:itinerary_photos,
           accept: ~w(.jpg .jpeg .png .gif),
           max_entries: 50,
@@ -63,14 +63,11 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
   def handle_event("save_itinerary", %{"itinerary" => itinerary_params}, socket) do
     package_id = socket.assigns.package.id
 
-    # Debug logging
-    IO.inspect(itinerary_params, label: "Raw itinerary params")
+
 
     # Parse the itinerary data from the form
     itinerary_data = parse_itinerary_params(itinerary_params)
 
-    # Debug logging
-    IO.inspect(itinerary_data, label: "Parsed itinerary data")
 
     # Validate that we have itinerary data
     if length(itinerary_data) == 0 do
@@ -90,8 +87,6 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
           {:noreply, socket}
 
         {:error, reason} ->
-          # Log the error for debugging
-          IO.inspect(reason, label: "Itinerary save error")
 
           socket =
             socket
@@ -343,14 +338,12 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
 
 
   defp parse_itinerary_params(params) do
-    # Debug logging
-    IO.inspect(params, label: "parse_itinerary_params input")
+
 
     # Parse the form parameters to extract itinerary data
     # The form sends data in a nested structure
     case params do
       %{"days" => days_params} when is_map(days_params) ->
-        IO.inspect(days_params, label: "Days params found")
 
         result = days_params
         |> Map.keys()
@@ -371,11 +364,11 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
           }
         end)
 
-        IO.inspect(result, label: "parse_itinerary_params result")
+
         result
 
       _ ->
-        IO.inspect("No days params found")
+
         []
     end
   end

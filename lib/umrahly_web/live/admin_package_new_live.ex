@@ -4,14 +4,33 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
 
+  # Helper function to get field value from changeset
+  defp get_field_value(changeset, field) do
+    # First try to get the value from changes (user input)
+    case Ecto.Changeset.get_change(changeset, field) do
+      nil ->
+        # If no change, try to get from the data (existing value)
+        case Ecto.Changeset.get_field(changeset, field) do
+          nil -> ""
+          value -> value
+        end
+      value ->
+        # If it's a string and empty, return empty string, otherwise return the value
+        if is_binary(value) && value == "", do: "", else: value
+    end
+  end
+
   def mount(_params, _session, socket) do
+    # Create initial changeset
+    changeset = Packages.change_package(%Umrahly.Packages.Package{})
+
     socket =
       socket
       |> assign(:current_page, "packages")
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
-      |> assign(:package_changeset, Packages.change_package(%Umrahly.Packages.Package{}))
+      |> assign(:package_changeset, changeset)
       |> allow_upload(:package_picture,
         accept: ~w(.jpg .jpeg .png .gif),
         max_entries: 1,
@@ -88,10 +107,13 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
          |> put_flash(:info, "Package created successfully!")
          |> push_navigate(to: ~p"/admin/packages")}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
+      {:error, %Ecto.Changeset{} = _changeset} ->
+        # Create a new changeset with the user's input data to preserve form values
+        user_input_changeset = Packages.change_package(%Umrahly.Packages.Package{}, package_params)
+
         socket =
           socket
-          |> assign(:package_changeset, changeset)
+          |> assign(:package_changeset, user_input_changeset)
           |> put_flash(:error, "Failed to create package. Please check the form for errors.")
 
         {:noreply, socket}
@@ -102,8 +124,11 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
     {:noreply, cancel_upload(socket, :package_picture, ref)}
   end
 
-  def handle_event("validate", _params, socket) do
-    # This will be called whenever form fields change, including file uploads
+  def handle_event("validate", %{"package" => package_params}, socket) do
+    # Create a changeset with the current params to preserve user input during validation
+    changeset = Packages.change_package(%Umrahly.Packages.Package{}, package_params)
+
+    socket = assign(socket, :package_changeset, changeset)
     {:noreply, socket}
   end
 
@@ -132,7 +157,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                 <input
                   type="text"
                   name="package[name]"
-                  value={@package_changeset.changes[:name] || @package_changeset.data.name || ""}
+                  value={get_field_value(@package_changeset, :name)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter package name"
                   required
@@ -149,7 +174,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                   rows="3"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter package description..."
-                ><%= @package_changeset.changes[:description] || @package_changeset.data.description || "" %></textarea>
+                ><%= get_field_value(@package_changeset, :description) %></textarea>
                 <%= if @package_changeset.errors[:description] do %>
                   <p class="text-red-500 text-xs mt-1"><%= elem(@package_changeset.errors[:description], 0) %></p>
                 <% end %>
@@ -162,8 +187,8 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   required
                 >
-                  <option value="inactive" selected={@package_changeset.changes[:status] == "inactive" || @package_changeset.data.status == "inactive"}>Inactive</option>
-                  <option value="active" selected={@package_changeset.changes[:status] == "active" || @package_changeset.data.status == "active"}>Active</option>
+                  <option value="inactive" selected={get_field_value(@package_changeset, :status) == "inactive"}>Inactive</option>
+                  <option value="active" selected={get_field_value(@package_changeset, :status) == "active"}>Active</option>
                 </select>
               </div>
 
@@ -172,7 +197,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                 <input
                   type="number"
                   name="package[price]"
-                  value={@package_changeset.changes[:price] || @package_changeset.data.price || ""}
+                  value={get_field_value(@package_changeset, :price)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter price"
                   min="1"
@@ -188,7 +213,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                 <input
                   type="number"
                   name="package[duration_days]"
-                  value={@package_changeset.changes[:duration_days] || @package_changeset.data.duration_days || ""}
+                  value={get_field_value(@package_changeset, :duration_days)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter duration in days"
                   min="1"
@@ -205,7 +230,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                 <input
                   type="number"
                   name="package[duration_nights]"
-                  value={@package_changeset.changes[:duration_nights] || @package_changeset.data.duration_nights || ""}
+                  value={get_field_value(@package_changeset, :duration_nights)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter duration in nights"
                   min="1"
@@ -224,13 +249,13 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 >
                   <option value="">Select accommodation type</option>
-                  <option value="3 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "3 Star Hotel" || @package_changeset.data.accommodation_type == "3 Star Hotel"}>3 Star Hotel</option>
-                  <option value="4 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "4 Star Hotel" || @package_changeset.data.accommodation_type == "4 Star Hotel"}>4 Star Hotel</option>
-                  <option value="5 Star Hotel" selected={@package_changeset.changes[:accommodation_type] == "5 Star Hotel" || @package_changeset.data.accommodation_type == "5 Star Hotel"}>5 Star Hotel</option>
-                  <option value="Apartment" selected={@package_changeset.changes[:accommodation_type] == "Apartment" || @package_changeset.data.accommodation_type == "Apartment"}>Apartment</option>
-                  <option value="Villa" selected={@package_changeset.changes[:accommodation_type] == "Villa" || @package_changeset.data.accommodation_type == "Villa"}>Villa</option>
-                  <option value="Guest House" selected={@package_changeset.changes[:accommodation_type] == "Guest House" || @package_changeset.data.accommodation_type == "Guest House"}>Guest House</option>
-                  <option value="Not Included" selected={@package_changeset.changes[:accommodation_type] == "Not Included" || @package_changeset.data.accommodation_type == "Not Included"}>Not Included</option>
+                  <option value="3 Star Hotel" selected={get_field_value(@package_changeset, :accommodation_type) == "3 Star Hotel"}>3 Star Hotel</option>
+                  <option value="4 Star Hotel" selected={get_field_value(@package_changeset, :accommodation_type) == "4 Star Hotel"}>4 Star Hotel</option>
+                  <option value="5 Star Hotel" selected={get_field_value(@package_changeset, :accommodation_type) == "5 Star Hotel"}>5 Star Hotel</option>
+                  <option value="Apartment" selected={get_field_value(@package_changeset, :accommodation_type) == "Apartment"}>Apartment</option>
+                  <option value="Villa" selected={get_field_value(@package_changeset, :accommodation_type) == "Villa"}>Villa</option>
+                  <option value="Guest House" selected={get_field_value(@package_changeset, :accommodation_type) == "Guest House"}>Guest House</option>
+                  <option value="Not Included" selected={get_field_value(@package_changeset, :accommodation_type) == "Not Included"}>Not Included</option>
                 </select>
               </div>
 
@@ -241,12 +266,12 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 >
                   <option value="">Select transport type</option>
-                  <option value="Flight" selected={@package_changeset.changes[:transport_type] == "Flight" || @package_changeset.data.transport_type == "Flight"}>Flight</option>
-                  <option value="Bus" selected={@package_changeset.changes[:transport_type] == "Bus" || @package_changeset.data.transport_type == "Bus"}>Bus</option>
-                  <option value="Train" selected={@package_changeset.changes[:transport_type] == "Train" || @package_changeset.data.transport_type == "Train"}>Train</option>
-                  <option value="Private Car" selected={@package_changeset.changes[:transport_type] == "Private Car" || @package_changeset.data.transport_type == "Private Car"}>Private Car</option>
-                  <option value="Shared Transport" selected={@package_changeset.changes[:transport_type] == "Shared Transport" || @package_changeset.data.transport_type == "Shared Transport"}>Shared Transport</option>
-                  <option value="Not Included" selected={@package_changeset.changes[:transport_type] == "Not Included" || @package_changeset.data.transport_type == "Not Included"}>Not Included</option>
+                  <option value="Flight" selected={get_field_value(@package_changeset, :transport_type) == "Flight"}>Flight</option>
+                  <option value="Bus" selected={get_field_value(@package_changeset, :transport_type) == "Bus"}>Bus</option>
+                  <option value="Train" selected={get_field_value(@package_changeset, :transport_type) == "Train"}>Train</option>
+                  <option value="Private Car" selected={get_field_value(@package_changeset, :transport_type) == "Private Car"}>Private Car</option>
+                  <option value="Shared Transport" selected={get_field_value(@package_changeset, :transport_type) == "Shared Transport"}>Shared Transport</option>
+                  <option value="Not Included" selected={get_field_value(@package_changeset, :transport_type) == "Not Included"}>Not Included</option>
                 </select>
               </div>
 
@@ -257,7 +282,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                   rows="2"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter accommodation details (e.g., hotel name, room type, amenities)..."
-                ><%= @package_changeset.changes[:accommodation_details] || @package_changeset.data.accommodation_details || "" %></textarea>
+                ><%= get_field_value(@package_changeset, :accommodation_details) %></textarea>
               </div>
 
               <div class="md:col-span-2">
@@ -267,7 +292,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                   rows="2"
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter transport details (e.g., flight details, pickup times, vehicle info)..."
-                ><%= @package_changeset.changes[:transport_details] || @package_changeset.data.transport_details || "" %></textarea>
+                ><%= get_field_value(@package_changeset, :transport_details) %></textarea>
               </div>
 
               <div class="md:col-span-2">

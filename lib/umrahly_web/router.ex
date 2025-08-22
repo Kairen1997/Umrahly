@@ -93,6 +93,7 @@ defmodule UmrahlyWeb.Router do
       live "/package-schedules", AdminPackageSchedulesLive, :index
       live "/package-schedules/new", AdminPackageScheduleNewLive, :new
       live "/package-schedules/:id", AdminPackageScheduleViewLive, :show
+      live "/package-schedules/:id/edit", AdminPackageScheduleEditLive, :edit
       live "/payments", AdminPaymentsLive, :index
       live "/flights", AdminFlightsLive, :index
       live "/activity-log", AdminActivityLogLive, :index

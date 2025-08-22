@@ -6,13 +6,6 @@ defmodule UmrahlyWeb.UserAuth do
 
   alias Umrahly.Accounts
 
-  # Make the remember me cookie valid for 60 days.
-  # If you want bump or reduce this value, also change
-  # the token expiry itself in UserToken.
-  @max_age 60 * 60 * 24 * 60
-  @remember_me_cookie "_umrahly_web_user_remember_me"
-  @remember_me_options [sign: true, max_age: @max_age, same_site: "Lax"]
-
   @doc """
   Logs the user in.
 
@@ -28,33 +21,23 @@ defmodule UmrahlyWeb.UserAuth do
   def log_in_user(conn, user, params \\ %{}) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
+
     redirect_path = if user_return_to do
       user_return_to
     else
       if Umrahly.Accounts.is_admin?(user) do
         ~p"/admin/dashboard"
       else
-        if Umrahly.Profiles.get_profile_by_user_id(user.id) == nil do
-          ~p"/complete-profile"
-        else
-          ~p"/dashboard"
-        end
+        ~p"/dashboard"
       end
     end
 
     conn
     |> renew_session()
-    |> put_token_in_session(token)
+    |> put_session(:user_token, token)
+    |> put_session(:live_socket_id, "users_sessions:#{Base.url_encode64(token)}")
     |> maybe_write_remember_me_cookie(token, params)
     |> redirect(to: redirect_path)
-  end
-
-  defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
-    put_resp_cookie(conn, @remember_me_cookie, token, @remember_me_options)
-  end
-
-  defp maybe_write_remember_me_cookie(conn, _token, _params) do
-    conn
   end
 
   # This function renews the session ID and erases the whole
@@ -73,30 +56,17 @@ defmodule UmrahlyWeb.UserAuth do
   #     end
   #
   defp renew_session(conn) do
-    delete_csrf_token()
-
     conn
     |> configure_session(renew: true)
     |> clear_session()
   end
 
-  @doc """
-  Logs the user out.
+  defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
+    put_resp_cookie(conn, :user_remember_me, token, [max_age: 60 * 60 * 24 * 30])
+  end
 
-  It clears all session data for safety. See renew_session.
-  """
-  def log_out_user(conn) do
-    user_token = get_session(conn, :user_token)
-    user_token && Accounts.delete_user_session_token(user_token)
-
-    if live_socket_id = get_session(conn, :live_socket_id) do
-      UmrahlyWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
-    end
-
+  defp maybe_write_remember_me_cookie(conn, _token, _params) do
     conn
-    |> renew_session()
-    |> delete_resp_cookie(@remember_me_cookie)
-    |> redirect(to: ~p"/")
   end
 
   @doc """
@@ -124,14 +94,26 @@ defmodule UmrahlyWeb.UserAuth do
     if token = get_session(conn, :user_token) do
       {token, conn}
     else
-      conn = fetch_cookies(conn, signed: [@remember_me_cookie])
-
-      if token = conn.cookies[@remember_me_cookie] do
-        {token, put_token_in_session(conn, token)}
-      else
-        {nil, conn}
-      end
+      {nil, conn}
     end
+  end
+
+  @doc """
+  Logs the user out.
+
+  It clears all session data for safety. See renew_session.
+  """
+  def log_out_user(conn) do
+    user_token = get_session(conn, :user_token)
+    user_token && Accounts.delete_user_session_token(user_token)
+
+    if live_socket_id = get_session(conn, :live_socket_id) do
+      UmrahlyWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
+    end
+
+    conn
+    |> renew_session()
+    |> delete_resp_cookie("user_remember_me", [])
   end
 
   @doc """
@@ -271,12 +253,6 @@ defmodule UmrahlyWeb.UserAuth do
         |> Phoenix.Controller.redirect(to: ~p"/admin/dashboard")
         |> halt()
     end
-  end
-
-  defp put_token_in_session(conn, token) do
-    conn
-    |> put_session(:user_token, token)
-    |> put_session(:live_socket_id, "users_sessions:#{Base.url_encode64(token)}")
   end
 
   defp maybe_store_return_to(%{method: "GET"} = conn) do

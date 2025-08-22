@@ -3,10 +3,10 @@ defmodule Umrahly.Repo.Migrations.AddAccommodationTransportToPackages do
 
   def change do
     alter table(:packages) do
-      add :accommodation_type, :string
-      add :accommodation_details, :text
-      add :transport_type, :string
-      add :transport_details, :text
+      add :accommodation_type, :string, null: true
+      add :accommodation_details, :text, null: true
+      add :transport_type, :string, null: true
+      add :transport_details, :text, null: true
     end
   end
 end

@@ -66,8 +66,8 @@ defmodule Umrahly.Packages do
   @doc """
   Returns a data structure for tracking package changes.
   """
-  def change_package(%Package{} = package, _attrs \\ %{}) do
-    Package.changeset(package, %{})
+  def change_package(%Package{} = package, attrs \\ %{}) do
+    Package.changeset(package, attrs)
   end
 
   @doc """
@@ -237,8 +237,8 @@ defmodule Umrahly.Packages do
   @doc """
   Returns a data structure for tracking package schedule changes.
   """
-  def change_package_schedule(%PackageSchedule{} = package_schedule, _attrs \\ %{}) do
-    PackageSchedule.changeset(package_schedule, %{})
+  def change_package_schedule(%PackageSchedule{} = package_schedule, attrs \\ %{}) do
+    PackageSchedule.changeset(package_schedule, attrs)
   end
 
   @doc """
@@ -331,17 +331,17 @@ defmodule Umrahly.Packages do
     # Get booking counts for all schedules in a single query
     booking_counts =
       from(b in Umrahly.Bookings.Booking,
-        where: b.package_id in ^schedule_ids,
-        group_by: b.package_id,
+        where: b.package_schedule_id in ^schedule_ids,
+        group_by: b.package_schedule_id,
         select: {
-          b.package_id,
+          b.package_schedule_id,
           count(b.id),
           count(fragment("CASE WHEN ? = 'confirmed' THEN 1 END", b.status))
         }
       )
       |> Repo.all()
-      |> Map.new(fn {package_id, total, confirmed} ->
-        {package_id, %{total: total, confirmed: confirmed}}
+      |> Map.new(fn {package_schedule_id, total, confirmed} ->
+        {package_schedule_id, %{total: total, confirmed: confirmed}}
       end)
 
     # Attach booking stats to each schedule

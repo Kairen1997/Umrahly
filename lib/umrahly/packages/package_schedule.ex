@@ -7,7 +7,7 @@ defmodule Umrahly.Packages.PackageSchedule do
     field :return_date, :date
     field :quota, :integer
     field :status, :string, default: "active"
-    field :price_override, :integer
+    field :price_override, :decimal
     field :notes, :string
 
     belongs_to :package, Umrahly.Packages.Package
@@ -22,33 +22,45 @@ defmodule Umrahly.Packages.PackageSchedule do
     |> validate_required([:departure_date, :return_date, :quota, :status, :package_id])
     |> validate_inclusion(:status, ["active", "inactive", "cancelled", "completed"])
     |> validate_inclusion(:quota, 1..100)
-    |> validate_change(:departure_date, fn _, departure_date ->
-      if Date.compare(departure_date, Date.utc_today()) == :lt do
-        [{:departure_date, "Departure date must be in the future"}]
-      else
-        []
-      end
-    end)
-    |> validate_change(:return_date, fn _, return_date ->
-      if Date.compare(return_date, Date.utc_today()) == :lt do
-        [{:return_date, "Return date must be in the future"}]
-      else
-        []
-      end
-    end)
-    |> validate_change(:return_date, fn _, return_date ->
-      case package_schedule.departure_date do
-        nil -> []
-        departure_date ->
-          if Date.compare(return_date, departure_date) == :lt do
-            [{:return_date, "Return date must be after departure date"}]
-          else
-            []
-          end
-      end
-    end)
-    |> validate_number(:quota, greater_than: 0)
-    |> validate_number(:price_override, greater_than: 0)
+    |> validate_price_override()
+    |> validate_future_dates()
+    |> validate_dates()
     |> foreign_key_constraint(:package_id)
+  end
+
+  defp validate_future_dates(changeset) do
+    departure = get_field(changeset, :departure_date)
+    return = get_field(changeset, :return_date)
+
+    departure_error = if departure, do: Date.compare(departure, Date.utc_today()) == :lt, else: false
+    return_error = if return, do: Date.compare(return, Date.utc_today()) == :lt, else: false
+
+    changeset
+    |> maybe_add_error(:departure_date, departure_error, "Departure date must be in the future")
+    |> maybe_add_error(:return_date, return_error, "Return date must be in the future")
+  end
+
+  defp validate_dates(changeset) do
+    departure = get_field(changeset, :departure_date)
+    return = get_field(changeset, :return_date)
+
+    if departure && return && Date.compare(return, departure) == :lt do
+      add_error(changeset, :return_date, "Return date must be after departure date")
+    else
+      changeset
+    end
+  end
+
+  defp maybe_add_error(changeset, _field, false, _msg), do: changeset
+  defp maybe_add_error(changeset, field, true, msg), do: add_error(changeset, field, msg)
+
+  defp validate_price_override(changeset) do
+    price_override = get_field(changeset, :price_override)
+
+    if price_override && price_override < 0 do
+      add_error(changeset, :price_override, "Price override must be greater than 0")
+    else
+      changeset
+    end
   end
 end

@@ -3,7 +3,7 @@ defmodule Umrahly.Repo.Migrations.AddPictureToPackages do
 
   def change do
     alter table(:packages) do
-      add :picture, :string
+      add :picture, :string, null: true
     end
   end
 end

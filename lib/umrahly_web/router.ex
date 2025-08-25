@@ -66,6 +66,7 @@ defmodule UmrahlyWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     get "/dashboard", PageController, :dashboard
+    live "/bookings", UserActiveBookingsLive, :index
     live "/packages", UserPackagesLive, :index
     live "/packages/:id", UserPackageDetailsLive, :show
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new

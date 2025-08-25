@@ -6,39 +6,49 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
   import UmrahlyWeb.SidebarComponent
   alias Umrahly.Packages
 
-    def mount(_params, _session, socket) do
-    # Initialize socket with current user from assigns
+  def mount(_params, _session, socket) do
     current_user = socket.assigns[:current_user]
-    {:ok, assign(socket, :current_user, current_user)}
+
+    socket =
+      socket
+      |> assign(:current_user, current_user)
+      |> assign(:selected_schedule_id, nil)
+
+    {:ok, socket}
   end
 
-    def handle_params(%{"id" => package_id}, _url, socket) do
+
+  def handle_params(%{"id" => package_id}, _url, socket) do
     package = Packages.get_package_with_schedules!(package_id)
 
-          # Validate package has required fields
-      if is_nil(package.price) do
-        socket =
-          socket
-          |> put_flash(:error, "Package data is incomplete (missing price). Please contact support.")
-          |> push_navigate(to: ~p"/packages")
+    # Validate package has required fields
+    if is_nil(package.price) do
+      socket =
+        socket
+        |> put_flash(:error, "Package data is incomplete (missing price). Please contact support.")
+        |> push_navigate(to: ~p"/packages")
 
-        {:noreply, socket}
-      else
+      {:noreply, socket}
+    else
       # Only show active packages to users
       if package.status != "active" do
         {:noreply, push_navigate(socket, to: ~p"/packages")}
       else
-                        # Get current user for income-based recommendations
+        # Get current user for income-based recommendations
         current_user = socket.assigns[:current_user]
 
         # Analyze schedules and rank them by affordability
         ranked_schedules = rank_schedules_by_affordability(package.package_schedules || [], current_user, package)
+
+        # Don't pre-select any schedule - let user choose
+        selected_schedule_id = nil
 
         socket =
           socket
           |> assign(:package, package)
           |> assign(:current_user, current_user)
           |> assign(:ranked_schedules, ranked_schedules)
+          |> assign(:selected_schedule_id, selected_schedule_id)
           |> assign(:current_page, "packages")
           |> assign(:page_title, package.name)
 
@@ -56,11 +66,28 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
       {:noreply, socket}
   end
 
+      # Handle schedule selection with proper error handling
+  def handle_event("select_schedule", %{"schedule_id" => schedule_id}, socket) do
+    # Convert the string schedule_id to an integer to match the database IDs
+    case Integer.parse(schedule_id) do
+      {new_selected_id, _} ->
+        updated_socket =
+          socket
+          |> assign(:selected_schedule_id, new_selected_id)
+          |> put_flash(:info, "Schedule #{new_selected_id} selected!")
+        {:noreply, updated_socket}
+      :error ->
+        updated_socket = put_flash(socket, :error, "Failed to parse schedule ID")
+        {:noreply, updated_socket}
+    end
+  end
+
     # Rank schedules by affordability based on user's monthly income
   defp rank_schedules_by_affordability(schedules, current_user, package) do
     # Always ensure all schedules have the required fields
     base_schedules = Enum.map(schedules, fn schedule ->
       total_price = calculate_schedule_price(schedule, package)
+
       schedule
       |> Map.put(:total_price, total_price)
       |> Map.put(:affordability_ratio, nil)
@@ -139,6 +166,8 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
     ~H"""
     <.sidebar page_title={@page_title}>
       <div class="max-w-6xl mx-auto space-y-6 px-4">
+
+
         <!-- Back Button -->
         <div class="flex items-center">
           <a
@@ -230,12 +259,18 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
               <div class="lg:ml-6 mt-4 lg:mt-0">
                 <div class="space-y-3">
                   <%= if length(@ranked_schedules) > 0 do %>
-                    <a
-                      href={~p"/book/#{@package.id}/#{List.first(@ranked_schedules).id}"}
-                      class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-base text-center block"
-                    >
-                      Book This Date
-                    </a>
+                    <%= if @selected_schedule_id do %>
+                      <a
+                        href={~p"/book/#{@package.id}/#{@selected_schedule_id}"}
+                        class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-base text-center block"
+                      >
+                        Book This Package
+                      </a>
+                    <% else %>
+                      <button disabled class="w-full bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed font-medium text-base">
+                        Select a Date to Book
+                      </button>
+                    <% end %>
                   <% else %>
                     <button disabled class="w-full bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed font-medium text-base">
                       No Available Schedules
@@ -304,6 +339,27 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
             <% end %>
           </div>
         </div>
+
+        <!-- Selected Schedule Display -->
+        <%= if @selected_schedule_id do %>
+          <%= if selected_schedule = Enum.find(@ranked_schedules, & &1.id == @selected_schedule_id) do %>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="text-sm font-medium text-blue-900">Selected Departure Date:</span>
+                  <span class="ml-2 text-sm font-semibold text-blue-800">
+                    <%= Calendar.strftime(selected_schedule.departure_date, "%B %d, %Y") %>
+                  </span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+
+
 
         <!-- Income-Based Recommendations -->
         <%= if @current_user && @current_user.monthly_income do %>
@@ -382,41 +438,25 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                         <div class="text-base font-semibold text-gray-900">
                           <%= Calendar.strftime(schedule.departure_date, "%B %d, %Y") %>
                         </div>
-                                            <div class="text-xs text-gray-500 mt-1">
-                      <%= Calendar.strftime(schedule.departure_date, "%A") %>
-                    </div>
-
-                    <!-- Affordability Indicator -->
-                    <%= if @current_user && @current_user.monthly_income do %>
-                      <div class="mt-2 mb-2">
-                        <span class={[
-                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                          case schedule.affordability_level do
-                            "very_affordable" -> "bg-green-100 text-green-800"
-                            "highly_affordable" -> "bg-blue-100 text-blue-800"
-                            "affordable" -> "bg-blue-100 text-blue-800"
-                            "manageable" -> "bg-yellow-100 text-yellow-800"
-                            "challenging" -> "bg-orange-100 text-orange-800"
-                            "difficult" -> "bg-red-100 text-red-800"
-                            "very_difficult" -> "bg-red-100 text-red-800"
-                            "unknown" -> "bg-gray-100 text-gray-600"
-                            _ -> "bg-gray-100 text-gray-800"
-                          end
-                        ]}>
-                          <%= if schedule.affordability_level == "unknown" do %>
-                            Not Available
-                          <% else %>
-                            <%= String.replace(schedule.affordability_level, "_", " ") |> String.capitalize() %>
-                          <% end %>
-                        </span>
-                      </div>
-                    <% end %>
+                        <div class="text-xs text-gray-500 mt-1">
+                          <%= Calendar.strftime(schedule.departure_date, "%A") %>
+                        </div>
                                                 <div class="mt-2 space-y-1">
                           <div class="text-xs text-gray-600">
-                            <span class="font-medium">Price:</span>
+                            <span class="font-medium">Base Price:</span>
+                            <span class="font-medium text-gray-700">RM <%= @package.price %></span>
+                          </div>
+                          <%= if schedule.price_override && Decimal.to_integer(schedule.price_override) > 0 do %>
+                            <div class="text-xs text-gray-600">
+                              <span class="font-medium">Price Override:</span>
+                              <span class="font-medium text-orange-600">+RM <%= Decimal.to_integer(schedule.price_override) %></span>
+                            </div>
+                          <% end %>
+                          <div class="text-xs text-gray-600">
+                            <span class="font-medium">Total Price:</span>
                             <span class="font-bold text-green-700">RM <%= schedule.total_price %></span>
                           </div>
-                                                    <div class="text-xs text-gray-600">
+                          <div class="text-xs text-gray-600">
                             <span class="font-medium">Affordability:</span>
                             <span class="font-medium">
                               <%= if schedule.affordability_ratio do %>
@@ -426,7 +466,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                               <% end %>
                             </span> of monthly income
                           </div>
-                                                    <div class="text-xs text-gray-600">
+                          <div class="text-xs text-gray-600">
                             <span class="font-medium">Score:</span>
                             <span class="font-medium text-blue-600">
                               <%= if schedule.affordability_score > 0 do %>
@@ -441,12 +481,22 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                             <span class="font-medium"><%= schedule.quota %></span> spots
                           </div>
                         </div>
-                        <a
-                          href={~p"/book/#{@package.id}/#{schedule.id}"}
-                          class="mt-3 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium text-center block"
-                        >
-                          Book This Date
-                        </a>
+                        <div class="mt-3 text-center">
+                          <span class={[
+                            "inline-flex px-3 py-2 text-xs font-semibold rounded-full",
+                            if @selected_schedule_id == schedule.id do
+                              "bg-blue-100 text-blue-800 border-2 border-blue-300"
+                            else
+                              "bg-gray-100 text-gray-600 border-2 border-gray-300"
+                            end
+                          ]}>
+                            <%= if @selected_schedule_id == schedule.id do %>
+                              ✓ Currently Selected
+                            <% else %>
+                              Click below to select
+                            <% end %>
+                          </span>
+                        </div>
                       </div>
                     </div>
                   <% end %>
@@ -494,10 +544,13 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
               <%= for schedule <- @ranked_schedules do %>
                 <div class={[
                   "border rounded-lg p-3 transition-colors",
-                  if schedule.is_recommended do
-                    "border-2 border-green-300 bg-green-50"
-                  else
-                    "border-gray-200 hover:border-blue-300"
+                  cond do
+                    @selected_schedule_id == schedule.id ->
+                      "border-2 border-blue-500 bg-blue-50 shadow-md"
+                    schedule.is_recommended ->
+                      "border-2 border-green-300 bg-green-50"
+                    true ->
+                      "border-gray-200 hover:border-blue-300"
                   end
                 ]}>
                   <div class="text-center">
@@ -514,17 +567,30 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                     <div class="text-xs text-gray-500 mt-1">
                       <%= Calendar.strftime(schedule.departure_date, "%A") %>
                     </div>
-                    <div class="mt-2 flex items-center justify-between">
-                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        Quota: <%= schedule.quota %>
-                      </span>
-                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        RM <%= schedule.total_price %>
-                      </span>
+                    <div class="mt-2 space-y-1">
+                      <div class="text-xs text-gray-600">
+                        <span class="font-medium">Base:</span>
+                        <span class="font-medium text-gray-700">RM <%= @package.price %></span>
+                      </div>
+                      <%= if schedule.price_override && Decimal.to_integer(schedule.price_override) > 0 do %>
+                        <div class="text-xs text-gray-600">
+                          <span class="font-medium">Override:</span>
+                          <span class="font-medium text-orange-600">+RM <%= Decimal.to_integer(schedule.price_override) %></span>
+                        </div>
+                      <% end %>
+                      <div class="text-xs text-gray-600">
+                        <span class="font-medium">Total:</span>
+                        <span class="font-bold text-green-700">RM <%= schedule.total_price %></span>
+                      </div>
+                      <div class="mt-2 flex items-center justify-between">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          Quota: <%= schedule.quota %>
+                        </span>
+                      </div>
                     </div>
 
-                                        <%= if @current_user && @current_user.monthly_income do %>
-                                            <div class="mt-2 text-xs text-gray-600">
+                    <%= if @current_user && @current_user.monthly_income do %>
+                      <div class="mt-2 text-xs text-gray-600">
                         <span class="font-medium">Affordability:</span>
                         <span class="font-medium">
                           <%= if schedule.affordability_ratio do %>
@@ -534,7 +600,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                           <% end %>
                         </span> of monthly income
                       </div>
-                                            <div class="mt-1 text-xs text-gray-600">
+                      <div class="mt-1 text-xs text-gray-600">
                         <span class="font-medium">Score:</span>
                         <span class="font-medium text-blue-600">
                           <%= if schedule.affordability_score > 0 do %>
@@ -546,12 +612,25 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                       </div>
                     <% end %>
 
-                    <a
-                      href={~p"/book/#{@package.id}/#{schedule.id}"}
-                      class="mt-2 w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium text-center block"
+                    <button
+                      phx-click="select_schedule"
+                      phx-value-schedule_id={schedule.id}
+                      class={[
+                        "mt-2 w-full px-3 py-2 rounded-lg text-xs font-medium text-center block transition-colors",
+                        if @selected_schedule_id == schedule.id do
+                          "bg-blue-600 text-white border-2 border-blue-700"
+                        else
+                          "bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-300"
+                        end
+                      ]}
                     >
-                      Book This Date
-                    </a>
+                      <!-- Debug: selected_id=<%= @selected_schedule_id %> schedule_id=<%= schedule.id %> types: selected=<%= @selected_schedule_id |> inspect %> schedule=<%= schedule.id |> inspect %> -->
+                      <%= if @selected_schedule_id == schedule.id do %>
+                        ✓ Selected
+                      <% else %>
+                        Select This Date
+                      <% end %>
+                    </button>
                   </div>
                 </div>
               <% end %>
@@ -641,10 +720,10 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
           <p class="text-base mb-4 opacity-90">
             Don't miss out on this amazing opportunity. Book now and secure your spot!
           </p>
-                                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
-              <%= if length(@ranked_schedules) > 0 do %>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+              <%= if @selected_schedule_id do %>
                 <a
-                  href={~p"/book/#{@package.id}/#{List.first(@ranked_schedules).id}"}
+                  href={~p"/book/#{@package.id}/#{@selected_schedule_id}"}
                   class="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm"
                 >
                   Book This Package

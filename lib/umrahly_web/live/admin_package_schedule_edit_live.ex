@@ -33,21 +33,13 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
   end
 
   def handle_event("save", %{"package_schedule" => schedule_params}, socket) do
-    IO.puts("=== FORM SUBMISSION DEBUG ===")
-    IO.inspect(schedule_params, label: "Raw schedule_params")
-
-    # Convert numeric fields from strings to appropriate types
     schedule_params = schedule_params
       |> Map.update("quota", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
       |> Map.update("price_override", nil, &if(is_binary(&1) && &1 != "", do: String.to_float(&1), else: &1))
 
-    IO.inspect(schedule_params, label: "Processed schedule_params")
-    IO.inspect(socket.assigns.schedule, label: "Current schedule")
 
     case Packages.update_package_schedule(socket.assigns.schedule, schedule_params) do
       {:ok, updated_schedule} ->
-        IO.puts("SUCCESS: Schedule updated successfully")
-        IO.inspect(updated_schedule, label: "Updated schedule")
         socket =
           socket
           |> put_flash(:info, "Schedule updated successfully!")
@@ -56,9 +48,6 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
         {:noreply, socket}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        IO.puts("ERROR: Failed to update schedule")
-        IO.inspect(changeset.errors, label: "Changeset errors")
-        IO.inspect(changeset.changes, label: "Changeset changes")
         socket = assign(socket, :changeset, changeset)
         {:noreply, socket}
     end

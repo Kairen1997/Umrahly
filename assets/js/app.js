@@ -445,6 +445,8 @@ const AddItemDebugHook = {
 };
 
 
+
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -462,13 +464,17 @@ let liveSocket = new LiveSocket("/live", Socket, {
 })
 
 // Add debug logging for LiveView events
-liveSocket.onMessage((message) => {
-  console.log("LiveView message received:", message);
+// Note: onMessage and onError are not available in current LiveView versions
+// Using event listeners instead
+document.addEventListener('phx:update', (event) => {
+  console.log("LiveView update event:", event);
 });
 
-liveSocket.onError((error) => {
-  console.error("LiveView error:", error);
+document.addEventListener('phx:error', (event) => {
+  console.error("LiveView error event:", event);
 });
+
+
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

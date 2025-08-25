@@ -15,17 +15,23 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     package = Packages.get_package!(package_id)
     schedule = Packages.get_package_schedule!(schedule_id)
 
-    # Check if we're resuming a booking flow
-    is_resuming = Map.get(socket.assigns, :resume, false)
+    # Always check for existing progress to resume the booking flow
+    progress = case Bookings.get_or_create_booking_flow_progress(
+      socket.assigns.current_user.id,
+      package.id,
+      schedule.id
+    ) do
+      {:ok, progress} -> progress
+      _ -> nil
+    end
 
         # Helper function to check if price override should be shown
     has_price_override = schedule.price_override && Decimal.gt?(schedule.price_override, Decimal.new(0))
 
     # Calculate price per person
-    price_per_person =
-      base_price = package.price
-      override_price = if has_price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-      base_price + override_price
+    base_price = package.price
+    override_price = if has_price_override, do: Decimal.to_integer(schedule.price_override), else: 0
+    price_per_person = base_price + override_price
 
     # Verify the schedule belongs to the package
     if schedule.package_id != String.to_integer(package_id) do
@@ -42,19 +48,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(1))
 
-      # Check if we're resuming a booking flow
-      progress = if is_resuming do
-        case Bookings.get_or_create_booking_flow_progress(
-          socket.assigns.current_user.id,
-          package.id,
-          schedule.id
-        ) do
-          {:ok, progress} -> progress
-          _ -> nil
-        end
-      else
-        nil
-      end
+      # Progress is already retrieved above
 
       # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
@@ -92,12 +86,18 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:step, progress && progress.current_step || 1)
         |> assign(:max_steps, 4)
 
+      IO.puts("DEBUG: Mount completed. Progress found: #{progress != nil}, Initial step: #{progress && progress.current_step || 1}")
+      IO.puts("DEBUG: Mount completed. Final socket step: #{socket.assigns.step}")
+
 
       {:ok, socket}
     end
   end
 
   def handle_event("validate_booking", %{"booking" => booking_params}, socket) do
+    IO.puts("DEBUG: validate_booking called with params: #{inspect(booking_params)}")
+    IO.puts("DEBUG: Current step before validation: #{socket.assigns.step}")
+
     # Update local assigns for real-time validation
     number_of_persons = String.to_integer(booking_params["number_of_persons"] || "1")
     payment_plan = booking_params["payment_plan"] || "full_payment"
@@ -139,10 +139,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     # Calculate amounts
     package_price = socket.assigns.package.price
-    schedule_price_per_person =
-      base_price = package_price
-      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-      base_price + override_price
+    base_price = package_price
+    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
+    schedule_price_per_person = base_price + override_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(number_of_persons))
 
@@ -192,10 +191,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Save progress after validation
     save_booking_progress(socket, socket.assigns.step)
 
+    IO.puts("DEBUG: validate_booking completed. Final step: #{socket.assigns.step}")
+
     {:noreply, socket}
   end
 
-  def handle_event("toggle_booking_for_self", params, socket) do
+  def handle_event("toggle_booking_for_self", _params, socket) do
     current_is_booking_for_self = socket.assigns.is_booking_for_self
 
     # Toggle the value
@@ -252,10 +253,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     # Calculate new amounts
     package_price = socket.assigns.package.price
-    schedule_price_per_person =
-      base_price = package_price
-      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-      base_price + override_price
+    base_price = package_price
+    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
+    schedule_price_per_person = base_price + override_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
     _deposit_amount = socket.assigns.deposit_amount
@@ -296,10 +296,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     # Calculate new amounts
     package_price = socket.assigns.package.price
-    schedule_price_per_person =
-      base_price = package_price
-      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-      base_price + override_price
+    base_price = package_price
+    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
+    schedule_price_per_person = base_price + override_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
     _deposit_amount = socket.assigns.deposit_amount
@@ -336,10 +335,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   end
 
   def handle_event("update_payment_method", %{"payment_method" => payment_method}, socket) do
+    IO.puts("DEBUG: update_payment_method called. Current step: #{socket.assigns.step}, New payment method: #{payment_method}")
+
     socket = assign(socket, :payment_method, payment_method)
 
     # Save progress after updating payment method
-    save_booking_progress(socket, socket.assigns.step)
+    _ = save_booking_progress(socket, socket.assigns.step)
+
+    IO.puts("DEBUG: update_payment_method completed. Step preserved: #{socket.assigns.step}")
 
     {:noreply, socket}
   end
@@ -373,38 +376,59 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     travelers = socket.assigns.travelers
 
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      Map.put(traveler, String.to_existing_atom(field), value)
+      Map.put(traveler, String.to_atom(field), value)
     end)
 
     socket = assign(socket, :travelers, updated_travelers)
 
-    # Save progress after updating traveler details
-    save_booking_progress(socket, socket.assigns.step)
+    # Don't auto-save on every keystroke to prevent interference
+    # Progress will be saved when user clicks Save Progress or navigates
 
     {:noreply, socket}
   end
 
-  def handle_event("validate_booking", params, socket) do
+  def handle_event("save_travelers_progress", _params, socket) do
+    # Save the current progress
+    case save_booking_progress(socket, socket.assigns.step) do
+      :ok ->
+        socket =
+          socket
+          |> put_flash(:info, "Travelers details saved successfully!")
+
+        {:noreply, socket}
+      _ ->
+        socket =
+          socket
+          |> put_flash(:error, "Failed to save progress. Please try again.")
+
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("validate_booking", _params, socket) do
     # This is just a placeholder to prevent form submission
     # The actual validation happens in real-time via individual field updates
     {:noreply, socket}
   end
 
-    def handle_event("go_to_next_step", params, socket) do
+    def handle_event("go_to_next_step", _params, socket) do
     current_step = socket.assigns.step
     max_steps = socket.assigns.max_steps
 
-    # Validate step bounds
-    if current_step < 1 or current_step > max_steps do
-      {:noreply, assign(socket, :step, 1)}
-    else
-      if current_step < max_steps do
-        new_step = current_step + 1
+    # Debug logging
+    IO.puts("DEBUG: go_to_next_step called. Current step: #{current_step}, Max steps: #{max_steps}")
 
-        # Validate new step
-        if new_step > max_steps do
-          new_step = max_steps
-        end
+    # Validate step bounds - be more defensive
+    cond do
+      current_step < 1 ->
+        IO.puts("DEBUG: Step too low (#{current_step}), resetting to step 1")
+        {:noreply, assign(socket, :step, 1)}
+      current_step > max_steps ->
+        IO.puts("DEBUG: Step too high (#{current_step}), resetting to step #{max_steps}")
+        {:noreply, assign(socket, :step, max_steps)}
+      current_step < max_steps ->
+        new_step = current_step + 1
+        IO.puts("DEBUG: Advancing from step #{current_step} to step #{new_step}")
 
         # Advance the step
         socket = assign(socket, :step, new_step)
@@ -413,23 +437,21 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         _ = save_booking_progress(socket, new_step)
 
         {:noreply, socket}
-      else
+      true ->
+        IO.puts("DEBUG: Already at max step")
         {:noreply, socket}
-      end
     end
   end
 
   def handle_event("next_step", params, socket) do
-    # Call the new handler
     handle_event("go_to_next_step", params, socket)
   end
 
-  def handle_event("prev_step", params, socket) do
+  def handle_event("prev_step", _params, socket) do
     current_step = socket.assigns.step
 
     if current_step > 1 do
       new_step = current_step - 1
-      # Save progress when going back (ignore errors)
       _ = save_booking_progress(socket, new_step)
       {:noreply, assign(socket, :step, new_step)}
     else
@@ -437,8 +459,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  def handle_event("create_booking", params, socket) do
-    # Create final booking attributes
+  def handle_event("create_booking", _params, socket) do
     attrs = %{
       total_amount: socket.assigns.total_amount,
       deposit_amount: socket.assigns.deposit_amount,
@@ -455,18 +476,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     case Bookings.create_booking(attrs) do
       {:ok, _booking} ->
-        # Mark the booking flow progress as completed
         complete_booking_flow_progress(socket)
 
         socket =
           socket
           |> put_flash(:info, "Booking created successfully! You will be redirected to payment.")
-          |> assign(:step, 5) # Show success step
-
-        # In a real application, you would redirect to a payment gateway here
-        # For now, we'll just show the success message
+          |> assign(:step, 5)
 
         {:noreply, socket}
+
+
 
       {:error, %Ecto.Changeset{} = changeset} ->
         socket =
@@ -475,21 +494,23 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           |> assign(:changeset, changeset)
 
         {:noreply, socket}
+
+      {:error, _changeset} ->
+        {:noreply, socket}
     end
   end
 
-  # Private functions for managing booking progress
 
     defp save_booking_progress(socket, step) do
+    IO.puts("DEBUG: save_booking_progress called with step: #{step}")
+    IO.puts("DEBUG: Current socket step: #{socket.assigns.step}")
     try do
-      # Get or create booking flow progress
       case Bookings.get_or_create_booking_flow_progress(
         socket.assigns.current_user.id,
         socket.assigns.package.id,
         socket.assigns.schedule.id
       ) do
         {:ok, progress} ->
-          # Update the progress with current state
           attrs = %{
             current_step: step,
             number_of_persons: socket.assigns.number_of_persons,
@@ -502,24 +523,31 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             deposit_amount: socket.assigns.deposit_amount
           }
 
+          IO.puts("DEBUG: Saving progress with step: #{step}")
+
           case Bookings.update_booking_flow_progress(progress, attrs) do
-            {:ok, _updated_progress} -> :ok
-            {:error, _changeset} -> :error
+            {:ok, _updated_progress} ->
+              IO.puts("DEBUG: Progress saved successfully")
+              :ok
+            {:error, _changeset} ->
+              IO.puts("DEBUG: Failed to save progress")
+              :error
           end
         {:error, _changeset} ->
-          # If creation fails, just return error but don't crash
+          IO.puts("DEBUG: Failed to get/create progress")
           :error
         _ ->
+          IO.puts("DEBUG: Unexpected result from get_or_create_booking_flow_progress")
           :error
       end
     rescue
-      _ ->
+      error ->
+        IO.puts("DEBUG: Error in save_booking_progress: #{inspect(error)}")
         :error
     end
   end
 
   defp complete_booking_flow_progress(socket) do
-    # Find and complete the booking flow progress
     case Bookings.get_or_create_booking_flow_progress(
       socket.assigns.current_user.id,
       socket.assigns.package.id,
@@ -671,14 +699,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Travelers</h2>
 
-            <form phx-submit="validate_booking" phx-submit-ignore class="space-y-6">
+            <div class="space-y-6">
               <!-- Number of Persons -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                   Number of Travelers
                 </label>
-                                <div class="flex items-center space-x-2">
-                  <label class="text-sm font-medium text-gray-700">Number of Travelers:</label>
+                <div class="flex items-center space-x-2">
                   <div class="flex border border-gray-300 rounded-lg">
                     <button
                       type="button"
@@ -725,16 +752,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                         <button
                           type="button"
                           phx-click="toggle_booking_for_self"
-                          class={if @is_booking_for_self, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-700"}
-                          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                          class={"px-4 py-2 rounded-lg text-sm font-medium transition-colors #{if @is_booking_for_self, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-700"}"}
                         >
                           I am traveling
                         </button>
                         <button
                           type="button"
                           phx-click="toggle_booking_for_self"
-                          class={if !@is_booking_for_self, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-700"}
-                          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                          class={"px-4 py-2 rounded-lg text-sm font-medium transition-colors #{if !@is_booking_for_self, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-700"}"}
                         >
                           Someone else is traveling
                         </button>
@@ -881,15 +906,24 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 >
                   Back
                 </button>
-                <button
-                  type="button"
-                  phx-click="next_step"
-                  class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Continue
-                </button>
+                <div class="flex space-x-3">
+                  <button
+                    type="button"
+                    phx-click="save_travelers_progress"
+                    class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                  >
+                    Save Progress
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="next_step"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
-            </form>
+            </div>
           </div>
         <% end %>
 

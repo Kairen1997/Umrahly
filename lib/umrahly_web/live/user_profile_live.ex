@@ -299,9 +299,9 @@ defmodule UmrahlyWeb.UserProfileLive do
     ~H"""
     <div class="flex min-h-screen bg-gray-100">
       <!-- Sidebar -->
-      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
+      <aside class="w-50 bg-gray-800 shadow-lg sticky top-0 h-screen flex flex-col justify-between overflow-y-auto">
         <!-- Navigation Menu -->
-        <div>
+        <div class="py-4">
           <nav class="mt-0">
             <div class="px-4 space-y-2">
               <!-- Dashboard -->
@@ -352,9 +352,9 @@ defmodule UmrahlyWeb.UserProfileLive do
       </aside>
 
       <!-- Main Content -->
-      <div class="flex-1 flex flex-col">
+      <div class="flex-1 flex flex-col min-h-screen">
         <!-- Content Header -->
-        <div class="bg-white border-b border-gray-200">
+        <div class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
           <div class="px-6 py-4">
             <div class="flex items-center justify-between">
               <div>
@@ -368,7 +368,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                 <% end %>
               </div>
               <%= if @profile do %>
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center justify-between">
                   <div class="w-3 h-3 bg-green-400 rounded-full"></div>
                   <span class="text-sm text-gray-600">Profile Complete</span>
                 </div>
@@ -378,7 +378,7 @@ defmodule UmrahlyWeb.UserProfileLive do
         </div>
 
         <!-- Page Content -->
-        <main class="flex-1 bg-gray-50 p-6 overflow-auto">
+        <main class="flex-1 bg-gray-50 p-6 overflow-y-auto">
           <div class="max-w-6xl mx-auto">
 
             <!-- Profile Completion Guidance -->

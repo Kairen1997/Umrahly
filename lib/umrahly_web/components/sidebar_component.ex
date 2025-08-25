@@ -5,11 +5,11 @@ defmodule UmrahlyWeb.SidebarComponent do
     ~H"""
     <div class="flex min-h-screen bg-gray-100" style="min-height: calc(100vh - 64px);">
       <!-- Sidebar -->
-      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
+      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between sticky top-0 h-screen">
         <!-- Navigation Menu -->
-        <div>
+        <div class="sticky top-0">
           <nav class="mt-0">
-            <div class="px-4 space-y-2">
+            <div class="px-4 space-y-2 py-4">
               <!-- Dashboard -->
               <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
                 <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

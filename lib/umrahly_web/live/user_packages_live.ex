@@ -63,13 +63,6 @@ defmodule UmrahlyWeb.UserPackagesLive do
     # First filter, then sort the filtered results
     filtered_packages = filter_packages(socket.assigns.packages, search_query)
     sorted_packages = sort_packages_by_criteria(filtered_packages, search_sort)
-
-    # Debug: Log the search operation
-    IO.inspect("Search query: '#{search_query}'")
-    IO.inspect("Total packages: #{length(socket.assigns.packages)}")
-    IO.inspect("Filtered packages: #{length(filtered_packages)}")
-    IO.inspect("Sorting by: #{search_sort}")
-
     # Reset to first page when searching
     total_pages = :math.ceil(length(sorted_packages) / socket.assigns.packages_per_page) |> trunc
 
@@ -92,14 +85,6 @@ defmodule UmrahlyWeb.UserPackagesLive do
     # First filter, then sort the filtered results
     filtered_packages = filter_packages(socket.assigns.packages, search_query)
     sorted_packages = sort_packages_by_criteria(filtered_packages, current_sort)
-
-    # Debug: Log the search operation
-    IO.inspect("Search query (query only): '#{search_query}'")
-    IO.inspect("Total packages: #{length(socket.assigns.packages)}")
-    IO.inspect("Total packages: #{length(socket.assigns.packages)}")
-    IO.inspect("Filtered packages: #{length(filtered_packages)}")
-    IO.inspect("Using current sort: #{current_sort}")
-
     # Reset to first page when searching
     total_pages = :math.ceil(length(sorted_packages) / socket.assigns.packages_per_page) |> trunc
 
@@ -134,13 +119,6 @@ defmodule UmrahlyWeb.UserPackagesLive do
   def handle_event("change_page", %{"page" => page}, socket) do
     page_number = String.to_integer(page)
 
-    # Debug: Log the page change
-    IO.inspect("Changing to page: #{page_number}")
-    IO.inspect("Current page before change: #{socket.assigns.current_page_number}")
-    IO.inspect("Total pages: #{socket.assigns.total_pages}")
-    IO.inspect("Filtered packages count: #{length(socket.assigns.filtered_packages)}")
-    IO.inspect("Packages per page: #{socket.assigns.packages_per_page}")
-
     # Ensure page number is within valid range
     valid_page = max(1, min(page_number, socket.assigns.total_pages))
 
@@ -149,9 +127,7 @@ defmodule UmrahlyWeb.UserPackagesLive do
   end
 
   defp filter_packages(packages, search_query) do
-    # Debug: Log the filtering operation
-    IO.inspect("Filtering packages with query: '#{search_query}'")
-    IO.inspect("Total packages to filter: #{length(packages)}")
+
 
     filtered = packages
     |> Enum.filter(fn package ->
@@ -159,15 +135,12 @@ defmodule UmrahlyWeb.UserPackagesLive do
         search_query == "" ->
           true
         package.name && String.contains?(String.downcase(package.name), String.downcase(search_query)) ->
-          IO.inspect("Package '#{package.name}' matches query '#{search_query}'")
           true
         true ->
-          IO.inspect("Package '#{package.name}' does not match query '#{search_query}'")
           false
       end
     end)
 
-    IO.inspect("Filtered result: #{length(filtered)} packages")
     filtered
   end
 
@@ -236,20 +209,8 @@ defmodule UmrahlyWeb.UserPackagesLive do
     # Get paginated packages for the current page
   defp get_paginated_packages(packages, current_page, packages_per_page) do
     start_index = (current_page - 1) * packages_per_page
-
-    # Debug: Log pagination details
-    IO.inspect("Pagination debug:")
-    IO.inspect("  Total packages: #{length(packages)}")
-    IO.inspect("  Current page: #{current_page}")
-    IO.inspect("  Packages per page: #{packages_per_page}")
-    IO.inspect("  Start index: #{start_index}")
-    IO.inspect("  End index: #{start_index + packages_per_page - 1}")
-
     result = packages
     |> Enum.slice(start_index, packages_per_page)
-
-    IO.inspect("  Result packages count: #{length(result)}")
-    IO.inspect("  Result packages: #{Enum.map(result, & &1.name)}")
     result
   end
 
@@ -297,7 +258,6 @@ defmodule UmrahlyWeb.UserPackagesLive do
         </div>
 
         <!-- Packages Grid -->
-        <!-- Debug: current_page_number = <%= @current_page_number %>, total_pages = <%= @total_pages %>, packages_count = <%= length(@filtered_packages) %> -->
         <div id={"packages-grid-page-#{@current_page_number}"} class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <%= for package <- get_paginated_packages(@filtered_packages, @current_page_number, @packages_per_page) do %>
             <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 relative">
@@ -409,26 +369,14 @@ defmodule UmrahlyWeb.UserPackagesLive do
                   </div>
                 <% end %>
 
-                <!-- Action Buttons -->
+                <!-- Action Button -->
                 <div class="flex space-x-2">
                   <a
                     href={~p"/packages/#{package.id}"}
-                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
+                    class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
                   >
                     View Details
                   </a>
-                  <%= if length(package.package_schedules) > 0 do %>
-                    <a
-                      href={~p"/book/#{package.id}/#{List.first(package.package_schedules).id}"}
-                      class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-center"
-                    >
-                      Book Now
-                    </a>
-                  <% else %>
-                    <button disabled class="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed font-medium text-center">
-                      No Schedules
-                    </button>
-                  <% end %>
                 </div>
               </div>
             </div>
@@ -436,7 +384,6 @@ defmodule UmrahlyWeb.UserPackagesLive do
         </div>
 
         <!-- Pagination Controls -->
-        <!-- Debug: total_pages = <%= @total_pages %>, current_page_number = <%= @current_page_number %> -->
         <%= if @total_pages > 1 do %>
           <div class="flex items-center justify-center space-x-2 py-6">
             <!-- Previous Page Button -->

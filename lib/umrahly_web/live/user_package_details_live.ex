@@ -624,7 +624,6 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                         end
                       ]}
                     >
-                      <!-- Debug: selected_id=<%= @selected_schedule_id %> schedule_id=<%= schedule.id %> types: selected=<%= @selected_schedule_id |> inspect %> schedule=<%= schedule.id |> inspect %> -->
                       <%= if @selected_schedule_id == schedule.id do %>
                         ✓ Selected
                       <% else %>

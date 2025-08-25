@@ -493,12 +493,6 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         <td class="px-3 py-3 text-sm font-medium">
                           <div class="flex flex-col space-y-1">
                             <.link
-                              navigate={~p"/admin/packages/#{package.id}/edit"}
-                              class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors text-center"
-                            >
-                              Edit
-                            </.link>
-                            <.link
                               navigate={~p"/admin/packages/details/#{package.id}"}
                               class="bg-teal-600 text-white px-2 py-1 rounded text-xs hover:bg-teal-700 transition-colors text-center"
                             >

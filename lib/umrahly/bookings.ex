@@ -6,6 +6,7 @@ defmodule Umrahly.Bookings do
   import Ecto.Query, warn: false
   alias Umrahly.Repo
   alias Umrahly.Bookings.Booking
+  alias Umrahly.Bookings.BookingFlowProgress
 
   @doc """
   Returns the list of bookings.
@@ -153,5 +154,90 @@ defmodule Umrahly.Bookings do
     else
       0
     end
+  end
+
+  # Booking Flow Progress Functions
+
+  @doc """
+  Gets or creates a booking flow progress record for a user and package schedule.
+  """
+  def get_or_create_booking_flow_progress(user_id, package_id, package_schedule_id) do
+    case Repo.get_by(BookingFlowProgress, user_id: user_id, package_schedule_id: package_schedule_id, status: "in_progress") do
+      nil ->
+        # Create new progress record
+        %BookingFlowProgress{}
+        |> BookingFlowProgress.changeset(%{
+          user_id: user_id,
+          package_id: package_id,
+          package_schedule_id: package_schedule_id,
+          current_step: 1,
+          max_steps: 4,
+          number_of_persons: 1,
+          is_booking_for_self: true,
+          payment_method: "bank_transfer",
+          payment_plan: "full_payment",
+          notes: "",
+          travelers_data: [],
+          total_amount: nil,
+          deposit_amount: nil,
+          status: "in_progress",
+          last_updated: DateTime.utc_now()
+        })
+        |> Repo.insert()
+      progress ->
+        {:ok, progress}
+    end
+  end
+
+  @doc """
+  Updates the booking flow progress.
+  """
+  def update_booking_flow_progress(%BookingFlowProgress{} = progress, attrs) do
+    progress
+    |> BookingFlowProgress.changeset(Map.merge(attrs, %{last_updated: DateTime.utc_now()}))
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets all in-progress booking flows for a user.
+  """
+  def get_user_booking_flows(user_id) do
+    Repo.all(
+      from p in BookingFlowProgress,
+      join: pack in Umrahly.Packages.Package, on: p.package_id == pack.id,
+      join: ps in Umrahly.Packages.PackageSchedule, on: p.package_schedule_id == ps.id,
+      where: p.user_id == ^user_id and p.status == "in_progress",
+      select: %{
+        id: p.id,
+        current_step: p.current_step,
+        max_steps: p.max_steps,
+        package_name: pack.name,
+        package_id: pack.id,
+        schedule_departure: ps.departure_date,
+        schedule_return: ps.return_date,
+        number_of_persons: p.number_of_persons,
+        total_amount: p.total_amount,
+        last_updated: p.last_updated
+      },
+      order_by: [desc: p.last_updated]
+    )
+  end
+
+  @doc """
+  Completes a booking flow progress (marks as completed).
+  """
+  def complete_booking_flow_progress(%BookingFlowProgress{} = progress) do
+    progress
+    |> BookingFlowProgress.changeset(%{status: "completed"})
+    |> Repo.update()
+  end
+
+  @doc """
+  Abandons a booking flow progress (marks as abandoned).
+  """
+  def abandon_booking_flow_progress(%BookingFlowProgress{} = progress) do
+    progress
+    |> BookingFlowProgress.changeset(%{status: "abandoned"})
+    |> Repo.update()
   end
 end

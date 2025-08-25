@@ -99,7 +99,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
       |> Map.put("duration_nights", package_params["duration_nights"] || 1)
       |> Map.put("status", package_params["status"] || "inactive")
 
-    # Creating new package
+        # Creating new package
     case Packages.create_package(package_params) do
       {:ok, _package} ->
         {:noreply,
@@ -107,7 +107,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
          |> put_flash(:info, "Package created successfully!")
          |> push_navigate(to: ~p"/admin/packages")}
 
-      {:error, %Ecto.Changeset{} = _changeset} ->
+            {:error, %Ecto.Changeset{} = _changeset} ->
         # Create a new changeset with the user's input data to preserve form values
         user_input_changeset = Packages.change_package(%Umrahly.Packages.Package{}, package_params)
 

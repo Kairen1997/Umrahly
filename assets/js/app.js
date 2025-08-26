@@ -78,6 +78,30 @@ const DebugClick = {
   }
 };
 
+// Custom hook for payment gateway redirect
+const PaymentGatewayRedirect = {
+  mounted() {
+    console.log("PaymentGatewayRedirect hook mounted");
+    
+    // Check if this is an online payment that requires immediate redirect
+    const requiresOnlinePayment = this.el.dataset.requiresOnlinePayment === "true";
+    const paymentGatewayUrl = this.el.dataset.paymentGatewayUrl;
+    
+    if (requiresOnlinePayment && paymentGatewayUrl) {
+      console.log("Redirecting to payment gateway:", paymentGatewayUrl);
+      
+      // Small delay to show the success message before redirect
+      setTimeout(() => {
+        // Open payment gateway in new tab/window
+        window.open(paymentGatewayUrl, '_blank');
+        
+        // Also redirect the current page to dashboard
+        window.location.href = '/dashboard';
+      }, 1500);
+    }
+  }
+};
+
 // Custom hook for terms validation
 const TermsValidation = {
   mounted() {
@@ -511,7 +535,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},
   hooks: {
     FileUploadHook,
-    FormValidationHook,
+    // FormValidationHook, // Temporarily disabled to fix form issues
     AutoDismissFlash,
     PackageDetails,
     ScheduleDetails,
@@ -519,7 +543,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     AddItemDebugHook,
     DebugClick,
     BookingProgress,
-    TermsValidation
+    TermsValidation,
+    PaymentGatewayRedirect
   }
 })
 

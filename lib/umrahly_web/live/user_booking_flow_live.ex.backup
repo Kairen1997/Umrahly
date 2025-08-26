@@ -129,6 +129,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
   # All handle_event functions grouped together
   def handle_event("validate_booking", %{"booking" => booking_params}, socket) do
+    IO.puts("DEBUG: validate_booking called with params: #{inspect(booking_params)}")
+    IO.puts("DEBUG: Current step before validation: #{socket.assigns.step}")
+
     # Update local assigns for real-time validation
     number_of_persons = String.to_integer(booking_params["number_of_persons"] || "1")
     payment_plan = booking_params["payment_plan"] || "full_payment"
@@ -217,6 +220,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> assign(:payment_plan, payment_plan)
       |> assign(:notes, booking_params["notes"] || "")
       |> assign(:changeset, changeset)
+
+    IO.puts("DEBUG: validate_booking completed. Final step: #{socket.assigns.step}")
 
     {:noreply, socket}
   end
@@ -383,119 +388,66 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-
-
-
-
-
-
-  def handle_event("submit_payment_proof", %{"payment_proof_notes" => notes}, socket) do
-    # Check if we're at the correct step
-    if socket.assigns.step != 5 do
-      socket = put_flash(socket, :error, "Payment proof can only be submitted after booking confirmation.")
-      {:noreply, socket}
-    else
-      # Check if we have a current booking ID
-      case socket.assigns[:current_booking_id] do
-        nil ->
-          socket = put_flash(socket, :error, "No booking found. Please create a booking first.")
-          {:noreply, socket}
-
-        booking_id ->
-          # Get the booking from the database
-          try do
-            booking = Bookings.get_booking!(booking_id)
-
-            # Check if payment proof has already been submitted
-            if booking.payment_proof_status == "submitted" do
-              socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
-              {:noreply, socket}
-            else
-              # Check if there are uploaded files
-              if Enum.empty?(socket.assigns.uploads.payment_proof.entries) do
-                socket = put_flash(socket, :error, "Please select a file to upload.")
-                {:noreply, socket}
-              else
-                # Consume the uploaded files
-                uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
-                  # Create a unique filename to avoid conflicts
-                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
-                  extension = Path.extname(entry.client_name)
-                  filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
-
-                  # Ensure upload directory exists and save the file
-                  upload_path = ensure_upload_directory()
-                  file_path = Path.join(upload_path, filename)
-
-                  # Copy the uploaded file to the destination
-                  case File.cp(entry.path, file_path) do
-                    :ok ->
-                      {:ok, filename}
-                    {:error, reason} ->
-                      {:error, "Failed to save file: #{inspect(reason)}"}
-                  end
-                end)
-
-                # Filter out any failed uploads
-                successful_uploads = Enum.filter(uploaded_files, fn
-                  {:ok, _filename} -> true
-                  {:error, _reason} -> false
-                end)
-
-                if Enum.empty?(successful_uploads) do
-                  socket = put_flash(socket, :error, "Failed to process uploaded file.")
-                  {:noreply, socket}
-                else
-                  # Get the first successful upload
-                  {:ok, filename} = List.first(successful_uploads)
-
-                  # Prepare payment proof attributes
-                  attrs = %{
-                    "payment_proof_file" => filename,
-                    "payment_proof_notes" => notes || ""
-                  }
-
-                  case Bookings.submit_payment_proof(booking, attrs) do
-                    {:ok, _updated_booking} ->
-                      socket =
-                        socket
-                        |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
-                        |> assign(:show_payment_proof_form, false)
-                        |> assign(:payment_proof_notes, notes || "")
-                        |> assign(:payment_proof_file, filename)
-
-                      {:noreply, socket}
-
-                    {:error, %Ecto.Changeset{} = _changeset} ->
-                      socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
-                      {:noreply, socket}
-
-                    {:error, _error} ->
-                      socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
-                      {:noreply, socket}
-                  end
-                end
-              end
-            end
-          rescue
-            Ecto.QueryError ->
-              socket = put_flash(socket, :error, "Invalid booking ID.")
-              {:noreply, socket}
-            Ecto.NoResultsError ->
-              socket = put_flash(socket, :error, "Booking not found.")
-              {:noreply, socket}
-            _error ->
-              socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
-              {:noreply, socket}
-          end
-      end
-    end
+  def handle_event("payment_proof_file_selected", %{"value" => file_info}, socket) do
+    IO.puts("DEBUG: File selected: #{inspect(file_info)}")
+    # Store the file information in the socket assigns
+    socket = assign(socket, :payment_proof_file, file_info)
+    {:noreply, socket}
   end
 
-  # Fallback handler for submit_payment_proof
-  def handle_event("submit_payment_proof", _params, socket) do
-    socket = put_flash(socket, :error, "Invalid form submission. Please try again.")
+  def handle_event("update_payment_proof_notes", %{"notes" => notes}, socket) do
+    socket = assign(socket, :payment_proof_notes, notes)
     {:noreply, socket}
+  end
+
+      def handle_event("submit_payment_proof", _params, socket) do
+    IO.puts("DEBUG: submit_payment_proof called")
+    IO.puts("DEBUG: Current step: #{socket.assigns.step}")
+    IO.puts("DEBUG: Current booking ID: #{inspect(socket.assigns[:current_booking_id])}")
+
+    # For now, just return success to test if the event is being handled
+    socket = put_flash(socket, :info, "Submit payment proof event received! Step: #{socket.assigns.step}")
+    {:noreply, socket}
+  end
+
+                        # Commented out the actual logic for debugging
+        # # Get uploaded files
+        # IO.puts("DEBUG: About to consume uploaded entries")
+        # uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
+        #   IO.puts("DEBUG: Processing entry: #{entry.client_name}")
+        #   # For now, we'll store the filename. In production, you'd want to:
+        #   # 1. Save the file to a storage service (S3, etc.)
+        #   # 2. Store the file path/URL in the database
+        #   {:ok, entry.client_name}
+        # end)
+        #
+        # IO.puts("DEBUG: Uploaded files result: #{inspect(uploaded_files)}")
+        #
+        # if Enum.empty?(uploaded_files) do
+        #   IO.puts("DEBUG: No uploaded files found")
+        #   socket = put_flash(socket, :error, "Please select a file to upload.")
+        #   {:noreply, socket}
+        # else
+        #   # Get the first uploaded file
+        #   filename = List.first(uploaded_files)
+        #   IO.puts("DEBUG: Using filename: #{filename}")
+        #
+        #   # Prepare payment proof attributes
+        #   attrs = %{
+        #     "payment_proof_file" => filename,
+        #     "payment_proof_notes" => socket.assigns.payment_proof_notes
+        #   }
+        #
+        #   case Bookings.submit_payment_proof(booking, attrs) do
+        #     {:ok, _updated_booking} ->
+        #       socket =
+        #         socket
+        #         |> put_flash(:info, "Payment proof submitted successfully! Admin will review and approve your payment.")
+        #         |> assign(:show_payment_proof_form, false)
+        #         |> assign(:payment_proof_notes, "")
+        #
+        #       socket
+
   end
 
   def handle_event("toggle_payment_proof_form", _params, socket) do
@@ -589,60 +541,57 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_step = socket.assigns.step
     max_steps = socket.assigns.max_steps
 
-    # If we're at the final step (step 5), don't allow any step changes
-    if current_step == max_steps do
-      {:noreply, socket}
-    else
-      # Validate step bounds - be more defensive
-      cond do
-        current_step < 1 ->
-          socket = assign(socket, :step, 1)
-          {:noreply, socket}
-        current_step > max_steps ->
-          socket = assign(socket, :step, max_steps)
-          {:noreply, socket}
-        current_step < max_steps ->
-          new_step = current_step + 1
+    # Debug logging
+    IO.puts("DEBUG: go_to_next_step called. Current step: #{current_step}, Max steps: #{max_steps}")
 
-          # Advance the step
-          socket = assign(socket, :step, new_step)
+    # Validate step bounds - be more defensive
+    cond do
+      current_step < 1 ->
+        IO.puts("DEBUG: Step too low (#{current_step}), resetting to step 1")
+        socket = assign(socket, :step, 1)
+        {:noreply, socket}
+      current_step > max_steps ->
+        IO.puts("DEBUG: Step too high (#{current_step}), resetting to step #{max_steps}")
+        socket = assign(socket, :step, max_steps)
+        {:noreply, socket}
+      current_step < max_steps ->
+        new_step = current_step + 1
+        IO.puts("DEBUG: Advancing from step #{current_step} to step #{new_step}")
 
-          {:noreply, socket}
-        true ->
-          {:noreply, socket}
-      end
+        # Advance the step
+        socket = assign(socket, :step, new_step)
+        IO.puts("DEBUG: Step after assignment: #{socket.assigns.step}")
+
+        {:noreply, socket}
+      true ->
+        IO.puts("DEBUG: Already at max step")
+        {:noreply, socket}
     end
   end
 
   def handle_event("next_step", params, socket) do
-    # If we're at step 5, don't allow any step changes
-    if socket.assigns.step == 5 do
-      {:noreply, socket}
-    else
-      handle_event("go_to_next_step", params, socket)
-    end
+    handle_event("go_to_next_step", params, socket)
   end
 
   def handle_event("prev_step", _params, socket) do
-    # If we're at step 5, don't allow going back
-    if socket.assigns.step == 5 do
+    current_step = socket.assigns.step
+
+    if current_step > 1 do
+      new_step = current_step - 1
+      socket = assign(socket, :step, new_step)
       {:noreply, socket}
     else
-      current_step = socket.assigns.step
-
-      if current_step > 1 do
-        new_step = current_step - 1
-        socket = assign(socket, :step, new_step)
-        {:noreply, socket}
-      else
-        {:noreply, socket}
-      end
+      {:noreply, socket}
     end
   end
 
 
 
     def handle_event("create_booking", _params, socket) do
+    # Debug logging
+    IO.puts("DEBUG: create_booking called")
+    IO.puts("DEBUG: Current step before creating booking: #{socket.assigns.step}")
+
     # Validate that all required traveler information is filled
     travelers = socket.assigns.travelers
 
@@ -656,6 +605,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Check if payment method is selected
     cond do
       socket.assigns.payment_method == "" or is_nil(socket.assigns.payment_method) ->
+        IO.puts("DEBUG: Payment method not selected")
         socket =
           socket
           |> put_flash(:error, "Please select a payment method before proceeding.")
@@ -663,6 +613,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         {:noreply, socket}
 
       !all_travelers_complete ->
+        IO.puts("DEBUG: Traveler information incomplete")
         socket =
           socket
           |> put_flash(:error, "Please complete all required traveler information before proceeding.")
@@ -670,6 +621,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         {:noreply, socket}
 
       true ->
+        IO.puts("DEBUG: All validations passed, creating booking...")
         attrs = %{
           total_amount: socket.assigns.total_amount,
           deposit_amount: socket.assigns.deposit_amount,
@@ -684,9 +636,15 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           booking_date: Date.utc_today()
         }
 
+        # Add more detailed debugging
+        IO.puts("DEBUG: About to create booking with attrs: #{inspect(attrs)}")
+
         try do
           case Bookings.create_booking(attrs) do
             {:ok, booking} ->
+              IO.puts("DEBUG: Booking created successfully with ID: #{booking.id}")
+              IO.puts("DEBUG: Socket assigns before step assignment: #{inspect(socket.assigns)}")
+
               # Check if payment method requires immediate payment gateway redirect
               payment_method = socket.assigns.payment_method
               requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
@@ -695,7 +653,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 # For online payment methods, redirect to payment gateway
                 payment_url = generate_payment_gateway_url(booking, socket.assigns)
 
-                # Set the payment gateway URL - the JavaScript hook will handle the redirect
+                # Send redirect after a short delay to show the success message
+                Process.send_after(self(), {:redirect_to_payment, payment_url}, 2000)
+
                 socket
                   |> put_flash(:info, "Booking created successfully! Redirecting to payment gateway...")
                   |> assign(:step, 5)
@@ -711,10 +671,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   |> assign(:current_booking_id, booking.id)
               end
 
+              IO.puts("DEBUG: Step after assignment: #{socket.assigns.step}")
+              IO.puts("DEBUG: Socket assigns after step assignment: #{inspect(socket.assigns)}")
+
               # Return the socket with step 5
               {:noreply, socket}
 
             {:error, %Ecto.Changeset{} = changeset} ->
+              IO.puts("DEBUG: Failed to create booking - changeset error: #{inspect(changeset.errors)}")
               socket =
                 socket
                 |> put_flash(:error, "Failed to create booking. Please check the form for errors.")
@@ -723,6 +687,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               {:noreply, socket}
 
             {:error, error} ->
+              IO.puts("DEBUG: Failed to create booking - unexpected error: #{inspect(error)}")
               socket =
                 socket
                 |> put_flash(:error, "An unexpected error occurred while creating the booking: #{inspect(error)}")
@@ -731,6 +696,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           end
         rescue
           error ->
+            IO.puts("DEBUG: CRASH in create_booking: #{inspect(error)}")
+            IO.puts("DEBUG: Stack trace: #{Exception.format_stacktrace(__STACKTRACE__)}")
+
             socket =
               socket
               |> put_flash(:error, "System error occurred: #{inspect(error)}")
@@ -740,10 +708,10 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  # Handle redirect to payment gateway (no longer needed with immediate redirect)
-  # def handle_info({:redirect_to_payment, payment_url}, socket) do
-  #   {:noreply, push_navigate(socket, to: payment_url, external: true)}
-  # end
+  # Handle redirect to payment gateway
+  def handle_info({:redirect_to_payment, payment_url}, socket) do
+    {:noreply, push_navigate(socket, to: payment_url, external: true)}
+  end
 
   # Handle async messages
   def handle_info({:save_progress_async, _step}, socket) do
@@ -772,10 +740,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         # Use PayPal for online banking
         generate_paypal_payment_url(booking, assigns, config[:paypal])
 
-      "e_wallet" ->
-        # Use e-wallet payment gateway
-        generate_ewallet_payment_url(booking, assigns, config[:ewallet])
-
       _ ->
         # Fallback to generic payment gateway
         generate_generic_payment_url(booking, assigns, config[:generic])
@@ -783,122 +747,80 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   end
 
   # Generate Stripe payment URL
-  defp generate_stripe_payment_url(booking, _assigns, _stripe_config) do
+  defp generate_stripe_payment_url(booking, assigns, _stripe_config) do
     # This is a placeholder - replace with actual Stripe integration
     # In a real implementation, you would:
     # 1. Create a Stripe Checkout Session
     # 2. Return the session URL
 
-    # For demo purposes, we'll create a more realistic Stripe-like URL
-    # In production, replace this with actual Stripe Checkout Session creation
     base_url = "https://checkout.stripe.com"
+    _session_params = %{
+      amount: Decimal.to_integer(Decimal.mult(assigns.total_amount, Decimal.new(100))), # Convert to cents
+      currency: "myr",
+      client_reference_id: "booking_#{booking.id}",
+      success_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=success&booking_id=#{booking.id}",
+      cancel_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=cancelled&booking_id=#{booking.id}",
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        %{
+          price_data: %{
+            currency: "myr",
+            product_data: %{
+              name: assigns.package.name,
+              description: "Umrah Package - #{assigns.schedule.departure_date} to #{assigns.schedule.return_date}"
+            },
+            unit_amount: Decimal.to_integer(Decimal.mult(assigns.total_amount, Decimal.new(100)))
+          },
+          quantity: assigns.number_of_persons
+        }
+      ]
+    }
 
-    # Create a demo session ID (in real implementation, this would come from Stripe API)
-    # Safely handle the booking ID to prevent String.slice errors
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-    # Take last 8 characters safely
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    session_id = "cs_test_#{id_suffix}_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
-
-    # Return a realistic Stripe checkout URL
-    "#{base_url}/pay/#{session_id}"
+    # For now, return a placeholder URL - replace with actual Stripe session creation
+    "#{base_url}/pay?session_id=stripe_session_#{booking.id}"
   end
 
   # Generate PayPal payment URL
-  defp generate_paypal_payment_url(booking, _assigns, paypal_config) do
+  defp generate_paypal_payment_url(booking, assigns, paypal_config) do
     # This is a placeholder - replace with actual PayPal integration
-    # In production, replace this with actual PayPal payment creation
+    base_url = if paypal_config[:mode] == "live", do: "https://www.paypal.com", else: "https://www.sandbox.paypal.com"
 
-    # For demo purposes, we'll create a realistic PayPal-like URL
-    base_url = if paypal_config && paypal_config[:mode] == "live", do: "https://www.paypal.com", else: "https://www.sandbox.paypal.com"
+    paypal_params = %{
+      cmd: "_xclick",
+      business: paypal_config[:client_id] || "merchant@example.com",
+      item_name: "#{assigns.package.name} - Umrah Package",
+      item_number: "booking_#{booking.id}",
+      amount: Decimal.to_string(assigns.total_amount),
+      currency_code: "MYR",
+      return: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=success&booking_id=#{booking.id}",
+      cancel_return: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=cancelled&booking_id=#{booking.id}",
+      no_shipping: "1",
+      no_note: "1"
+    }
 
-    # Create a demo payment ID (in real implementation, this would come from PayPal API)
-    # Safely handle the booking ID to prevent String.slice errors
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-    # Take last 8 characters safely
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    payment_id = "PAY-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
-
-    # Return a realistic PayPal payment URL
-    "#{base_url}/checkoutnow?token=#{payment_id}"
-  end
-
-    # Generate e-wallet payment URL
-  defp generate_ewallet_payment_url(booking, _assigns, _ewallet_config) do
-    # This is a placeholder - replace with actual e-wallet integration
-    # In production, replace this with actual e-wallet payment creation
-
-    # For demo purposes, we'll create a realistic e-wallet payment URL
-    # This could be Boost, Touch 'n Go, or other Malaysian e-wallets
-    base_url = "https://demo-ewallet-gateway.com"
-
-    # Create a demo payment ID (in real implementation, this would come from the e-wallet API)
-    # Safely handle the booking ID to prevent String.slice errors
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-    # Take last 8 characters safely
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    payment_id = "EW-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
-
-    # Return a realistic e-wallet payment URL
-    "#{base_url}/pay/#{payment_id}"
+    query_string = URI.encode_query(paypal_params)
+    "#{base_url}/cgi-bin/webscr?#{query_string}"
   end
 
   # Generate generic payment gateway URL
-  defp generate_generic_payment_url(booking, _assigns, generic_config) do
-    # This is a placeholder - replace with actual payment gateway integration
+  defp generate_generic_payment_url(booking, assigns, generic_config) do
+    base_url = generic_config[:base_url]
 
-    # For demo purposes, we'll create a realistic payment gateway URL
-    base_url = generic_config && generic_config[:base_url] || "https://demo-payment-gateway.com"
+    params = %{
+      amount: Decimal.to_string(assigns.total_amount),
+      currency: "MYR",
+      booking_id: booking.id,
+      customer_name: assigns.current_user.full_name,
+      customer_email: assigns.current_user.email,
+      return_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=success&booking_id=#{booking.id}",
+      cancel_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=cancelled&booking_id=#{booking.id}",
+      merchant_id: generic_config[:merchant_id],
+      api_key: generic_config[:api_key]
+    }
 
-    # Create a demo transaction ID (in real implementation, this would come from the payment gateway API)
-    # Safely handle the booking ID to prevent String.slice errors
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-    # Take last 8 characters safely
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    transaction_id = "TXN-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
-
-    # Return a realistic payment gateway URL
-    "#{base_url}/payment/#{transaction_id}"
+    query_string = URI.encode_query(params)
+    "#{base_url}/pay?#{query_string}"
   end
 
   # Helper function to convert upload errors to readable strings
@@ -907,18 +829,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   defp error_to_string(:not_accepted), do: "File type not accepted"
   defp error_to_string(_), do: "Invalid file"
 
-  # Helper function to ensure upload directory exists
-  defp ensure_upload_directory do
-    upload_path = Path.join(["priv", "static", "uploads", "payment_proof"])
-    File.mkdir_p!(upload_path)
-    upload_path
-  end
-
   def render(assigns) do
+    # Debug logging for render
+    IO.puts("DEBUG: Rendering with step: #{assigns.step}")
+
     ~H"""
     <.sidebar page_title={@page_title}>
       <div id="booking-flow-container" class="max-w-4xl mx-auto space-y-6"
-
+           phx-hook="BookingProgress"
            data-step={@step}
            data-package-id={@package.id}
            data-schedule-id={@schedule.id}>
@@ -1558,12 +1476,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         <%= if @step == 5 do %>
           <%= if @requires_online_payment do %>
             <!-- Online Payment Success -->
-            <div
-              id="payment-gateway-container"
-              class="bg-white rounded-lg shadow p-6 text-center"
-              phx-hook="PaymentGatewayRedirect"
-              data-requires-online-payment={@requires_online_payment}
-              data-payment-gateway-url={@payment_gateway_url}>
+            <div class="bg-white rounded-lg shadow p-6 text-center">
               <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
@@ -1572,7 +1485,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
               <h2 class="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
               <p class="text-gray-600 mb-6">
-                Your booking has been created successfully. You are being redirected to the payment gateway to complete your payment.
+                Your booking has been created successfully. You will be redirected to the payment gateway to complete your payment.
               </p>
 
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -1584,23 +1497,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </div>
                   <div class="ml-3">
                     <p class="text-sm text-blue-700">
-                      <strong>Payment Gateway:</strong> <%= String.replace(@payment_method, "_", " ") |> String.capitalize() %>
-                    </p>
-                    <p class="text-sm text-blue-700 mt-1">
-                      Complete your payment securely on the external payment gateway.
+                      <strong>Redirecting...</strong> You will be automatically redirected to the payment gateway in a few seconds.
                     </p>
                   </div>
-                </div>
-              </div>
-
-              <!-- Debug Information (remove in production) -->
-              <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-left">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Debug Information</h4>
-                <div class="text-xs text-gray-600 space-y-1">
-                  <div><strong>Payment Method:</strong> <%= @payment_method %></div>
-                  <div><strong>Payment Gateway URL:</strong> <span class="break-all"><%= @payment_gateway_url %></span></div>
-                  <div><strong>Requires Online Payment:</strong> <%= @requires_online_payment %></div>
-                  <div><strong>Booking ID:</strong> <%= @current_booking_id %></div>
                 </div>
               </div>
 
@@ -1611,13 +1510,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   Go to Payment Gateway Now
-                </button>
-                <button
-                  type="button"
-                  onclick={"window.location.href='#{@payment_gateway_url}'"}
-                  class="inline-block bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium ml-3"
-                >
-                  Redirect to Payment Gateway
                 </button>
                 <a
                   href={~p"/dashboard"}
@@ -1660,112 +1552,91 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               </div>
 
               <!-- Payment Proof Submission Section -->
-              <%= if !@payment_proof_file do %>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                  <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-lg font-medium text-blue-900">Submit Payment Proof</h3>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-lg font-medium text-blue-900">Submit Payment Proof</h3>
+                  <button
+                    type="button"
+                    phx-click="toggle_payment_proof_form"
+                    class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    <%= if @show_payment_proof_form, do: "Hide Form", else: "Show Form" %>
+                  </button>
+                </div>
+
+                <p class="text-sm text-blue-700 mb-3">
+                  After completing your payment, please upload proof of payment (receipt, bank transfer slip, etc.) for admin approval.
+                </p>
+
+                <%= if @show_payment_proof_form do %>
+                  <div class="space-y-4 text-left">
+                    <div>
+                      <label class="block text-sm font-medium text-blue-900 mb-2">
+                        Payment Proof File <span class="text-red-500">*</span>
+                      </label>
+                      <div class="w-full border border-blue-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500">
+                                                <!-- Temporarily using regular file input to debug form issues -->
+                        <input
+                          id="payment-proof-file-input"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                          class="w-full border-0 focus:outline-none"
+                          phx-hook="FileUploadHook"
+                        />
+                        <!-- <.live_file_input upload={@uploads.payment_proof} class="w-full border-0 focus:outline-none" /> -->
+                      </div>
+                      <p class="text-xs text-blue-600 mt-1">
+                        Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 5MB)
+                      </p>
+
+                      <!-- Show selected file info -->
+                      <%= for entry <- @uploads.payment_proof.entries do %>
+                        <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm text-blue-700"><%= entry.client_name %></span>
+                            <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-500 hover:text-red-700">
+                              Remove
+                            </button>
+                          </div>
+                          <%= for err <- upload_errors(@uploads.payment_proof, entry) do %>
+                            <div class="text-red-500 text-xs mt-1"><%= error_to_string(err) %></div>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-blue-900 mb-2">
+                        Additional Notes
+                      </label>
+                      <textarea
+                        rows="3"
+                        placeholder="Any additional information about your payment..."
+                        phx-change="update_payment_proof_notes"
+                        value={@payment_proof_notes}
+                        class="w-full border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      ></textarea>
+                    </div>
+
                     <button
                       type="button"
-                      phx-click="toggle_payment_proof_form"
-                      class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      phx-click="test_button"
+                      class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium mb-2"
                     >
-                      <%= if @show_payment_proof_form, do: "Hide Form", else: "Show Form" %>
+                      Test Button (Debug)
+                    </button>
+
+                    <button
+                      type="button"
+                      phx-click="submit_payment_proof"
+                      disabled={Enum.empty?(@uploads.payment_proof.entries)}
+                      class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Submit Payment Proof
                     </button>
                   </div>
-
-                  <p class="text-sm text-blue-700 mb-3">
-                    After completing your payment, please upload proof of payment (receipt, bank transfer slip, etc.) for admin approval.
-                  </p>
-
-                  <%= if @show_payment_proof_form do %>
-                    <form phx-submit="submit_payment_proof" phx-submit-ignore class="space-y-4 text-left">
-                      <div>
-                        <label class="block text-sm font-medium text-blue-900 mb-2">
-                          Payment Proof File <span class="text-red-500">*</span>
-                        </label>
-                        <div class="w-full border border-blue-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500">
-                          <.live_file_input upload={@uploads.payment_proof} class="w-full border-0 focus:outline-none" />
-                        </div>
-                        <p class="text-xs text-blue-600 mt-1">
-                          Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 5MB)
-                        </p>
-
-                        <!-- Show selected file info -->
-                        <%= for entry <- @uploads.payment_proof.entries do %>
-                          <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                            <div class="flex items-center justify-between">
-                              <span class="text-sm text-blue-700"><%= entry.client_name %></span>
-                              <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-500 hover:text-red-700">
-                                Remove
-                              </button>
-                            </div>
-                            <%= for err <- upload_errors(@uploads.payment_proof, entry) do %>
-                              <div class="text-red-500 text-xs mt-1"><%= error_to_string(err) %></div>
-                            <% end %>
-                          </div>
-                        <% end %>
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium text-blue-900 mb-2">
-                          Additional Notes
-                        </label>
-                        <textarea
-                          rows="3"
-                          name="payment_proof_notes"
-                          placeholder="Any additional information about your payment..."
-                          class="w-full border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        ><%= @payment_proof_notes %></textarea>
-                      </div>
-
-                      <button
-                        type="submit"
-                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                      >
-                        Submit Payment Proof
-                      </button>
-
-
-                    </form>
-                  <% end %>
-                </div>
-              <% end %>
-
-              <!-- Display Submitted Payment Proof -->
-              <%= if @payment_proof_file do %>
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                  <div class="flex items-center mb-3">
-                    <div class="flex-shrink-0">
-                      <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                      </svg>
-                    </div>
-                    <div class="ml-3">
-                      <h3 class="text-lg font-medium text-green-900">Payment Proof Submitted</h3>
-                      <p class="text-sm text-green-700">Your payment proof has been submitted and is pending admin review.</p>
-                    </div>
-                  </div>
-
-                  <div class="bg-white border border-green-200 rounded-lg p-3">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center">
-                        <svg class="h-4 w-4 text-green-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
-                        </svg>
-                        <span class="text-sm font-medium text-green-900"><%= @payment_proof_file %></span>
-                      </div>
-                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        Pending Review
-                      </span>
-                    </div>
-                    <%= if @payment_proof_notes && @payment_proof_notes != "" do %>
-                      <div class="mt-2 text-sm text-green-700">
-                        <strong>Notes:</strong> <%= @payment_proof_notes %>
-                      </div>
-                    <% end %>
-                  </div>
-                </div>
-              <% end %>
+                <% end %>
+              </div>
 
               <div class="space-y-3">
                 <a
@@ -1788,5 +1659,4 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     </.sidebar>
     """
   end
-
 end

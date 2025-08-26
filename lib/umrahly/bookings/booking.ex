@@ -50,8 +50,8 @@ defmodule Umrahly.Bookings.Booking do
       payment_plan == "installment" and Decimal.compare(deposit_amount, total_amount) == :gt ->
         add_error(changeset, :deposit_amount, "Deposit amount cannot exceed total amount")
 
-      payment_plan == "installment" and Decimal.compare(deposit_amount, Decimal.mult(total_amount, Decimal.new("0.1"))) == :lt ->
-        add_error(changeset, :deposit_amount, "Deposit amount must be at least 10% of total amount")
+      payment_plan == "installment" and Decimal.compare(deposit_amount, Decimal.mult(total_amount, Decimal.new("0.2"))) == :lt ->
+        add_error(changeset, :deposit_amount, "Deposit amount must be at least 20% of total amount")
 
       true ->
         changeset

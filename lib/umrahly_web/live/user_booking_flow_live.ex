@@ -41,10 +41,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
        |> push_navigate(to: ~p"/packages/#{package_id}")}
     else
       # Calculate total amount based on number of persons and schedule price
-      schedule_price_per_person =
-        base_price = package.price
-        override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-      base_price + override_price
+      base_price = package.price
+      override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
+      schedule_price_per_person = base_price + override_price
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(1))
 
@@ -73,12 +72,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:has_price_override, has_price_override)
         |> assign(:price_per_person, price_per_person)
         |> assign(:total_amount, progress && progress.total_amount || total_amount)
-        |> assign(:deposit_amount, progress && progress.deposit_amount || total_amount)
+        |> assign(:payment_plan, progress && progress.payment_plan || "full_payment")
+        |> assign(:deposit_amount, progress && progress.deposit_amount || if((progress && progress.payment_plan) == "installment", do: Decimal.mult(total_amount, Decimal.new("0.2")), else: total_amount))
         |> assign(:number_of_persons, progress && progress.number_of_persons || 1)
         |> assign(:travelers, travelers)
         |> assign(:is_booking_for_self, progress && progress.is_booking_for_self || true)
         |> assign(:payment_method, progress && progress.payment_method || "bank_transfer")
-        |> assign(:payment_plan, progress && progress.payment_plan || "full_payment")
         |> assign(:notes, progress && progress.notes || "")
         |> assign(:changeset, changeset)
         |> assign(:current_page, "packages")
@@ -145,15 +144,15 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(number_of_persons))
 
-    deposit_amount = case payment_plan do
+        deposit_amount = case payment_plan do
       "full_payment" -> total_amount
       "installment" ->
         deposit_input = booking_params["deposit_amount"] || "0"
-        # Try to parse the deposit amount, default to 10% of total if parsing fails
+        # Try to parse the deposit amount, default to 20% of total if parsing fails (same as package details)
         try do
           Decimal.new(deposit_input)
         rescue
-          _ -> Decimal.mult(total_amount, Decimal.new("0.1"))
+          _ -> Decimal.mult(total_amount, Decimal.new("0.2"))
         end
     end
 
@@ -233,8 +232,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_number = socket.assigns.number_of_persons
     new_number = min(current_number + 1, 10)
 
-
-
     # Initialize travelers based on new number of persons
     travelers = Enum.map(1..new_number, fn index ->
       if index == 1 and socket.assigns.is_booking_for_self do
@@ -258,13 +255,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     schedule_price_per_person = base_price + override_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
-    _deposit_amount = socket.assigns.deposit_amount
+
+    # Update deposit amount if payment plan is installment
+    deposit_amount = if socket.assigns.payment_plan == "installment" do
+      Decimal.mult(total_amount, Decimal.new("0.2"))
+    else
+      total_amount
+    end
 
     socket =
       socket
       |> assign(:number_of_persons, new_number)
       |> assign(:travelers, travelers)
       |> assign(:total_amount, total_amount)
+      |> assign(:deposit_amount, deposit_amount)
 
     # Save progress after updating number of persons
     save_booking_progress(socket, socket.assigns.step)
@@ -276,8 +280,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_number = socket.assigns.number_of_persons
     new_number = max(current_number - 1, 1)
 
-
-
     # Initialize travelers based on new number of persons
     travelers = Enum.map(1..new_number, fn index ->
       if index == 1 and socket.assigns.is_booking_for_self do
@@ -301,13 +303,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     schedule_price_per_person = base_price + override_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
-    _deposit_amount = socket.assigns.deposit_amount
+
+    # Update deposit amount if payment plan is installment
+    deposit_amount = if socket.assigns.payment_plan == "installment" do
+      Decimal.mult(total_amount, Decimal.new("0.2"))
+    else
+      total_amount
+    end
 
     socket =
       socket
       |> assign(:number_of_persons, new_number)
       |> assign(:travelers, travelers)
       |> assign(:total_amount, total_amount)
+      |> assign(:deposit_amount, deposit_amount)
 
     # Save progress after updating number of persons
     save_booking_progress(socket, socket.assigns.step)
@@ -319,8 +328,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     deposit_amount = case payment_plan do
       "full_payment" -> socket.assigns.total_amount
       "installment" ->
-        # Default to 10% of total for installment
-        Decimal.mult(socket.assigns.total_amount, Decimal.new("0.1"))
+        # Default to 20% of total for installment (same as package details)
+        Decimal.mult(socket.assigns.total_amount, Decimal.new("0.2"))
     end
 
     socket =
@@ -667,6 +676,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       <span class="text-gray-600 font-medium">Total price per person:</span>
                       <span class="font-bold text-green-600">RM <%= @price_per_person %></span>
                     </div>
+
                     <div class="flex justify-between">
                       <span class="text-gray-600">Available slots:</span>
                       <span class="font-medium"><%= @schedule.quota %></span>
@@ -970,13 +980,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               <%= if @payment_plan == "installment" do %>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Deposit Amount (Minimum: RM <%= Decimal.mult(@total_amount, Decimal.new("0.1")) %>)
+                    Deposit Amount (Minimum: RM <%= Decimal.mult(@total_amount, Decimal.new("0.2")) %>)
                   </label>
                   <input
                     type="number"
                     name="booking[deposit_amount]"
                     value={@deposit_amount}
-                    min={Decimal.mult(@total_amount, Decimal.new("0.1"))}
+                    min={Decimal.mult(@total_amount, Decimal.new("0.2"))}
                     max={@total_amount}
                     step="0.01"
                     phx-change="update_deposit_amount"

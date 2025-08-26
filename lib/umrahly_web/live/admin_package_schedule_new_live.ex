@@ -55,7 +55,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
 
         {:noreply, push_navigate(socket, to: ~p"/admin/package-schedules")}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
+            {:error, %Ecto.Changeset{} = changeset} ->
         socket =
           socket
           |> assign(:schedule_changeset, changeset)

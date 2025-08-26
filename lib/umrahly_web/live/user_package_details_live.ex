@@ -356,6 +356,193 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                 </div>
               </div>
             </div>
+
+            <!-- Installment Payment Plan -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <div class="flex items-center mb-4">
+                <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-900">Installment Payment Plan</h3>
+              </div>
+
+              <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div class="flex items-center text-sm text-green-800">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    <strong>Payment Schedule:</strong> Complete all payments at least 1 month before departure to secure your booking.
+                  </span>
+                </div>
+              </div>
+
+              <%
+                # Calculate installment details
+                total_price = selected_schedule.total_price
+                departure_date = selected_schedule.departure_date
+                today = Date.utc_today()
+
+                # Calculate deposit (20% of total price)
+                deposit_amount = ceil(total_price * 0.2)
+                remaining_amount = total_price - deposit_amount
+
+                # Calculate months until departure (excluding the last month)
+                months_until_departure = Date.diff(departure_date, today) |> div(30)
+                months_to_pay = max(1, months_until_departure - 1)
+
+                # Calculate monthly payment amount (excluding deposit)
+                monthly_payment = if months_to_pay > 0, do: ceil(remaining_amount / months_to_pay), else: remaining_amount
+
+                # Calculate remaining amount for the last payment
+                total_paid = monthly_payment * (months_to_pay - 1)
+                last_payment = remaining_amount - total_paid
+              %>
+
+              <!-- Payment Summary -->
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                  <div class="text-2xl font-bold text-blue-600">RM <%= total_price %></div>
+                  <div class="text-sm text-gray-600">Total Amount</div>
+                </div>
+                <div class="text-center p-4 bg-orange-50 rounded-lg">
+                  <div class="text-2xl font-bold text-orange-600">RM <%= deposit_amount %></div>
+                  <div class="text-sm text-gray-600">Deposit (20%)</div>
+                </div>
+                <div class="text-center p-4 bg-green-50 rounded-lg">
+                  <div class="text-2xl font-bold text-green-600"><%= months_to_pay %></div>
+                  <div class="text-sm text-gray-600">Monthly Payments</div>
+                </div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                  <div class="text-2xl font-bold text-purple-600">RM <%= monthly_payment %></div>
+                  <div class="text-sm text-gray-600">Monthly Amount</div>
+                </div>
+              </div>
+
+              <!-- Deposit Information -->
+              <div class="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div class="flex items-center text-sm text-orange-800">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                  <span>
+                    <strong>Deposit Required:</strong> Pay RM <%= deposit_amount %> (20% of total) upfront to secure your booking.
+                    The remaining RM <%= remaining_amount %> will be split into <%= months_to_pay %> monthly installments.
+                  </span>
+                </div>
+              </div>
+
+              <!-- Monthly Payment Schedule Table -->
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Payment #
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Type
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Due Date
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Amount
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200">
+                    <!-- Deposit Row -->
+                    <tr class="bg-orange-50">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                        0
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          Deposit
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-sm text-gray-900">
+                        <%= Calendar.strftime(today, "%B %d, %Y") %>
+                        <span class="ml-1 text-xs text-orange-600">(Immediate)</span>
+                      </td>
+                      <td class="px-4 py-3 text-sm font-semibold text-gray-900">
+                        RM <%= deposit_amount %>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          Due Now
+                        </span>
+                      </td>
+                    </tr>
+
+                    <!-- Monthly Installments -->
+                    <%= for month <- 1..months_to_pay do %>
+                      <%
+                        # Calculate due date for each month
+                        due_date = Date.add(today, month * 30)
+                        is_last_payment = month == months_to_pay
+                        payment_amount = if is_last_payment, do: last_payment, else: monthly_payment
+                        payment_status = if Date.compare(due_date, today) == :gt, do: "Upcoming", else: "Overdue"
+                      %>
+                      <tr class={if month == months_to_pay, do: "bg-yellow-50", else: ""}>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                          <%= month %>
+                          <%= if is_last_payment do %>
+                            <span class="ml-1 text-xs text-yellow-600">(Final)</span>
+                          <% end %>
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Installment
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                          <%= Calendar.strftime(due_date, "%B %d, %Y") %>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-semibold text-gray-900">
+                          RM <%= payment_amount %>
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class={[
+                            "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                            case payment_status do
+                              "Upcoming" -> "bg-blue-100 text-blue-800"
+                              "Overdue" -> "bg-red-100 text-red-800"
+                              _ -> "bg-gray-100 text-gray-800"
+                            end
+                          ]}>
+                            <%= payment_status %>
+                          </span>
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Important Notes -->
+              <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="w-5 h-5 mr-2 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div class="text-sm text-yellow-800">
+                    <div class="font-semibold mb-1">Important Payment Terms:</div>
+                    <ul class="list-disc list-inside space-y-1 text-xs">
+                      <li><strong>Deposit:</strong> RM <%= deposit_amount %> (20%) must be paid immediately to secure your booking</li>
+                      <li>All remaining installments must be completed at least 1 month before departure</li>
+                      <li>Late payments may result in booking cancellation and deposit forfeiture</li>
+                      <li>Final payment amount may vary slightly due to rounding</li>
+                      <li>Contact support if you need to adjust your payment schedule</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           <% end %>
         <% end %>
 

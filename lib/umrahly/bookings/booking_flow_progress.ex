@@ -28,16 +28,34 @@ defmodule Umrahly.Bookings.BookingFlowProgress do
     booking_flow_progress
     |> cast(attrs, [:current_step, :max_steps, :number_of_persons, :is_booking_for_self, :payment_method, :payment_plan, :notes, :travelers_data, :total_amount, :deposit_amount, :status, :last_updated, :user_id, :package_id, :package_schedule_id])
     |> validate_required([:current_step, :max_steps, :number_of_persons, :is_booking_for_self, :payment_method, :payment_plan, :status, :last_updated, :user_id, :package_id, :package_schedule_id])
+    |> validate_required([:travelers_data])
     |> validate_inclusion(:status, ["in_progress", "completed", "abandoned"])
     |> validate_inclusion(:payment_plan, ["full_payment", "installment"])
     |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash"])
     |> validate_number(:current_step, greater_than: 0, less_than_or_equal_to: 4)
     |> validate_number(:max_steps, greater_than: 0, less_than_or_equal_to: 4)
     |> validate_number(:number_of_persons, greater_than: 0, less_than_or_equal_to: 10)
-    |> validate_number(:total_amount, greater_than: 0)
-    |> validate_number(:deposit_amount, greater_than: 0)
+    |> validate_optional_amounts()
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:package_id)
     |> foreign_key_constraint(:package_schedule_id)
+  end
+
+  # Validate amounts only if they are present
+  defp validate_optional_amounts(changeset) do
+    total_amount = get_field(changeset, :total_amount)
+    deposit_amount = get_field(changeset, :deposit_amount)
+
+    changeset
+    |> maybe_validate_number(:total_amount, total_amount, greater_than: 0)
+    |> maybe_validate_number(:deposit_amount, deposit_amount, greater_than: 0)
+  end
+
+  defp maybe_validate_number(changeset, field, value, opts) when not is_nil(value) do
+    validate_number(changeset, field, opts)
+  end
+
+  defp maybe_validate_number(changeset, _field, _value, _opts) do
+    changeset
   end
 end

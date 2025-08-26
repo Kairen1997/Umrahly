@@ -11,7 +11,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
   def mount(%{"package_id" => package_id, "schedule_id" => schedule_id}, _session, socket) do
-        # Get package and schedule details
+    # Get package and schedule details
     package = Packages.get_package!(package_id)
     schedule = Packages.get_package_schedule!(schedule_id)
 
@@ -21,8 +21,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       package.id,
       schedule.id
     ) do
-      {:ok, progress} -> progress
-      _ -> nil
+      {:ok, progress} ->
+        progress
+      {:error, error} ->
+        nil
+      other ->
+        nil
     end
 
         # Helper function to check if price override should be shown
@@ -82,12 +86,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:changeset, changeset)
         |> assign(:current_page, "packages")
         |> assign(:page_title, "Book Package")
-        |> assign(:step, progress && progress.current_step || 1)
+        |> assign(:step, if(progress && progress.current_step && progress.current_step > 0, do: progress.current_step, else: 1))
         |> assign(:max_steps, 4)
-
-      IO.puts("DEBUG: Mount completed. Progress found: #{progress != nil}, Initial step: #{progress && progress.current_step || 1}")
-      IO.puts("DEBUG: Mount completed. Final socket step: #{socket.assigns.step}")
-
 
       {:ok, socket}
     end
@@ -343,15 +343,25 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("update_payment_method", %{"payment_method" => payment_method}, socket) do
-    IO.puts("DEBUG: update_payment_method called. Current step: #{socket.assigns.step}, New payment method: #{payment_method}")
+  def handle_event("update_payment_method", params, socket) do
+    # Handle the case where payment_method might be in a nested structure
+    payment_method = case params do
+      %{"payment_method" => pm} -> pm
+      %{"booking" => %{"payment_method" => pm}} -> pm
+      _ -> socket.assigns.payment_method
+    end
 
+    # Store the current step before any operations
+    current_step = socket.assigns.step
+
+    # Update the payment method immediately for responsive UI
     socket = assign(socket, :payment_method, payment_method)
 
-    # Save progress after updating payment method
-    _ = save_booking_progress(socket, socket.assigns.step)
+    # Send immediate response to prevent timeout
+    send(self(), {:save_progress_async, current_step})
 
-    IO.puts("DEBUG: update_payment_method completed. Step preserved: #{socket.assigns.step}")
+    # Add flash message to confirm the change
+    socket = put_flash(socket, :info, "Payment method changed to #{String.replace(payment_method, "_", " ") |> String.capitalize()}")
 
     {:noreply, socket}
   end
@@ -362,6 +372,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Save progress after updating notes
     save_booking_progress(socket, socket.assigns.step)
 
+    {:noreply, socket}
+  end
+
+  def handle_info({:save_progress_async, step}, socket) do
+    case save_booking_progress(socket, step) do
+      :ok -> :ok
+      :error -> :error
+    end
     {:noreply, socket}
   end
 
@@ -511,48 +529,52 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
     defp save_booking_progress(socket, step) do
-    IO.puts("DEBUG: save_booking_progress called with step: #{step}")
-    IO.puts("DEBUG: Current socket step: #{socket.assigns.step}")
+    # Ensure we don't save a step that's less than 1
+    step_to_save = if step < 1, do: 1, else: step
+
+    # Add timeout protection
     try do
-      case Bookings.get_or_create_booking_flow_progress(
-        socket.assigns.current_user.id,
-        socket.assigns.package.id,
-        socket.assigns.schedule.id
-      ) do
-        {:ok, progress} ->
-          attrs = %{
-            current_step: step,
-            number_of_persons: socket.assigns.number_of_persons,
-            is_booking_for_self: socket.assigns.is_booking_for_self,
-            payment_method: socket.assigns.payment_method,
-            payment_plan: socket.assigns.payment_plan,
-            notes: socket.assigns.notes,
-            travelers_data: socket.assigns.travelers,
-            total_amount: socket.assigns.total_amount,
-            deposit_amount: socket.assigns.deposit_amount
-          }
+      # Use Task.async to prevent blocking
+      task = Task.async(fn ->
+        try do
+          case Bookings.get_or_create_booking_flow_progress(
+            socket.assigns.current_user.id,
+            socket.assigns.package.id,
+            socket.assigns.schedule.id
+          ) do
+            {:ok, progress} ->
+              attrs = %{
+                current_step: step_to_save,
+                number_of_persons: socket.assigns.number_of_persons,
+                is_booking_for_self: socket.assigns.is_booking_for_self,
+                payment_method: socket.assigns.payment_method,
+                payment_plan: socket.assigns.payment_plan,
+                notes: socket.assigns.notes,
+                travelers_data: socket.assigns.travelers,
+                total_amount: socket.assigns.total_amount,
+                deposit_amount: socket.assigns.deposit_amount
+              }
 
-          IO.puts("DEBUG: Saving progress with step: #{step}")
-
-          case Bookings.update_booking_flow_progress(progress, attrs) do
-            {:ok, _updated_progress} ->
-              IO.puts("DEBUG: Progress saved successfully")
-              :ok
-            {:error, _changeset} ->
-              IO.puts("DEBUG: Failed to save progress")
-              :error
+              case Bookings.update_booking_flow_progress(progress, attrs) do
+                {:ok, _updated_progress} -> :ok
+                {:error, _changeset} -> :error
+              end
+            {:error, _changeset} -> :error
+            _ -> :error
           end
-        {:error, _changeset} ->
-          IO.puts("DEBUG: Failed to get/create progress")
-          :error
-        _ ->
-          IO.puts("DEBUG: Unexpected result from get_or_create_booking_flow_progress")
-          :error
+        rescue
+          _ -> :error
+        end
+      end)
+
+      # Wait for the task with a timeout
+      case Task.await(task, 5000) do
+        :ok -> :ok
+        :error -> :error
+        _ -> :error
       end
     rescue
-      error ->
-        IO.puts("DEBUG: Error in save_booking_progress: #{inspect(error)}")
-        :error
+      _ -> :error
     end
   end
 
@@ -942,7 +964,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Payment Details</h2>
 
-            <form phx-submit="validate_booking" phx-submit-ignore class="space-y-6">
+            <form phx-submit="validate_booking" phx-submit-ignore class="space-y-6" onsubmit="return false;" novalidate>
               <!-- Payment Plan -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1006,6 +1028,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   phx-change="update_payment_method"
                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={@payment_method}
+                  phx-debounce="100"
                 >
                   <option value="credit_card">Credit Card</option>
                   <option value="bank_transfer">Bank Transfer</option>

@@ -162,30 +162,80 @@ defmodule Umrahly.Bookings do
   Gets or creates a booking flow progress record for a user and package schedule.
   """
   def get_or_create_booking_flow_progress(user_id, package_id, package_schedule_id) do
-    case Repo.get_by(BookingFlowProgress, user_id: user_id, package_schedule_id: package_schedule_id, status: "in_progress") do
-      nil ->
-        # Create new progress record
-        %BookingFlowProgress{}
-        |> BookingFlowProgress.changeset(%{
-          user_id: user_id,
-          package_id: package_id,
-          package_schedule_id: package_schedule_id,
-          current_step: 1,
-          max_steps: 4,
-          number_of_persons: 1,
-          is_booking_for_self: true,
-          payment_method: "bank_transfer",
-          payment_plan: "full_payment",
-          notes: "",
-          travelers_data: [],
-          total_amount: nil,
-          deposit_amount: nil,
-          status: "in_progress",
-          last_updated: DateTime.utc_now()
-        })
-        |> Repo.insert()
-      progress ->
-        {:ok, progress}
+    try do
+      # First try to get existing progress with more specific query
+      case Repo.get_by(BookingFlowProgress,
+        user_id: user_id,
+        package_schedule_id: package_schedule_id,
+        status: "in_progress"
+      ) do
+        nil ->
+          # Also check if there's any progress record for this user/schedule regardless of status
+          case Repo.get_by(BookingFlowProgress,
+            user_id: user_id,
+            package_schedule_id: package_schedule_id
+          ) do
+            nil ->
+              # No existing record found, create a new one
+              %BookingFlowProgress{}
+              |> BookingFlowProgress.changeset(%{
+                user_id: user_id,
+                package_id: package_id,
+                package_schedule_id: package_schedule_id,
+                current_step: 1,
+                max_steps: 4,
+                number_of_persons: 1,
+                is_booking_for_self: true,
+                payment_method: "bank_transfer",
+                payment_plan: "full_payment",
+                notes: "",
+                travelers_data: [],
+                total_amount: nil,
+                deposit_amount: nil,
+                status: "in_progress",
+                last_updated: DateTime.utc_now()
+              })
+              |> Repo.insert()
+
+            existing_progress when not is_nil(existing_progress) ->
+              # If there's an existing record but it's not in_progress, reactivate it
+              case Repo.update(existing_progress
+                |> BookingFlowProgress.changeset(%{
+                  status: "in_progress",
+                  last_updated: DateTime.utc_now()
+                })) do
+                {:ok, updated_progress} ->
+                  {:ok, updated_progress}
+                {:error, _changeset} ->
+                  # If reactivation fails, create a new one
+                  %BookingFlowProgress{}
+                  |> BookingFlowProgress.changeset(%{
+                    user_id: user_id,
+                    package_id: package_id,
+                    package_schedule_id: package_schedule_id,
+                    current_step: 1,
+                    max_steps: 4,
+                    number_of_persons: 1,
+                    is_booking_for_self: true,
+                    payment_method: "bank_transfer",
+                    payment_plan: "full_payment",
+                    notes: "",
+                    travelers_data: [],
+                    total_amount: nil,
+                    deposit_amount: nil,
+                    status: "in_progress",
+                    last_updated: DateTime.utc_now()
+                  })
+                  |> Repo.insert()
+              end
+          end
+        progress ->
+          {:ok, progress}
+      end
+    rescue
+      _ ->
+        # Return error instead of crashing
+        {:error, "Failed to get or create booking flow progress"}
     end
   end
 

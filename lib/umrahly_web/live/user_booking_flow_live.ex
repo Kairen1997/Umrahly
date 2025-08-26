@@ -119,6 +119,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:max_steps, 5)
         |> assign(:requires_online_payment, false)
         |> assign(:payment_gateway_url, nil)
+        |> assign(:payment_proof_file, nil)
+        |> assign(:payment_proof_notes, "")
+        |> assign(:show_payment_proof_form, false)
 
       {:ok, socket}
     end
@@ -385,6 +388,58 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
+  def handle_event("payment_proof_file_selected", %{"file" => file}, socket) do
+    socket = assign(socket, :payment_proof_file, file)
+    {:noreply, socket}
+  end
+
+  def handle_event("update_payment_proof_notes", %{"notes" => notes}, socket) do
+    socket = assign(socket, :payment_proof_notes, notes)
+    {:noreply, socket}
+  end
+
+  def handle_event("submit_payment_proof", _params, socket) do
+    # Get the current booking ID from the socket assigns
+    # This would typically be stored when the booking is created
+    case socket.assigns[:current_booking_id] do
+      nil ->
+        socket = put_flash(socket, :error, "No booking found. Please try again.")
+        {:noreply, socket}
+
+      booking_id ->
+        # Get the booking
+        booking = Bookings.get_booking!(booking_id)
+
+        # Prepare payment proof attributes
+        attrs = %{
+          "payment_proof_file" => socket.assigns.payment_proof_file,
+          "payment_proof_notes" => socket.assigns.payment_proof_notes
+        }
+
+        case Bookings.submit_payment_proof(booking, attrs) do
+          {:ok, _updated_booking} ->
+            socket =
+              socket
+              |> put_flash(:info, "Payment proof submitted successfully! Admin will review and approve your payment.")
+              |> assign(:show_payment_proof_form, false)
+              |> assign(:payment_proof_file, nil)
+              |> assign(:payment_proof_notes, "")
+
+            {:noreply, socket}
+
+          {:error, _changeset} ->
+            socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form.")
+            {:noreply, socket}
+        end
+    end
+  end
+
+  def handle_event("toggle_payment_proof_form", _params, socket) do
+    show_form = !socket.assigns.show_payment_proof_form
+    socket = assign(socket, :show_payment_proof_form, show_form)
+    {:noreply, socket}
+  end
+
   def handle_event("save_progress_async", %{"value" => %{"step" => step_str}}, socket) do
     # Handle the step value if needed
     IO.puts("DEBUG: save_progress_async called with step: #{step_str}")
@@ -578,12 +633,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   |> assign(:step, 5)
                   |> assign(:payment_gateway_url, payment_url)
                   |> assign(:requires_online_payment, true)
+                  |> assign(:current_booking_id, booking.id)
               else
                 # For offline payment methods, show success message
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
                   |> assign(:step, 5)
                   |> assign(:requires_online_payment, false)
+                  |> assign(:current_booking_id, booking.id)
               end
 
               IO.puts("DEBUG: Step after assignment: #{socket.assigns.step}")
@@ -1458,6 +1515,64 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     </p>
                   </div>
                 </div>
+              </div>
+
+              <!-- Payment Proof Submission Section -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-lg font-medium text-blue-900">Submit Payment Proof</h3>
+                  <button
+                    type="button"
+                    phx-click="toggle_payment_proof_form"
+                    class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    <%= if @show_payment_proof_form, do: "Hide Form", else: "Show Form" %>
+                  </button>
+                </div>
+
+                <p class="text-sm text-blue-700 mb-3">
+                  After completing your payment, please upload proof of payment (receipt, bank transfer slip, etc.) for admin approval.
+                </p>
+
+                <%= if @show_payment_proof_form do %>
+                  <form phx-submit="submit_payment_proof" class="space-y-4 text-left">
+                    <div>
+                      <label class="block text-sm font-medium text-blue-900 mb-2">
+                        Payment Proof File <span class="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        phx-change="payment_proof_file_selected"
+                        class="w-full border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                      <p class="text-xs text-blue-600 mt-1">
+                        Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 5MB)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-blue-900 mb-2">
+                        Additional Notes
+                      </label>
+                      <textarea
+                        rows="3"
+                        placeholder="Any additional information about your payment..."
+                        phx-change="update_payment_proof_notes"
+                        value={@payment_proof_notes}
+                        class="w-full border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      ></textarea>
+                    </div>
+
+                    <button
+                      type="submit"
+                      class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      Submit Payment Proof
+                    </button>
+                  </form>
+                <% end %>
               </div>
 
               <div class="space-y-3">

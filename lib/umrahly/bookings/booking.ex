@@ -12,6 +12,10 @@ defmodule Umrahly.Bookings.Booking do
     field :payment_plan, :string, default: "full_payment"
     field :booking_date, :date
     field :notes, :string
+    field :payment_proof_file, :string
+    field :payment_proof_notes, :string
+    field :payment_proof_submitted_at, :utc_datetime
+    field :payment_proof_status, :string, default: "pending"
 
     belongs_to :user, Umrahly.Accounts.User
     belongs_to :package_schedule, Umrahly.Packages.PackageSchedule
@@ -22,11 +26,12 @@ defmodule Umrahly.Bookings.Booking do
   @doc false
   def changeset(booking, attrs) do
     booking
-    |> cast(attrs, [:status, :amount, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :notes, :user_id, :package_schedule_id])
+    |> cast(attrs, [:status, :amount, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :notes, :payment_proof_file, :payment_proof_notes, :payment_proof_submitted_at, :payment_proof_status, :user_id, :package_schedule_id])
     |> validate_required([:status, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :user_id, :package_schedule_id])
     |> validate_inclusion(:status, ["pending", "confirmed", "cancelled", "completed"])
     |> validate_inclusion(:payment_plan, ["full_payment", "installment"])
-    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash"])
+    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash", "e_wallet"])
+    |> validate_inclusion(:payment_proof_status, ["pending", "submitted", "approved", "rejected"])
     |> validate_number(:total_amount, greater_than: 0)
     |> validate_number(:deposit_amount, greater_than: 0)
     |> validate_number(:number_of_persons, greater_than: 0, less_than_or_equal_to: 10)

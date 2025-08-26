@@ -98,11 +98,62 @@ defmodule Umrahly.Bookings do
     package_schedules = Packages.get_package_schedules(package_id)
     schedule_ids = Enum.map(package_schedules, & &1.id)
 
-    if length(schedule_ids) > 0 do
-      Repo.all(from b in Booking, where: b.package_schedule_id in ^schedule_ids)
-    else
+    if Enum.empty?(schedule_ids) do
       []
+    else
+      Repo.all(from b in Booking, where: b.package_schedule_id in ^schedule_ids)
     end
+  end
+
+  @doc """
+  Submits payment proof for a booking.
+  """
+  def submit_payment_proof(%Booking{} = booking, attrs) do
+    attrs = Map.merge(attrs, %{
+      "payment_proof_submitted_at" => DateTime.utc_now(),
+      "payment_proof_status" => "submitted"
+    })
+
+    booking
+    |> Booking.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Updates payment proof status (for admin approval/rejection).
+  """
+  def update_payment_proof_status(%Booking{} = booking, status, admin_notes \\ nil) do
+    attrs = %{
+      "payment_proof_status" => status
+    }
+
+    attrs = if admin_notes, do: Map.put(attrs, "payment_proof_notes", admin_notes), else: attrs
+
+    booking
+    |> Booking.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets all bookings pending payment proof approval.
+  """
+  def get_bookings_pending_payment_proof_approval do
+    Repo.all(
+      from b in Booking,
+      where: b.payment_proof_status == "submitted" and b.status == "pending",
+      preload: [:user, :package_schedule]
+    )
+  end
+
+  @doc """
+  Gets all bookings with payment proof status.
+  """
+  def get_bookings_with_payment_proof_status(status) do
+    Repo.all(
+      from b in Booking,
+      where: b.payment_proof_status == ^status,
+      preload: [:user, :package_schedule]
+    )
   end
 
   @doc """

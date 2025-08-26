@@ -341,4 +341,31 @@ defmodule Umrahly.Bookings do
     |> BookingFlowProgress.changeset(%{status: "abandoned"})
     |> Repo.update()
   end
+
+  @doc """
+  Gets all bookings for a user with payment information.
+  """
+  def list_user_bookings_with_payments(user_id) do
+    Repo.all(
+      from b in Booking,
+      join: ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id,
+      join: p in Umrahly.Packages.Package, on: ps.package_id == p.id,
+      where: b.user_id == ^user_id,
+      select: %{
+        id: b.id,
+        package_name: p.name,
+        status: b.status,
+        total_amount: b.total_amount,
+        paid_amount: b.deposit_amount,
+        payment_plan: b.payment_plan,
+        payment_method: b.payment_method,
+        number_of_persons: b.number_of_persons,
+        booking_date: b.booking_date
+      },
+      order_by: [desc: b.inserted_at]
+    )
+    |> Enum.map(fn booking ->
+      Map.put(booking, :booking_reference, "BK#{String.pad_leading(to_string(booking.id), 3, "0")}")
+    end)
+  end
 end

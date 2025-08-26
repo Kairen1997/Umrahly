@@ -61,6 +61,27 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Payment Gateway Configuration
+config :umrahly, :payment_gateway,
+  # Stripe configuration (example)
+  stripe: [
+    publishable_key: System.get_env("STRIPE_PUBLISHABLE_KEY") || "pk_test_example",
+    secret_key: System.get_env("STRIPE_SECRET_KEY") || "sk_test_example",
+    webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET") || "whsec_example"
+  ],
+  # PayPal configuration (example)
+  paypal: [
+    client_id: System.get_env("PAYPAL_CLIENT_ID") || "client_id_example",
+    client_secret: System.get_env("PAYPAL_CLIENT_SECRET") || "client_secret_example",
+    mode: System.get_env("PAYPAL_MODE") || "sandbox" # or "live"
+  ],
+  # Generic payment gateway (for development/testing)
+  generic: [
+    base_url: System.get_env("PAYMENT_GATEWAY_URL") || "https://payment-gateway.example.com",
+    merchant_id: System.get_env("PAYMENT_MERCHANT_ID") || "merchant_example",
+    api_key: System.get_env("PAYMENT_API_KEY") || "api_key_example"
+  ]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

@@ -78,6 +78,34 @@ const DebugClick = {
   }
 };
 
+// Custom hook for terms validation
+const TermsValidation = {
+  mounted() {
+    console.log("TermsValidation hook mounted");
+    
+    const termsCheckbox = this.el;
+    const confirmButton = document.getElementById("confirm-booking-btn");
+    
+    if (termsCheckbox && confirmButton) {
+      const validateTerms = () => {
+        if (termsCheckbox.checked) {
+          confirmButton.disabled = false;
+          confirmButton.classList.remove("opacity-50", "cursor-not-allowed");
+        } else {
+          confirmButton.disabled = true;
+          confirmButton.classList.add("opacity-50", "cursor-not-allowed");
+        }
+      };
+      
+      // Initial validation
+      validateTerms();
+      
+      // Add event listener
+      termsCheckbox.addEventListener("change", validateTerms);
+    }
+  }
+};
+
 // Custom hook for auto-dismissing flash messages
 const AutoDismissFlash = {
   mounted() {
@@ -444,7 +472,37 @@ const AddItemDebugHook = {
   }
 };
 
-
+// Booking Progress Hook - Disabled to fix step progression issue
+const BookingProgress = {
+  mounted() {
+    this.step = this.el.dataset.step;
+    this.packageId = this.el.dataset.packageId;
+    this.scheduleId = this.el.dataset.scheduleId;
+    
+    // Disabled all progress saving to fix step progression
+    console.log("BookingProgress hook mounted but disabled for debugging");
+    
+    // Notify when page is fully loaded
+    if (document.readyState === "complete") {
+      this.pushEvent("page_loaded", {});
+    } else {
+      window.addEventListener("load", () => {
+        this.pushEvent("page_loaded", {});
+      });
+    }
+  },
+  
+  destroyed() {
+    // Clean up event listeners
+    console.log("BookingProgress hook destroyed");
+  },
+  
+  updated() {
+    // Update step when it changes
+    this.step = this.el.dataset.step;
+    console.log("BookingProgress hook updated, new step:", this.step);
+  }
+};
 
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
@@ -459,7 +517,9 @@ let liveSocket = new LiveSocket("/live", Socket, {
     ScheduleDetails,
     AutoScroll,
     AddItemDebugHook,
-    DebugClick
+    DebugClick,
+    BookingProgress,
+    TermsValidation
   }
 })
 

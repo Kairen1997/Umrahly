@@ -58,7 +58,8 @@ defmodule Umrahly.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
-      {:bandit, "~> 1.5"}
+      {:plug, "~> 1.14"},
+      {:bandit, "~> 1.2"}
     ]
   end
 

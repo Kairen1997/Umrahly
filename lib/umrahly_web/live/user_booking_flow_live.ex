@@ -1,10 +1,57 @@
 defmodule UmrahlyWeb.UserBookingFlowLive do
+  @moduledoc """
+  LiveView for handling the user booking flow.
+
+  ## Payment Gateway Integration
+
+  This module includes placeholder implementations for payment gateway integration.
+  To complete the integration, you need to:
+
+  1. **Stripe Integration** (for credit card payments):
+     - Install Stripe library: `mix deps.get stripe`
+     - Set environment variables: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY
+     - Replace `generate_stripe_payment_url/3` with actual Stripe Checkout Session creation
+
+  2. **PayPal Integration** (for online banking/FPX):
+     - Install PayPal library: `mix deps.get pay`
+     - Set environment variables: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET
+     - Replace `generate_paypal_payment_url/3` with actual PayPal payment creation
+
+  3. **E-Wallet Integration** (for Boost, Touch 'n Go):
+     - Implement integration with respective e-wallet APIs
+     - Update `generate_payment_gateway_url/2` to handle e-wallet payments
+
+  4. **Bank Transfer & Cash**:
+     - These are handled as offline payment methods
+     - No immediate redirection required
+
+  ## Environment Variables Required
+
+  ```bash
+  # Stripe
+  export STRIPE_PUBLISHABLE_KEY=pk_test_...
+  export STRIPE_SECRET_KEY=sk_test_...
+  export STRIPE_WEBHOOK_SECRET=whsec_...
+
+  # PayPal
+  export PAYPAL_CLIENT_ID=client_id_...
+  export PAYPAL_CLIENT_SECRET=client_secret_...
+  export PAYPAL_MODE=sandbox  # or live
+
+  # Generic Payment Gateway
+  export PAYMENT_GATEWAY_URL=https://your-gateway.com
+  export PAYMENT_MERCHANT_ID=your_merchant_id
+  export PAYMENT_API_KEY=your_api_key
+  ```
+  """
+
   use UmrahlyWeb, :live_view
 
   import UmrahlyWeb.SidebarComponent
   alias Umrahly.Bookings
   alias Umrahly.Bookings.Booking
   alias Umrahly.Packages
+  import URI
 
   on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
@@ -15,21 +62,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     package = Packages.get_package!(package_id)
     schedule = Packages.get_package_schedule!(schedule_id)
 
-    # Always check for existing progress to resume the booking flow
-    progress = case Bookings.get_or_create_booking_flow_progress(
-      socket.assigns.current_user.id,
-      package.id,
-      schedule.id
-    ) do
-      {:ok, progress} ->
-        progress
-      {:error, error} ->
-        nil
-      other ->
-        nil
-    end
-
-        # Helper function to check if price override should be shown
+    # Helper function to check if price override should be shown
     has_price_override = schedule.price_override && Decimal.gt?(schedule.price_override, Decimal.new(0))
 
     # Calculate price per person
@@ -51,23 +84,19 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(1))
 
-      # Progress is already retrieved above
-
       # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
 
       # Initialize travelers with current user details for single traveler
-      travelers = if progress && progress.travelers_data && length(progress.travelers_data) > 0 do
-        # Use saved travelers data
-        progress.travelers_data
-      else
-        [%{
-          full_name: socket.assigns.current_user.full_name || "",
-          identity_card_number: socket.assigns.current_user.identity_card_number || "",
-          passport_number: "", # Passport might not be in user profile
-          phone: socket.assigns.current_user.phone_number || ""
-        }]
-      end
+      travelers = [%{
+        full_name: socket.assigns.current_user.full_name || "",
+        identity_card_number: socket.assigns.current_user.identity_card_number || "",
+        passport_number: "", # Passport might not be in user profile
+        phone: socket.assigns.current_user.phone_number || ""
+      }]
+
+      # Default step to 1
+      saved_step = 1
 
       socket =
         socket
@@ -75,24 +104,27 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:schedule, schedule)
         |> assign(:has_price_override, has_price_override)
         |> assign(:price_per_person, price_per_person)
-        |> assign(:total_amount, progress && progress.total_amount || total_amount)
-        |> assign(:payment_plan, progress && progress.payment_plan || "full_payment")
-        |> assign(:deposit_amount, progress && progress.deposit_amount || if((progress && progress.payment_plan) == "installment", do: Decimal.mult(total_amount, Decimal.new("0.2")), else: total_amount))
-        |> assign(:number_of_persons, progress && progress.number_of_persons || 1)
+        |> assign(:total_amount, total_amount)
+        |> assign(:payment_plan, "full_payment")
+        |> assign(:deposit_amount, total_amount)
+        |> assign(:number_of_persons, 1)
         |> assign(:travelers, travelers)
-        |> assign(:is_booking_for_self, progress && progress.is_booking_for_self || true)
-        |> assign(:payment_method, progress && progress.payment_method || "bank_transfer")
-        |> assign(:notes, progress && progress.notes || "")
+        |> assign(:is_booking_for_self, true)
+        |> assign(:payment_method, "bank_transfer")
+        |> assign(:notes, "")
         |> assign(:changeset, changeset)
         |> assign(:current_page, "packages")
         |> assign(:page_title, "Book Package")
-        |> assign(:step, if(progress && progress.current_step && progress.current_step > 0, do: progress.current_step, else: 1))
-        |> assign(:max_steps, 4)
+        |> assign(:step, saved_step)
+        |> assign(:max_steps, 5)
+        |> assign(:requires_online_payment, false)
+        |> assign(:payment_gateway_url, nil)
 
       {:ok, socket}
     end
   end
 
+  # All handle_event functions grouped together
   def handle_event("validate_booking", %{"booking" => booking_params}, socket) do
     IO.puts("DEBUG: validate_booking called with params: #{inspect(booking_params)}")
     IO.puts("DEBUG: Current step before validation: #{socket.assigns.step}")
@@ -185,10 +217,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> assign(:payment_plan, payment_plan)
       |> assign(:notes, booking_params["notes"] || "")
       |> assign(:changeset, changeset)
-      |> assign(:step, socket.assigns.step) # Preserve the current step
-
-    # Save progress after validation
-    save_booking_progress(socket, socket.assigns.step)
 
     IO.puts("DEBUG: validate_booking completed. Final step: #{socket.assigns.step}")
 
@@ -228,7 +256,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-          def handle_event("update_number_of_persons", %{"action" => "increase"}, socket) do
+  def handle_event("update_number_of_persons", %{"action" => "increase"}, socket) do
     current_number = socket.assigns.number_of_persons
     new_number = min(current_number + 1, 10)
 
@@ -269,9 +297,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> assign(:travelers, travelers)
       |> assign(:total_amount, total_amount)
       |> assign(:deposit_amount, deposit_amount)
-
-    # Save progress after updating number of persons
-    save_booking_progress(socket, socket.assigns.step)
 
     {:noreply, socket}
   end
@@ -318,9 +343,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> assign(:total_amount, total_amount)
       |> assign(:deposit_amount, deposit_amount)
 
-    # Save progress after updating number of persons
-    save_booking_progress(socket, socket.assigns.step)
-
     {:noreply, socket}
   end
 
@@ -337,9 +359,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> assign(:payment_plan, payment_plan)
       |> assign(:deposit_amount, deposit_amount)
 
-    # Save progress after updating payment plan
-    save_booking_progress(socket, socket.assigns.step)
-
     {:noreply, socket}
   end
 
@@ -351,14 +370,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       _ -> socket.assigns.payment_method
     end
 
-    # Store the current step before any operations
-    current_step = socket.assigns.step
-
     # Update the payment method immediately for responsive UI
     socket = assign(socket, :payment_method, payment_method)
-
-    # Send immediate response to prevent timeout
-    send(self(), {:save_progress_async, current_step})
 
     # Add flash message to confirm the change
     socket = put_flash(socket, :info, "Payment method changed to #{String.replace(payment_method, "_", " ") |> String.capitalize()}")
@@ -369,17 +382,46 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   def handle_event("update_notes", %{"booking" => %{"notes" => notes}}, socket) do
     socket = assign(socket, :notes, notes)
 
-    # Save progress after updating notes
-    save_booking_progress(socket, socket.assigns.step)
-
     {:noreply, socket}
   end
 
-  def handle_info({:save_progress_async, step}, socket) do
-    case save_booking_progress(socket, step) do
-      :ok -> :ok
-      :error -> :error
-    end
+  def handle_event("save_progress_async", %{"value" => %{"step" => step_str}}, socket) do
+    # Handle the step value if needed
+    IO.puts("DEBUG: save_progress_async called with step: #{step_str}")
+    {:noreply, socket}
+  end
+
+  def handle_event("save_progress_async", _params, socket) do
+    # Fallback handler for any other save_progress_async calls
+    IO.puts("DEBUG: save_progress_async called with no step value")
+    {:noreply, socket}
+  end
+
+  def handle_event("refresh_progress", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("page_visible", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("cross_tab_sync", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("sync_progress", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("save_and_navigate", %{"url" => url}, socket) do
+    {:noreply, push_navigate(socket, to: url)}
+  end
+
+  def handle_event("page_refresh", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("page_loaded", _params, socket) do
     {:noreply, socket}
   end
 
@@ -388,9 +430,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       deposit_amount = Decimal.new(deposit_amount_str)
       socket = assign(socket, :deposit_amount, deposit_amount)
 
-      # Save progress after updating deposit amount
-      save_booking_progress(socket, socket.assigns.step)
-
       {:noreply, socket}
     rescue
       _ ->
@@ -398,7 +437,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-    def handle_event("update_traveler", %{"index" => index_str, "field" => field, "value" => value}, socket) do
+  def handle_event("update_traveler", %{"index" => index_str, "field" => field, "value" => value}, socket) do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
 
@@ -408,37 +447,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     socket = assign(socket, :travelers, updated_travelers)
 
-    # Don't auto-save on every keystroke to prevent interference
-    # Progress will be saved when user clicks Save Progress or navigates
-
     {:noreply, socket}
   end
 
   def handle_event("save_travelers_progress", _params, socket) do
-    # Save the current progress
-    case save_booking_progress(socket, socket.assigns.step) do
-      :ok ->
-        socket =
-          socket
-          |> put_flash(:info, "Travelers details saved successfully!")
-
-        {:noreply, socket}
-      _ ->
-        socket =
-          socket
-          |> put_flash(:error, "Failed to save progress. Please try again.")
-
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("validate_booking", _params, socket) do
-    # This is just a placeholder to prevent form submission
-    # The actual validation happens in real-time via individual field updates
     {:noreply, socket}
   end
 
-    def handle_event("go_to_next_step", _params, socket) do
+  def handle_event("go_to_next_step", _params, socket) do
     current_step = socket.assigns.step
     max_steps = socket.assigns.max_steps
 
@@ -449,19 +465,19 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     cond do
       current_step < 1 ->
         IO.puts("DEBUG: Step too low (#{current_step}), resetting to step 1")
-        {:noreply, assign(socket, :step, 1)}
+        socket = assign(socket, :step, 1)
+        {:noreply, socket}
       current_step > max_steps ->
         IO.puts("DEBUG: Step too high (#{current_step}), resetting to step #{max_steps}")
-        {:noreply, assign(socket, :step, max_steps)}
+        socket = assign(socket, :step, max_steps)
+        {:noreply, socket}
       current_step < max_steps ->
         new_step = current_step + 1
         IO.puts("DEBUG: Advancing from step #{current_step} to step #{new_step}")
 
         # Advance the step
         socket = assign(socket, :step, new_step)
-
-        # Save progress
-        _ = save_booking_progress(socket, new_step)
+        IO.puts("DEBUG: Step after assignment: #{socket.assigns.step}")
 
         {:noreply, socket}
       true ->
@@ -479,124 +495,260 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     if current_step > 1 do
       new_step = current_step - 1
-      _ = save_booking_progress(socket, new_step)
-      {:noreply, assign(socket, :step, new_step)}
+      socket = assign(socket, :step, new_step)
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
   end
 
-  def handle_event("create_booking", _params, socket) do
-    attrs = %{
-      total_amount: socket.assigns.total_amount,
-      deposit_amount: socket.assigns.deposit_amount,
-      number_of_persons: socket.assigns.number_of_persons,
-      payment_method: socket.assigns.payment_method,
-      payment_plan: socket.assigns.payment_plan,
-      notes: socket.assigns.notes,
-      user_id: socket.assigns.current_user.id,
-      package_schedule_id: socket.assigns.schedule.id,
-      status: "pending",
-      booking_date: Date.utc_today(),
-      travelers: socket.assigns.travelers
-    }
 
-    case Bookings.create_booking(attrs) do
-      {:ok, _booking} ->
-        complete_booking_flow_progress(socket)
 
+    def handle_event("create_booking", _params, socket) do
+    # Debug logging
+    IO.puts("DEBUG: create_booking called")
+    IO.puts("DEBUG: Current step before creating booking: #{socket.assigns.step}")
+
+    # Validate that all required traveler information is filled
+    travelers = socket.assigns.travelers
+
+    # Check if all travelers have required fields filled
+    all_travelers_complete = Enum.all?(travelers, fn traveler ->
+      traveler.full_name != "" and
+      traveler.identity_card_number != "" and
+      traveler.phone != ""
+    end)
+
+    # Check if payment method is selected
+    cond do
+      socket.assigns.payment_method == "" or is_nil(socket.assigns.payment_method) ->
+        IO.puts("DEBUG: Payment method not selected")
         socket =
           socket
-          |> put_flash(:info, "Booking created successfully! You will be redirected to payment.")
-          |> assign(:step, 5)
+          |> put_flash(:error, "Please select a payment method before proceeding.")
 
         {:noreply, socket}
 
-
-
-      {:error, %Ecto.Changeset{} = changeset} ->
+      !all_travelers_complete ->
+        IO.puts("DEBUG: Traveler information incomplete")
         socket =
           socket
-          |> put_flash(:error, "Failed to create booking. Please check the form for errors.")
-          |> assign(:changeset, changeset)
+          |> put_flash(:error, "Please complete all required traveler information before proceeding.")
 
         {:noreply, socket}
 
-      {:error, _changeset} ->
-        {:noreply, socket}
-    end
-  end
+      true ->
+        IO.puts("DEBUG: All validations passed, creating booking...")
+        attrs = %{
+          total_amount: socket.assigns.total_amount,
+          deposit_amount: socket.assigns.deposit_amount,
+          amount: socket.assigns.total_amount, # Set amount to match total_amount
+          number_of_persons: socket.assigns.number_of_persons,
+          payment_method: socket.assigns.payment_method,
+          payment_plan: socket.assigns.payment_plan,
+          notes: socket.assigns.notes,
+          user_id: socket.assigns.current_user.id,
+          package_schedule_id: socket.assigns.schedule.id,
+          status: "pending",
+          booking_date: Date.utc_today()
+        }
 
+        # Add more detailed debugging
+        IO.puts("DEBUG: About to create booking with attrs: #{inspect(attrs)}")
 
-    defp save_booking_progress(socket, step) do
-    # Ensure we don't save a step that's less than 1
-    step_to_save = if step < 1, do: 1, else: step
-
-    # Add timeout protection
-    try do
-      # Use Task.async to prevent blocking
-      task = Task.async(fn ->
         try do
-          case Bookings.get_or_create_booking_flow_progress(
-            socket.assigns.current_user.id,
-            socket.assigns.package.id,
-            socket.assigns.schedule.id
-          ) do
-            {:ok, progress} ->
-              attrs = %{
-                current_step: step_to_save,
-                number_of_persons: socket.assigns.number_of_persons,
-                is_booking_for_self: socket.assigns.is_booking_for_self,
-                payment_method: socket.assigns.payment_method,
-                payment_plan: socket.assigns.payment_plan,
-                notes: socket.assigns.notes,
-                travelers_data: socket.assigns.travelers,
-                total_amount: socket.assigns.total_amount,
-                deposit_amount: socket.assigns.deposit_amount
-              }
+          case Bookings.create_booking(attrs) do
+            {:ok, booking} ->
+              IO.puts("DEBUG: Booking created successfully with ID: #{booking.id}")
+              IO.puts("DEBUG: Socket assigns before step assignment: #{inspect(socket.assigns)}")
 
-              case Bookings.update_booking_flow_progress(progress, attrs) do
-                {:ok, _updated_progress} -> :ok
-                {:error, _changeset} -> :error
+              # Check if payment method requires immediate payment gateway redirect
+              payment_method = socket.assigns.payment_method
+              requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
+
+              socket = if requires_online_payment do
+                # For online payment methods, redirect to payment gateway
+                payment_url = generate_payment_gateway_url(booking, socket.assigns)
+
+                # Send redirect after a short delay to show the success message
+                Process.send_after(self(), {:redirect_to_payment, payment_url}, 2000)
+
+                socket
+                  |> put_flash(:info, "Booking created successfully! Redirecting to payment gateway...")
+                  |> assign(:step, 5)
+                  |> assign(:payment_gateway_url, payment_url)
+                  |> assign(:requires_online_payment, true)
+              else
+                # For offline payment methods, show success message
+                socket
+                  |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
+                  |> assign(:step, 5)
+                  |> assign(:requires_online_payment, false)
               end
-            {:error, _changeset} -> :error
-            _ -> :error
+
+              IO.puts("DEBUG: Step after assignment: #{socket.assigns.step}")
+              IO.puts("DEBUG: Socket assigns after step assignment: #{inspect(socket.assigns)}")
+
+              # Return the socket with step 5
+              {:noreply, socket}
+
+            {:error, %Ecto.Changeset{} = changeset} ->
+              IO.puts("DEBUG: Failed to create booking - changeset error: #{inspect(changeset.errors)}")
+              socket =
+                socket
+                |> put_flash(:error, "Failed to create booking. Please check the form for errors.")
+                |> assign(:changeset, changeset)
+
+              {:noreply, socket}
+
+            {:error, error} ->
+              IO.puts("DEBUG: Failed to create booking - unexpected error: #{inspect(error)}")
+              socket =
+                socket
+                |> put_flash(:error, "An unexpected error occurred while creating the booking: #{inspect(error)}")
+
+              {:noreply, socket}
           end
         rescue
-          _ -> :error
+          error ->
+            IO.puts("DEBUG: CRASH in create_booking: #{inspect(error)}")
+            IO.puts("DEBUG: Stack trace: #{Exception.format_stacktrace(__STACKTRACE__)}")
+
+            socket =
+              socket
+              |> put_flash(:error, "System error occurred: #{inspect(error)}")
+
+            {:noreply, socket}
         end
-      end)
-
-      # Wait for the task with a timeout
-      case Task.await(task, 5000) do
-        :ok -> :ok
-        :error -> :error
-        _ -> :error
-      end
-    rescue
-      _ -> :error
     end
   end
 
-  defp complete_booking_flow_progress(socket) do
-    case Bookings.get_or_create_booking_flow_progress(
-      socket.assigns.current_user.id,
-      socket.assigns.package.id,
-      socket.assigns.schedule.id
-    ) do
-      {:ok, progress} ->
-        Bookings.complete_booking_flow_progress(progress)
+  # Handle redirect to payment gateway
+  def handle_info({:redirect_to_payment, payment_url}, socket) do
+    {:noreply, push_navigate(socket, to: payment_url, external: true)}
+  end
+
+  # Handle async messages
+  def handle_info({:save_progress_async, _step}, socket) do
+    {:noreply, socket}
+  end
+
+  # Handle page refresh and ensure progress is maintained
+  def handle_info(:restore_progress, socket) do
+    {:noreply, socket}
+  end
+
+  # Generate payment gateway URL (placeholder - replace with actual payment gateway integration)
+  defp generate_payment_gateway_url(booking, assigns) do
+    # Get payment gateway configuration
+    config = Application.get_env(:umrahly, :payment_gateway)
+
+    # Determine which payment gateway to use based on payment method
+    payment_method = assigns.payment_method
+
+    case payment_method do
+      "credit_card" ->
+        # Use Stripe for credit card payments
+        generate_stripe_payment_url(booking, assigns, config[:stripe])
+
+      "online_banking" ->
+        # Use PayPal for online banking
+        generate_paypal_payment_url(booking, assigns, config[:paypal])
+
       _ ->
-        :error
+        # Fallback to generic payment gateway
+        generate_generic_payment_url(booking, assigns, config[:generic])
     end
   end
 
+  # Generate Stripe payment URL
+  defp generate_stripe_payment_url(booking, assigns, _stripe_config) do
+    # This is a placeholder - replace with actual Stripe integration
+    # In a real implementation, you would:
+    # 1. Create a Stripe Checkout Session
+    # 2. Return the session URL
 
+    base_url = "https://checkout.stripe.com"
+    _session_params = %{
+      amount: Decimal.to_integer(Decimal.mult(assigns.total_amount, Decimal.new(100))), # Convert to cents
+      currency: "myr",
+      client_reference_id: "booking_#{booking.id}",
+      success_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=success&booking_id=#{booking.id}",
+      cancel_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=cancelled&booking_id=#{booking.id}",
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        %{
+          price_data: %{
+            currency: "myr",
+            product_data: %{
+              name: assigns.package.name,
+              description: "Umrah Package - #{assigns.schedule.departure_date} to #{assigns.schedule.return_date}"
+            },
+            unit_amount: Decimal.to_integer(Decimal.mult(assigns.total_amount, Decimal.new(100)))
+          },
+          quantity: assigns.number_of_persons
+        }
+      ]
+    }
+
+    # For now, return a placeholder URL - replace with actual Stripe session creation
+    "#{base_url}/pay?session_id=stripe_session_#{booking.id}"
+  end
+
+  # Generate PayPal payment URL
+  defp generate_paypal_payment_url(booking, assigns, paypal_config) do
+    # This is a placeholder - replace with actual PayPal integration
+    base_url = if paypal_config[:mode] == "live", do: "https://www.paypal.com", else: "https://www.sandbox.paypal.com"
+
+    paypal_params = %{
+      cmd: "_xclick",
+      business: paypal_config[:client_id] || "merchant@example.com",
+      item_name: "#{assigns.package.name} - Umrah Package",
+      item_number: "booking_#{booking.id}",
+      amount: Decimal.to_string(assigns.total_amount),
+      currency_code: "MYR",
+      return: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=success&booking_id=#{booking.id}",
+      cancel_return: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=cancelled&booking_id=#{booking.id}",
+      no_shipping: "1",
+      no_note: "1"
+    }
+
+    query_string = URI.encode_query(paypal_params)
+    "#{base_url}/cgi-bin/webscr?#{query_string}"
+  end
+
+  # Generate generic payment gateway URL
+  defp generate_generic_payment_url(booking, assigns, generic_config) do
+    base_url = generic_config[:base_url]
+
+    params = %{
+      amount: Decimal.to_string(assigns.total_amount),
+      currency: "MYR",
+      booking_id: booking.id,
+      customer_name: assigns.current_user.full_name,
+      customer_email: assigns.current_user.email,
+      return_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=success&booking_id=#{booking.id}",
+      cancel_url: "#{UmrahlyWeb.Endpoint.url()}/dashboard?payment=cancelled&booking_id=#{booking.id}",
+      merchant_id: generic_config[:merchant_id],
+      api_key: generic_config[:api_key]
+    }
+
+    query_string = URI.encode_query(params)
+    "#{base_url}/pay?#{query_string}"
+  end
 
   def render(assigns) do
+    # Debug logging for render
+    IO.puts("DEBUG: Rendering with step: #{assigns.step}")
+
     ~H"""
     <.sidebar page_title={@page_title}>
-      <div class="max-w-4xl mx-auto space-y-6">
+      <div id="booking-flow-container" class="max-w-4xl mx-auto space-y-6"
+           phx-hook="BookingProgress"
+           data-step={@step}
+           data-package-id={@package.id}
+           data-schedule-id={@schedule.id}>
         <!-- Progress Steps -->
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between mb-6">
@@ -605,6 +757,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               Step <%= @step %> of <%= @max_steps %>
             </div>
           </div>
+
+          <!-- Progress Restoration Message -->
+          <!-- Removed progress restoration message since progress saving is disabled -->
 
           <!-- Progress Bar -->
           <div class="w-full bg-gray-200 rounded-full h-2 mb-6">
@@ -637,6 +792,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 4
               </div>
               <span class="text-xs text-gray-600 mt-1">Review & Confirm</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @step >= 5, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
+                5
+              </div>
+              <span class="text-xs text-gray-600 mt-1">Success</span>
             </div>
           </div>
         </div>
@@ -938,22 +1099,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 >
                   Back
                 </button>
-                <div class="flex space-x-3">
-                  <button
-                    type="button"
-                    phx-click="save_travelers_progress"
-                    class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
-                  >
-                    Save Progress
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="next_step"
-                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    Continue
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  phx-click="next_step"
+                  class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Continue
+                </button>
               </div>
             </div>
           </div>
@@ -1030,9 +1182,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   value={@payment_method}
                   phx-debounce="100"
                 >
+                  <option value="">Select payment method</option>
                   <option value="credit_card">Credit Card</option>
+                  <option value="online_banking">Online Banking (FPX)</option>
+                  <option value="e_wallet">E-Wallet (Boost, Touch 'n Go)</option>
                   <option value="bank_transfer">Bank Transfer</option>
-                  <option value="online_banking">Online Banking</option>
                   <option value="cash">Cash</option>
                 </select>
               </div>
@@ -1197,6 +1351,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     id="terms"
                     class="mt-1 mr-3"
                     required
+                    phx-hook="TermsValidation"
                   />
                   <label for="terms" class="text-sm text-gray-600">
                     I agree to the terms and conditions and understand that this booking is subject to confirmation by Umrahly.
@@ -1213,8 +1368,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   Back
                 </button>
                 <button
+                  type="button"
                   phx-click="create_booking"
-                  class="bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  class="bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium opacity-50 cursor-not-allowed"
+                  id="confirm-booking-btn"
+                  disabled
                 >
                   Confirm & Proceed to Payment
                 </button>
@@ -1225,33 +1383,99 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
         <!-- Step 5: Success -->
         <%= if @step == 5 do %>
-          <div class="bg-white rounded-lg shadow p-6 text-center">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-            </div>
+          <%= if @requires_online_payment do %>
+            <!-- Online Payment Success -->
+            <div class="bg-white rounded-lg shadow p-6 text-center">
+              <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+              </div>
 
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-            <p class="text-gray-600 mb-6">
-              Your booking has been created successfully. You will be redirected to the payment gateway to complete your payment.
-            </p>
+              <h2 class="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+              <p class="text-gray-600 mb-6">
+                Your booking has been created successfully. You will be redirected to the payment gateway to complete your payment.
+              </p>
 
-            <div class="space-y-3">
-              <a
-                href={~p"/packages"}
-                class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Browse More Packages
-              </a>
-              <a
-                href={~p"/dashboard"}
-                class="inline-block bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium ml-3"
-              >
-                Go to Dashboard
-              </a>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                      <strong>Redirecting...</strong> You will be automatically redirected to the payment gateway in a few seconds.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <button
+                  type="button"
+                  onclick={"window.open('#{@payment_gateway_url}', '_blank')"}
+                  class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Go to Payment Gateway Now
+                </button>
+                <a
+                  href={~p"/dashboard"}
+                  class="inline-block bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium ml-3"
+                >
+                  Go to Dashboard
+                </a>
+              </div>
             </div>
-          </div>
+          <% else %>
+            <!-- Offline Payment Success -->
+            <div class="bg-white rounded-lg shadow p-6 text-center">
+              <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+
+              <h2 class="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+              <p class="text-gray-600 mb-6">
+                Your booking has been created successfully. Please complete your payment using the selected payment method.
+              </p>
+
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                      <strong>Payment Method:</strong> <%= String.replace(@payment_method, "_", " ") |> String.capitalize() %>
+                    </p>
+                    <p class="text-sm text-yellow-700 mt-1">
+                      Please contact our team to arrange payment completion.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <a
+                  href={~p"/packages"}
+                  class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Browse More Packages
+                </a>
+                <a
+                  href={~p"/dashboard"}
+                  class="inline-block bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium ml-3"
+                >
+                  Go to Dashboard
+                </a>
+              </div>
+            </div>
+          <% end %>
         <% end %>
       </div>
     </.sidebar>

@@ -121,6 +121,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:payment_proof_file, nil)
         |> assign(:payment_proof_notes, "")
         |> assign(:show_payment_proof_form, false)
+        |> assign(:saved_package_progress, nil)
+        |> assign(:saved_travelers_progress, nil)
+        |> assign(:saved_payment_progress, nil)
         |> allow_upload(:payment_proof, accept: ~w(.pdf .jpg .jpeg .png .doc .docx), max_entries: 1, max_file_size: 5_000_000)
 
       {:ok, socket}
@@ -409,17 +412,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, cancel_upload(socket, :payment_proof, ref)}
   end
 
-  def handle_event("test_button", _params, socket) do
-    socket = put_flash(socket, :info, "Test button clicked successfully! Current step: #{socket.assigns.step}")
-    {:noreply, socket}
-  end
 
-  def handle_event("test_payment_proof_form", _params, socket) do
-    socket = put_flash(socket, :info, "Payment proof form test! Step: #{socket.assigns.step}, Booking ID: #{inspect(socket.assigns[:current_booking_id])}, Files: #{length(socket.assigns.uploads.payment_proof.entries)}")
-    {:noreply, socket}
-  end
 
-  def handle_event("save_progress_async", %{"value" => %{"step" => step_str}}, socket) do
+  def handle_event("save_progress_async", %{"value" => %{"step" => _step_str}}, socket) do
     {:noreply, socket}
   end
 
@@ -467,12 +462,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  def handle_event("update_traveler", %{"index" => index_str, "field" => field, "value" => value}, socket) do
+    def handle_event("update_traveler", %{"index" => index_str, "field" => field, "value" => value}, socket) do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
 
+    # Convert field to atom for consistency
+    field_atom = String.to_atom(field)
+
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      Map.put(traveler, String.to_atom(field), value)
+      # Store only with atom keys for consistency
+      Map.put(traveler, field_atom, value)
     end)
 
     socket = assign(socket, :travelers, updated_travelers)
@@ -480,8 +479,49 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("save_travelers_progress", _params, socket) do
+      # Handle form submission for travelers step
+  def handle_event("validate_travelers", %{"booking" => booking_params}, socket) do
+    # Extract travelers data from the form
+    travelers_params = booking_params["travelers"] || []
+
+    # Update travelers with form data
+    updated_travelers = Enum.map(travelers_params, fn traveler ->
+      %{
+        full_name: traveler["full_name"] || "",
+        identity_card_number: traveler["identity_card_number"] || "",
+        passport_number: traveler["passport_number"] || "",
+        phone: traveler["phone"] || ""
+      }
+    end)
+
+    # Validate that all required traveler information is filled
+    all_travelers_complete = Enum.all?(updated_travelers, fn traveler ->
+      traveler[:full_name] != "" and
+      traveler[:identity_card_number] != "" and
+      traveler[:phone] != ""
+    end)
+
+    # Update the socket with new travelers data
+    socket = assign(socket, :travelers, updated_travelers)
+
+    # If validation passes, show success message
+    if all_travelers_complete do
+      socket = put_flash(socket, :info, "Traveler information validated successfully!")
+    else
+      socket = put_flash(socket, :error, "Please complete all required traveler information before proceeding.")
+    end
+
     {:noreply, socket}
+  end
+
+  # Fallback handler for validate_travelers
+  def handle_event("validate_travelers", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("save_travelers_progress", %{"booking" => %{"travelers" => travelers}}, socket) do
+    # This function is deprecated - use the new TravelerDetailsLive instead
+    {:noreply, put_flash(socket, :info, "Please use the dedicated traveler details page to manage traveler information.")}
   end
 
   def handle_event("go_to_next_step", _params, socket) do
@@ -500,6 +540,23 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         current_step > max_steps ->
           socket = assign(socket, :step, max_steps)
           {:noreply, socket}
+        current_step == 2 ->
+          # Validate travelers before allowing progression to step 3
+          travelers = socket.assigns.travelers
+          all_travelers_complete = Enum.all?(travelers, fn traveler ->
+            traveler[:full_name] != "" and
+            traveler[:identity_card_number] != "" and
+            traveler[:phone] != ""
+          end)
+
+          if all_travelers_complete do
+            new_step = current_step + 1
+            socket = assign(socket, :step, new_step)
+            {:noreply, socket}
+          else
+            socket = put_flash(socket, :error, "Please complete all required traveler information before proceeding.")
+            {:noreply, socket}
+          end
         current_step < max_steps ->
           new_step = current_step + 1
 
@@ -518,7 +575,24 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     if socket.assigns.step == 5 do
       {:noreply, socket}
     else
-      handle_event("go_to_next_step", params, socket)
+      # If we're at step 2, validate travelers before allowing progression
+      if socket.assigns.step == 2 do
+        travelers = socket.assigns.travelers
+        all_travelers_complete = Enum.all?(travelers, fn traveler ->
+          traveler[:full_name] != "" and
+          traveler[:identity_card_number] != "" and
+          traveler[:phone] != ""
+        end)
+
+        if all_travelers_complete do
+          handle_event("go_to_next_step", params, socket)
+        else
+          socket = put_flash(socket, :error, "Please complete all required traveler information before proceeding.")
+          {:noreply, socket}
+        end
+      else
+        handle_event("go_to_next_step", params, socket)
+      end
     end
   end
 
@@ -543,11 +617,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Validate that all required traveler information is filled
     travelers = socket.assigns.travelers
 
-    # Check if all travelers have required fields filled
+        # Check if all travelers have required fields filled
     all_travelers_complete = Enum.all?(travelers, fn traveler ->
-      traveler.full_name != "" and
-      traveler.identity_card_number != "" and
-      traveler.phone != ""
+      traveler[:full_name] != "" and
+      traveler[:identity_card_number] != "" and
+      traveler[:phone] != ""
     end)
 
     # Check if payment method is selected
@@ -642,10 +716,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Handle page refresh and ensure progress is maintained
-  def handle_info(:restore_progress, socket) do
-    {:noreply, socket}
-  end
+
 
   # Helper function to handle payment proof submission
   defp handle_payment_proof_submission(notes, socket) do
@@ -971,6 +1042,24 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Package Details</h2>
 
+            <!-- Progress Status for Step 1 -->
+            <%= if @saved_package_progress || @saved_travelers_progress || @saved_payment_progress do %>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                      <strong>Progress Available!</strong> You have saved progress in later steps. You can continue to review and complete your booking.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <!-- Package Information -->
               <div class="space-y-4">
@@ -1033,8 +1122,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               </div>
             </div>
 
-
-
             <div class="mt-6 flex justify-between">
               <a
                 href={~p"/packages/#{@package.id}"}
@@ -1057,8 +1144,25 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         <%= if @step == 2 do %>
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Travelers</h2>
-
             <div class="space-y-6">
+              <!-- Progress Status -->
+              <%= if @saved_travelers_progress do %>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
+                    <div class="ml-3">
+                      <p class="text-sm text-green-700">
+                        <strong>Progress Saved!</strong> Your travelers information has been saved. You can continue or go back to make changes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+
               <!-- Number of Persons -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1089,16 +1193,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     </button>
                   </div>
                 </div>
-
-                <!-- Debug info -->
-                <div class="text-xs text-gray-500 mt-1">
-                  Current: <%= @number_of_persons %> travelers, Step: <%= @step %>
-                </div>
               </div>
 
-                            <!-- Travelers Details -->
-              <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="font-medium text-gray-900 mb-3">Travelers Details</h3>
+              <!-- Travelers Details -->
+              <form id="travelers-form" phx-change="validate_travelers">
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <h3 class="font-medium text-gray-900 mb-3">Travelers Details</h3>
 
                 <!-- Toggle for single traveler -->
                 <%= if @number_of_persons == 1 do %>
@@ -1166,10 +1266,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <input
                             type="text"
                             name={"booking[travelers][#{index}][full_name]"}
-                            value={traveler.full_name}
-                            phx-change="update_traveler"
-                            phx-value-index={index}
-                            phx-value-field="full_name"
+                            value={traveler[:full_name] || ""}
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter full name"
                             required
@@ -1182,10 +1279,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <input
                             type="text"
                             name={"booking[travelers][#{index}][identity_card_number]"}
-                            value={traveler.identity_card_number}
-                            phx-change="update_traveler"
-                            phx-value-index={index}
-                            phx-value-field="identity_card_number"
+                            value={traveler[:identity_card_number] || ""}
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter identity card number"
                             required
@@ -1198,10 +1292,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <input
                             type="text"
                             name={"booking[travelers][#{index}][passport_number]"}
-                            value={traveler.passport_number}
-                            phx-change="update_traveler"
-                            phx-value-index={index}
-                            phx-value-field="passport_number"
+                            value={traveler[:passport_number] || ""}
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter passport number (optional)"
                           />
@@ -1213,10 +1304,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <input
                             type="text"
                             name={"booking[travelers][#{index}][phone]"}
-                            value={traveler.phone}
-                            phx-change="update_traveler"
-                            phx-value-index={index}
-                            phx-value-field="phone"
+                            value={traveler[:phone] || ""}
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter phone number"
                             required
@@ -1226,7 +1314,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     </div>
                   <% end %>
                 </div>
-              </div>
+                </div>
+              </form>
 
               <!-- Summary -->
               <div class="bg-gray-50 rounded-lg p-4">
@@ -1250,30 +1339,31 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <% end %>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Details filled:</span>
-                    <span class={if Enum.all?(@travelers, fn t -> t.full_name != "" and t.identity_card_number != "" and t.phone != "" end), do: "text-green-600 font-medium", else: "text-red-600 font-medium"}>
-                      <%= if Enum.all?(@travelers, fn t -> t.full_name != "" and t.identity_card_number != "" and t.phone != "" end), do: "Complete", else: "Incomplete" %>
+                    <span class={if Enum.all?(@travelers, fn t -> t[:full_name] != "" and t[:identity_card_number] != "" and t[:phone] != "" end), do: "text-green-600 font-medium", else: "text-red-600 font-medium"}>
+                      <%= if Enum.all?(@travelers, fn t -> t[:full_name] != "" and t[:identity_card_number] != "" and t[:phone] != "" end), do: "Complete", else: "Incomplete" %>
                     </span>
                   </div>
                 </div>
-
-
               </div>
 
               <div class="flex justify-between">
-               <button
+                <button
                   type="button"
                   phx-click="prev_step"
                   class="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium"
                 >
                   Back
                 </button>
-                <button
-                  type="button"
-                  phx-click="next_step"
-                  class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Continue
-                </button>
+                <div class="flex space-x-3">
+
+                  <button
+                    type="button"
+                    phx-click="go_to_next_step"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1284,7 +1374,25 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Payment Details</h2>
 
-            <form phx-submit="validate_booking" phx-submit-ignore class="space-y-6" onsubmit="return false;" novalidate>
+            <form phx-submit="validate_booking" class="space-y-6" novalidate>
+              <!-- Progress Status -->
+              <%= if @saved_payment_progress do %>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
+                    <div class="ml-3">
+                      <p class="text-sm text-green-700">
+                        <strong>Progress Saved!</strong> Your payment information has been saved. You can continue or go back to make changes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+
               <!-- Payment Plan -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1400,13 +1508,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 <button
                   type="button"
                   phx-click="prev_step"
-                  class="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                  class="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors font-medium"
                 >
                   Back
                 </button>
                 <button
                   type="button"
-                  phx-click="next_step"
+                  phx-click="go_to_next_step"
                   class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   Continue
@@ -1423,6 +1531,23 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
             <div class="space-y-6">
 
+              <!-- Progress Status for Step 4 -->
+              <%= if @saved_package_progress || @saved_travelers_progress || @saved_payment_progress do %>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
+                    <div class="ml-3">
+                      <p class="text-sm text-green-700">
+                        <strong>Progress Saved!</strong> Your booking information has been saved. You can now review and confirm your booking.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
 
               <!-- Package Summary -->
               <div class="border rounded-lg p-4">
@@ -1462,19 +1587,19 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>
                           <span class="text-gray-600">Full Name:</span>
-                          <span class="font-medium ml-2"><%= traveler.full_name %></span>
+                          <span class="font-medium ml-2"><%= traveler[:full_name] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Identity Card:</span>
-                          <span class="font-medium ml-2"><%= traveler.identity_card_number %></span>
+                          <span class="font-medium ml-2"><%= traveler[:identity_card_number] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Passport Number:</span>
-                          <span class="font-medium ml-2"><%= traveler.passport_number %></span>
+                          <span class="font-medium ml-2"><%= traveler[:passport_number] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Phone:</span>
-                          <span class="font-medium ml-2"><%= traveler.phone %></span>
+                          <span class="font-medium ml-2"><%= traveler[:phone] || "" %></span>
                         </div>
                       </div>
                     </div>
@@ -1589,19 +1714,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </div>
                 </div>
               </div>
-
-              <!-- Debug Information (remove in production) -->
-              <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-left">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Debug Information</h4>
-                <div class="text-xs text-gray-600 space-y-1">
-                  <div><strong>Payment Method:</strong> <%= @payment_method %></div>
-                  <div><strong>Payment Gateway URL:</strong> <span class="break-all"><%= @payment_gateway_url %></span></div>
-                  <div><strong>Requires Online Payment:</strong> <%= @requires_online_payment %></div>
-                  <div><strong>Booking ID:</strong> <%= @current_booking_id %></div>
-                </div>
-              </div>
-
-              <div class="space-y-3">
+                <div class="space-y-3">
                 <button
                   type="button"
                   onclick={"window.open('#{@payment_gateway_url}', '_blank')"}
@@ -1675,7 +1788,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </p>
 
                   <%= if @show_payment_proof_form do %>
-                    <form phx-submit="submit_payment_proof" method="post" class="space-y-4 text-left" enctype="multipart/form-data" id="payment-proof-form" phx-hook="FormDebug">
+                    <form phx-submit="submit_payment_proof" method="post" class="space-y-4 text-left" enctype="multipart/form-data" id="payment-proof-form">
                       <div>
                         <label class="block text-sm font-medium text-blue-900 mb-2">
                           Payment Proof File <span class="text-red-500">*</span>
@@ -1714,15 +1827,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           class="w-full border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         ><%= @payment_proof_notes %></textarea>
                       </div>
-
-                      <button
-                        type="button"
-                        phx-click="test_payment_proof_form"
-                        class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium mb-2"
-                      >
-                        Test Form (Debug)
-                      </button>
-
                       <button
                         type="submit"
                         class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -1791,5 +1895,4 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     </.sidebar>
     """
   end
-
 end

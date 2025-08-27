@@ -70,6 +70,7 @@ defmodule UmrahlyWeb.Router do
     live "/packages", UserPackagesLive, :index
     live "/packages/:id", UserPackageDetailsLive, :show
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new
+    live "/traveler-details/:booking_id", TravelerDetailsLive, :edit
     live "/payments", UserPaymentsLive, :index
     live "/payments/:tab", UserPaymentsLive, :index
     get "/receipts/:id/download", PageController, :download_receipt

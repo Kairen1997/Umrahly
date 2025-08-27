@@ -19,6 +19,7 @@ defmodule Umrahly.Bookings.Booking do
 
     belongs_to :user, Umrahly.Accounts.User
     belongs_to :package_schedule, Umrahly.Packages.PackageSchedule
+    has_many :traveler_details, Umrahly.Bookings.TravelerDetail
 
     timestamps(type: :utc_datetime)
   end

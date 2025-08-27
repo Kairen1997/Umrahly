@@ -4,7 +4,7 @@ defmodule Umrahly.Bookings.BookingFlowProgress do
 
   schema "booking_flow_progress" do
     field :current_step, :integer, default: 1
-    field :max_steps, :integer, default: 4
+    field :max_steps, :integer, default: 5
     field :number_of_persons, :integer, default: 1
     field :is_booking_for_self, :boolean, default: true
     field :payment_method, :string, default: "bank_transfer"

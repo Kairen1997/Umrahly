@@ -136,10 +136,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Handle travelers data and sync with number of persons
     travelers = case booking_params["travelers"] do
       nil ->
-        # Initialize travelers based on number of persons
-        Enum.map(1..number_of_persons, fn _ ->
-          %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
-        end)
+        # If no travelers data in form, use existing travelers from socket
+        socket.assigns.travelers
       travelers_params ->
         # If number of persons increased, add new travelers
         current_count = length(travelers_params)
@@ -220,6 +218,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     {:noreply, socket}
   end
+
 
   def handle_event("toggle_booking_for_self", _params, socket) do
     current_is_booking_for_self = socket.assigns.is_booking_for_self
@@ -383,21 +382,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("submit_payment_proof", %{"payment_proof_notes" => notes} = params, socket) do
-    # Add debugging information
-    IO.puts("DEBUG: submit_payment_proof called with notes: #{inspect(notes)}")
-    IO.puts("DEBUG: Full params: #{inspect(params)}")
-    IO.puts("DEBUG: Current step: #{socket.assigns.step}")
-    IO.puts("DEBUG: Current booking ID: #{inspect(socket.assigns[:current_booking_id])}")
-    IO.puts("DEBUG: Upload entries count: #{length(socket.assigns.uploads.payment_proof.entries)}")
-
+  def handle_event("submit_payment_proof", %{"payment_proof_notes" => notes} = _params, socket) do
     handle_payment_proof_submission(notes, socket)
   end
 
   # Fallback handler for submit_payment_proof
   def handle_event("submit_payment_proof", params, socket) do
-    IO.puts("DEBUG: Fallback submit_payment_proof called with params: #{inspect(params)}")
-
     # Check if we have a file but no notes
     if Map.has_key?(params, "payment_proof_notes") do
       # Handle the case where notes might be empty string
@@ -420,33 +410,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   end
 
   def handle_event("test_button", _params, socket) do
-    IO.puts("DEBUG: Test button clicked!")
-    IO.puts("DEBUG: Current step: #{socket.assigns.step}")
-    IO.puts("DEBUG: Socket assigns keys: #{Map.keys(socket.assigns)}")
     socket = put_flash(socket, :info, "Test button clicked successfully! Current step: #{socket.assigns.step}")
     {:noreply, socket}
   end
 
   def handle_event("test_payment_proof_form", _params, socket) do
-    IO.puts("DEBUG: Test payment proof form button clicked!")
-    IO.puts("DEBUG: Current step: #{socket.assigns.step}")
-    IO.puts("DEBUG: Current booking ID: #{inspect(socket.assigns[:current_booking_id])}")
-    IO.puts("DEBUG: Upload entries count: #{length(socket.assigns.uploads.payment_proof.entries)}")
-    IO.puts("DEBUG: Show payment proof form: #{socket.assigns.show_payment_proof_form}")
-
     socket = put_flash(socket, :info, "Payment proof form test! Step: #{socket.assigns.step}, Booking ID: #{inspect(socket.assigns[:current_booking_id])}, Files: #{length(socket.assigns.uploads.payment_proof.entries)}")
     {:noreply, socket}
   end
 
   def handle_event("save_progress_async", %{"value" => %{"step" => step_str}}, socket) do
-    # Handle the step value if needed
-    IO.puts("DEBUG: save_progress_async called with step: #{step_str}")
     {:noreply, socket}
   end
 
   def handle_event("save_progress_async", _params, socket) do
-    # Fallback handler for any other save_progress_async calls
-    IO.puts("DEBUG: save_progress_async called with no step value")
     {:noreply, socket}
   end
 
@@ -672,11 +649,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
   # Helper function to handle payment proof submission
   defp handle_payment_proof_submission(notes, socket) do
-    # Temporarily disable step validation for debugging
-    # if socket.assigns.step != 5 do
-    #   socket = put_flash(socket, :error, "Payment proof can only be submitted after booking confirmation.")
-    #   {:noreply, socket}
-    # else
+
       # Check if we have a current booking ID
       case socket.assigns[:current_booking_id] do
         nil ->
@@ -771,7 +744,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               {:noreply, socket}
           end
       end
-    # end
   end
 
   # Generate payment gateway URL (placeholder - replace with actual payment gateway integration)
@@ -1061,6 +1033,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               </div>
             </div>
 
+
+
             <div class="mt-6 flex justify-between">
               <a
                 href={~p"/packages/#{@package.id}"}
@@ -1182,7 +1156,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <%= for {traveler, index} <- Enum.with_index(@travelers) do %>
                     <div class="border border-gray-200 rounded-lg p-4">
                       <h4 class="font-medium text-gray-800 mb-3">
-                        <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: "Traveler #{index + 1}")) %>
+                        <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: if(index == 0, do: "Traveler #{index + 1} (Person In Charge)", else: "Traveler #{index + 1}"))) %>
                       </h4>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -1281,6 +1255,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     </span>
                   </div>
                 </div>
+
+
               </div>
 
               <div class="flex justify-between">
@@ -1446,6 +1422,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Review & Confirm Booking</h2>
 
             <div class="space-y-6">
+
+
               <!-- Package Summary -->
               <div class="border rounded-lg p-4">
                 <h3 class="font-medium text-gray-900 mb-3">Package Details</h3>
@@ -1479,7 +1457,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <%= for {traveler, index} <- Enum.with_index(@travelers) do %>
                     <div class="bg-gray-50 rounded-lg p-3">
                       <h4 class="font-medium text-gray-800 mb-2">
-                        <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: "Traveler #{index + 1}")) %>
+                        <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: if(index == 0, do: "Traveler #{index + 1} (Person In Charge)", else: "Traveler #{index + 1}"))) %>
                       </h4>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>

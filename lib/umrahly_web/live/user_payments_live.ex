@@ -6,7 +6,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   alias Decimal
   alias Calendar
   alias Float
-  alias Umrahly.Accounts
+  #alias Umrahly.Accounts
 
   on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
@@ -217,7 +217,6 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   defp ensure_decimal(value) when is_binary(value) do
     case Decimal.parse(value) do
       {:ok, decimal} -> decimal
-      :error -> Decimal.new(0)
       _ -> Decimal.new(0)
     end
   end

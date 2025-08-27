@@ -64,6 +64,29 @@ const FormValidationHook = {
   }
 };
 
+// Custom hook for debugging form submissions
+const FormDebug = {
+  mounted() {
+    console.log("FormDebug hook mounted for form:", this.el);
+    
+    this.el.addEventListener("submit", (e) => {
+      console.log("Form submission triggered!");
+      console.log("Form action:", this.el.action);
+      console.log("Form method:", this.el.method);
+      console.log("Form enctype:", this.el.enctype);
+      
+      const formData = new FormData(this.el);
+      console.log("Form data entries:");
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+      
+      // Don't prevent default - let Phoenix handle it
+      console.log("Allowing form submission to continue...");
+    });
+  }
+};
+
 // Custom hook for debugging button clicks
 const DebugClick = {
   mounted() {
@@ -98,6 +121,49 @@ const PaymentGatewayRedirect = {
         // Also redirect the current page to dashboard
         window.location.href = '/dashboard';
       }, 1500);
+    }
+  }
+};
+
+// Custom hook for receipt downloads
+const DownloadReceipt = {
+  mounted() {
+    console.log("DownloadReceipt hook mounted");
+    
+    this.el.addEventListener("click", (e) => {
+      e.preventDefault();
+      
+      const receiptId = this.el.dataset.receiptId;
+      console.log("Download receipt clicked for ID:", receiptId);
+      
+      // Push event to LiveView to get receipt data
+      this.pushEvent("download-receipt", { receipt_id: receiptId });
+    });
+    
+    // Listen for the response from the server
+    this.handleEvent("receipt_download_ready", (data) => {
+      console.log("Receipt download ready:", data);
+      this.downloadFile(data.file_path, data.filename);
+    });
+  },
+  
+  downloadFile(filePath, filename) {
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = filePath;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log("File download initiated:", filename);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      alert("Failed to download receipt. Please try again.");
     }
   }
 };
@@ -536,6 +602,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
   hooks: {
     FileUploadHook,
     // FormValidationHook, // Temporarily disabled to fix form issues
+    FormDebug,
     AutoDismissFlash,
     PackageDetails,
     ScheduleDetails,
@@ -544,7 +611,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     DebugClick,
     BookingProgress,
     TermsValidation,
-    PaymentGatewayRedirect
+    PaymentGatewayRedirect,
+    DownloadReceipt
   }
 })
 

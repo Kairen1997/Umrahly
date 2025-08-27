@@ -1,0 +1,22 @@
+RECEIPT
+========
+
+Receipt ID: 2
+Date: 2024-01-10
+Amount: RM 750.00
+Status: Completed
+Method: Bank Transfer
+Transaction ID: TXN_002_20240110
+Booking Reference: BK002
+Package: Umrah Package - Economy Plan
+
+Bank Details:
+- Bank: Maybank
+- Account: ****5678
+
+Fees: RM 5.00
+Net Amount: RM 745.00
+
+Description: Payment for Umrah Package - Economy Plan
+
+Thank you for your payment! 

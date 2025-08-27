@@ -383,119 +383,30 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
+  def handle_event("submit_payment_proof", %{"payment_proof_notes" => notes} = params, socket) do
+    # Add debugging information
+    IO.puts("DEBUG: submit_payment_proof called with notes: #{inspect(notes)}")
+    IO.puts("DEBUG: Full params: #{inspect(params)}")
+    IO.puts("DEBUG: Current step: #{socket.assigns.step}")
+    IO.puts("DEBUG: Current booking ID: #{inspect(socket.assigns[:current_booking_id])}")
+    IO.puts("DEBUG: Upload entries count: #{length(socket.assigns.uploads.payment_proof.entries)}")
 
-
-
-
-
-
-  def handle_event("submit_payment_proof", %{"payment_proof_notes" => notes}, socket) do
-    # Check if we're at the correct step
-    if socket.assigns.step != 5 do
-      socket = put_flash(socket, :error, "Payment proof can only be submitted after booking confirmation.")
-      {:noreply, socket}
-    else
-      # Check if we have a current booking ID
-      case socket.assigns[:current_booking_id] do
-        nil ->
-          socket = put_flash(socket, :error, "No booking found. Please create a booking first.")
-          {:noreply, socket}
-
-        booking_id ->
-          # Get the booking from the database
-          try do
-            booking = Bookings.get_booking!(booking_id)
-
-            # Check if payment proof has already been submitted
-            if booking.payment_proof_status == "submitted" do
-              socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
-              {:noreply, socket}
-            else
-              # Check if there are uploaded files
-              if Enum.empty?(socket.assigns.uploads.payment_proof.entries) do
-                socket = put_flash(socket, :error, "Please select a file to upload.")
-                {:noreply, socket}
-              else
-                # Consume the uploaded files
-                uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
-                  # Create a unique filename to avoid conflicts
-                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
-                  extension = Path.extname(entry.client_name)
-                  filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
-
-                  # Ensure upload directory exists and save the file
-                  upload_path = ensure_upload_directory()
-                  file_path = Path.join(upload_path, filename)
-
-                  # Copy the uploaded file to the destination
-                  case File.cp(entry.path, file_path) do
-                    :ok ->
-                      {:ok, filename}
-                    {:error, reason} ->
-                      {:error, "Failed to save file: #{inspect(reason)}"}
-                  end
-                end)
-
-                # Filter out any failed uploads
-                successful_uploads = Enum.filter(uploaded_files, fn
-                  {:ok, _filename} -> true
-                  {:error, _reason} -> false
-                end)
-
-                if Enum.empty?(successful_uploads) do
-                  socket = put_flash(socket, :error, "Failed to process uploaded file.")
-                  {:noreply, socket}
-                else
-                  # Get the first successful upload
-                  {:ok, filename} = List.first(successful_uploads)
-
-                  # Prepare payment proof attributes
-                  attrs = %{
-                    "payment_proof_file" => filename,
-                    "payment_proof_notes" => notes || ""
-                  }
-
-                  case Bookings.submit_payment_proof(booking, attrs) do
-                    {:ok, _updated_booking} ->
-                      socket =
-                        socket
-                        |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
-                        |> assign(:show_payment_proof_form, false)
-                        |> assign(:payment_proof_notes, notes || "")
-                        |> assign(:payment_proof_file, filename)
-
-                      {:noreply, socket}
-
-                    {:error, %Ecto.Changeset{} = _changeset} ->
-                      socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
-                      {:noreply, socket}
-
-                    {:error, _error} ->
-                      socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
-                      {:noreply, socket}
-                  end
-                end
-              end
-            end
-          rescue
-            Ecto.QueryError ->
-              socket = put_flash(socket, :error, "Invalid booking ID.")
-              {:noreply, socket}
-            Ecto.NoResultsError ->
-              socket = put_flash(socket, :error, "Booking not found.")
-              {:noreply, socket}
-            _error ->
-              socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
-              {:noreply, socket}
-          end
-      end
-    end
+    handle_payment_proof_submission(notes, socket)
   end
 
   # Fallback handler for submit_payment_proof
-  def handle_event("submit_payment_proof", _params, socket) do
-    socket = put_flash(socket, :error, "Invalid form submission. Please try again.")
-    {:noreply, socket}
+  def handle_event("submit_payment_proof", params, socket) do
+    IO.puts("DEBUG: Fallback submit_payment_proof called with params: #{inspect(params)}")
+
+    # Check if we have a file but no notes
+    if Map.has_key?(params, "payment_proof_notes") do
+      # Handle the case where notes might be empty string
+      notes = params["payment_proof_notes"] || ""
+      handle_payment_proof_submission(notes, socket)
+    else
+      socket = put_flash(socket, :error, "Invalid form submission. Please try again.")
+      {:noreply, socket}
+    end
   end
 
   def handle_event("toggle_payment_proof_form", _params, socket) do
@@ -513,6 +424,17 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     IO.puts("DEBUG: Current step: #{socket.assigns.step}")
     IO.puts("DEBUG: Socket assigns keys: #{Map.keys(socket.assigns)}")
     socket = put_flash(socket, :info, "Test button clicked successfully! Current step: #{socket.assigns.step}")
+    {:noreply, socket}
+  end
+
+  def handle_event("test_payment_proof_form", _params, socket) do
+    IO.puts("DEBUG: Test payment proof form button clicked!")
+    IO.puts("DEBUG: Current step: #{socket.assigns.step}")
+    IO.puts("DEBUG: Current booking ID: #{inspect(socket.assigns[:current_booking_id])}")
+    IO.puts("DEBUG: Upload entries count: #{length(socket.assigns.uploads.payment_proof.entries)}")
+    IO.puts("DEBUG: Show payment proof form: #{socket.assigns.show_payment_proof_form}")
+
+    socket = put_flash(socket, :info, "Payment proof form test! Step: #{socket.assigns.step}, Booking ID: #{inspect(socket.assigns[:current_booking_id])}, Files: #{length(socket.assigns.uploads.payment_proof.entries)}")
     {:noreply, socket}
   end
 
@@ -640,9 +562,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-
-
-    def handle_event("create_booking", _params, socket) do
+  def handle_event("create_booking", _params, socket) do
     # Validate that all required traveler information is filled
     travelers = socket.assigns.travelers
 
@@ -740,11 +660,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  # Handle redirect to payment gateway (no longer needed with immediate redirect)
-  # def handle_info({:redirect_to_payment, payment_url}, socket) do
-  #   {:noreply, push_navigate(socket, to: payment_url, external: true)}
-  # end
-
   # Handle async messages
   def handle_info({:save_progress_async, _step}, socket) do
     {:noreply, socket}
@@ -753,6 +668,110 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   # Handle page refresh and ensure progress is maintained
   def handle_info(:restore_progress, socket) do
     {:noreply, socket}
+  end
+
+  # Helper function to handle payment proof submission
+  defp handle_payment_proof_submission(notes, socket) do
+    # Temporarily disable step validation for debugging
+    # if socket.assigns.step != 5 do
+    #   socket = put_flash(socket, :error, "Payment proof can only be submitted after booking confirmation.")
+    #   {:noreply, socket}
+    # else
+      # Check if we have a current booking ID
+      case socket.assigns[:current_booking_id] do
+        nil ->
+          socket = put_flash(socket, :error, "No booking found. Please create a booking first.")
+          {:noreply, socket}
+
+        booking_id ->
+          # Get the booking from the database
+          try do
+            booking = Bookings.get_booking!(booking_id)
+
+            # Check if payment proof has already been submitted
+            if booking.payment_proof_status == "submitted" do
+              socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
+              {:noreply, socket}
+            else
+              # Check if there are uploaded files
+              if Enum.empty?(socket.assigns.uploads.payment_proof.entries) do
+                socket = put_flash(socket, :error, "Please select a file to upload.")
+                {:noreply, socket}
+              else
+                # Consume the uploaded files
+                uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
+                  # Create a unique filename to avoid conflicts
+                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
+                  extension = Path.extname(entry.client_name)
+                  filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
+
+                  # Ensure upload directory exists and save the file
+                  upload_path = ensure_upload_directory()
+                  file_path = Path.join(upload_path, filename)
+
+                  # Copy the uploaded file to the destination
+                  case File.cp(entry.path, file_path) do
+                    :ok ->
+                      {:ok, filename}
+                    {:error, reason} ->
+                      {:error, "Failed to save file: #{inspect(reason)}"}
+                  end
+                end)
+
+                # Filter out any failed uploads
+                successful_uploads = Enum.filter(uploaded_files, fn
+                  {:ok, _filename} -> true
+                  {:error, _reason} -> false
+                end)
+
+                if Enum.empty?(successful_uploads) do
+                  socket = put_flash(socket, :error, "Failed to process uploaded file.")
+                  {:noreply, socket}
+                else
+                  # Get the first successful upload
+                  {:ok, filename} = List.first(successful_uploads)
+
+                  # Prepare payment proof attributes
+                  attrs = %{
+                    "payment_proof_file" => filename,
+                    "payment_proof_notes" => notes || ""
+                  }
+
+                  case Bookings.submit_payment_proof(booking, attrs) do
+                    {:ok, _updated_booking} ->
+                      socket =
+                        socket
+                        |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
+                        |> assign(:show_payment_proof_form, false)
+                        |> assign(:payment_proof_notes, notes || "")
+                        |> assign(:payment_proof_file, filename)
+
+                      {:noreply, socket}
+
+                    {:error, %Ecto.Changeset{} = _changeset} ->
+                      socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
+                      {:noreply, socket}
+
+                    {:error, _error} ->
+                      socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
+                      {:noreply, socket}
+                  end
+                end
+              end
+            end
+          rescue
+            Ecto.QueryError ->
+              socket = put_flash(socket, :error, "Invalid booking ID.")
+              {:noreply, socket}
+            Ecto.NoResultsError ->
+              socket = put_flash(socket, :error, "Booking not found.")
+              {:noreply, socket}
+            _error ->
+              socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
+              {:noreply, socket}
+          end
+      end
+    # end
   end
 
   # Generate payment gateway URL (placeholder - replace with actual payment gateway integration)
@@ -1678,7 +1697,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </p>
 
                   <%= if @show_payment_proof_form do %>
-                    <form phx-submit="submit_payment_proof" phx-submit-ignore class="space-y-4 text-left">
+                    <form phx-submit="submit_payment_proof" method="post" class="space-y-4 text-left" enctype="multipart/form-data" id="payment-proof-form" phx-hook="FormDebug">
                       <div>
                         <label class="block text-sm font-medium text-blue-900 mb-2">
                           Payment Proof File <span class="text-red-500">*</span>
@@ -1719,13 +1738,19 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       </div>
 
                       <button
+                        type="button"
+                        phx-click="test_payment_proof_form"
+                        class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium mb-2"
+                      >
+                        Test Form (Debug)
+                      </button>
+
+                      <button
                         type="submit"
                         class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                       >
                         Submit Payment Proof
                       </button>
-
-
                     </form>
                   <% end %>
                 </div>

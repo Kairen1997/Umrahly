@@ -23,6 +23,8 @@ defmodule UmrahlyWeb.UserPaymentsLive do
       |> assign(:bookings, [])
       |> assign(:payment_history, [])
       |> assign(:receipts, [])
+      |> assign(:selected_payment, nil)
+      |> assign(:show_payment_modal, false)
       |> load_data()
 
     {:ok, socket}
@@ -42,6 +44,25 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     {:noreply, socket}
   end
 
+  def handle_event("view-payment-details", %{"payment_id" => payment_id}, socket) do
+    payment = find_payment_by_id(payment_id, socket.assigns.payment_history)
+    socket =
+      socket
+      |> assign(:selected_payment, payment)
+      |> assign(:show_payment_modal, true)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("close-payment-modal", _params, socket) do
+    socket =
+      socket
+      |> assign(:selected_payment, nil)
+      |> assign(:show_payment_modal, false)
+
+    {:noreply, socket}
+  end
+
   def handle_event("make-payment", %{"booking_id" => booking_id, "amount" => amount}, socket) do
     # Handle payment processing
     case process_payment(booking_id, amount, socket.assigns.current_user) do
@@ -58,9 +79,16 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   def handle_event("download-receipt", %{"receipt_id" => receipt_id}, socket) do
     # Handle receipt download
     case download_receipt(receipt_id, socket.assigns.current_user) do
-      {:ok, _file_path} ->
+      {:ok, file_path, filename} ->
+        # Send file download response to the client
+        socket = push_event(socket, "receipt_download_ready", %{
+          file_path: file_path,
+          filename: filename
+        })
         {:noreply, socket}
-
+      {:error, reason} ->
+        socket = put_flash(socket, :error, "Failed to download receipt: #{reason}")
+        {:noreply, socket}
     end
   end
 
@@ -82,9 +110,9 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     |> assign(:receipts, receipts)
   end
 
-  defp load_payment_history(user_id) do
+  defp load_payment_history(_user_id) do
     # This would typically query a payments table
-    # For now, returning mock data
+    # For now, returning mock data with more detailed information
     [
       %{
         id: "1",
@@ -92,7 +120,13 @@ defmodule UmrahlyWeb.UserPaymentsLive do
         amount: 1500.00,
         status: "completed",
         method: "credit_card",
-        booking_reference: "BK001"
+        booking_reference: "BK001",
+        transaction_id: "TXN_001_20240115",
+        card_last4: "1234",
+        card_brand: "Visa",
+        description: "Umrah Package - Standard Plan",
+        fees: 15.00,
+        net_amount: 1485.00
       },
       %{
         id: "2",
@@ -100,12 +134,22 @@ defmodule UmrahlyWeb.UserPaymentsLive do
         amount: 750.00,
         status: "completed",
         method: "bank_transfer",
-        booking_reference: "BK002"
+        booking_reference: "BK002",
+        transaction_id: "TXN_002_20240110",
+        bank_name: "Maybank",
+        account_last4: "5678",
+        description: "Umrah Package - Economy Plan",
+        fees: 5.00,
+        net_amount: 745.00
       }
     ]
   end
 
-  defp load_receipts(user_id) do
+  defp find_payment_by_id(payment_id, payment_history) do
+    Enum.find(payment_history, fn payment -> payment.id == payment_id end)
+  end
+
+  defp load_receipts(_user_id) do
     # This would typically query a receipts table
     # For now, returning mock data
     [
@@ -126,16 +170,23 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     ]
   end
 
-  defp process_payment(booking_id, amount, user) do
+  defp process_payment(_booking_id, _amount, _user) do
     # This would integrate with actual payment gateway
     # For now, simulating success
     {:ok, %{id: "payment_#{:rand.uniform(1000)}", status: "completed"}}
   end
 
-  defp download_receipt(receipt_id, user) do
+  defp download_receipt(receipt_id, _user) do
     # This would handle actual file download
-    # For now, simulating success
-    {:ok, "/receipts/receipt_#{receipt_id}.pdf"}
+    # For now, simulating success with proper file information
+    case receipt_id do
+      "1" ->
+        {:ok, "/receipts/#{receipt_id}/download", "receipt_BK001_#{Date.utc_today()}.txt"}
+      "2" ->
+        {:ok, "/receipts/#{receipt_id}/download", "receipt_BK002_#{Date.utc_today()}.txt"}
+      _ ->
+        {:error, "Invalid receipt ID"}
+    end
   end
 
   defp format_amount(amount) when is_nil(amount), do: "0.00"
@@ -167,6 +218,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     case Decimal.parse(value) do
       {:ok, decimal} -> decimal
       :error -> Decimal.new(0)
+      _ -> Decimal.new(0)
     end
   end
   defp ensure_decimal(_), do: Decimal.new(0)
@@ -253,16 +305,16 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                           <div>
-                            <dt class="text-sm font-medium text-gray-500">Total Amount</dt>
-                            <dd class="mt-1 text-lg font-semibold text-gray-900">RM <%= format_amount(booking.total_amount) %></dd>
+                            <div class="text-sm font-medium text-gray-500">Total Amount</div>
+                            <div class="mt-1 text-lg font-semibold text-gray-900">RM <%= format_amount(booking.total_amount) %></div>
                           </div>
                           <div>
-                            <dt class="text-sm font-medium text-gray-500">Paid Amount</dt>
-                            <dd class="mt-1 text-lg font-semibold text-green-600">RM <%= format_amount(booking.paid_amount || 0) %></dd>
+                            <div class="text-sm font-medium text-gray-500">Paid Amount</div>
+                            <div class="mt-1 text-lg font-semibold text-green-600">RM <%= format_amount(booking.paid_amount || 0) %></div>
                           </div>
                           <div>
-                            <dt class="text-sm font-medium text-gray-500">Remaining</dt>
-                            <dd class="mt-1 text-lg font-semibold text-red-600">RM <%= format_amount(calculate_remaining_amount(booking.total_amount, booking.paid_amount)) %></dd>
+                            <div class="text-sm font-medium text-gray-500">Remaining</div>
+                            <div class="mt-1 text-lg font-semibold text-red-600">RM <%= format_amount(calculate_remaining_amount(booking.total_amount, booking.paid_amount)) %></div>
                           </div>
                         </div>
 
@@ -319,6 +371,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
                           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
@@ -341,6 +394,15 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <%= payment.booking_reference %>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <button
+                                phx-click="view-payment-details"
+                                phx-value-payment_id={payment.id}
+                                class="text-blue-600 hover:text-blue-900 font-medium"
+                              >
+                                View Details
+                              </button>
+                            </td>
                           </tr>
                         <% end %>
                       </tbody>
@@ -357,7 +419,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                 <%= if Enum.empty?(@receipts) do %>
                   <div class="text-center py-12">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <h3 class="mt-2 text-sm font-medium text-gray-900">No receipts available</h3>
                     <p class="mt-1 text-sm text-gray-500">Receipts will appear here after you make payments.</p>
@@ -385,8 +447,11 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                         </div>
 
                         <button
+                          id={"receipt-download-#{receipt.id}"}
                           phx-click="download-receipt"
                           phx-value-receipt_id={receipt.id}
+                          phx-hook="DownloadReceipt"
+                          data-receipt-id={receipt.id}
                           class="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                           <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -402,6 +467,106 @@ defmodule UmrahlyWeb.UserPaymentsLive do
           <% end %>
         </div>
       </div>
+
+      <!-- Payment Details Modal -->
+      <%= if @show_payment_modal and @selected_payment do %>
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" id="payment-modal">
+          <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Payment Details</h3>
+                <button
+                  phx-click="close-payment-modal"
+                  class="text-gray-400 hover:text-gray-600"
+                >
+                  <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Transaction ID:</span>
+                    <span class="text-sm text-gray-900 font-mono"><%= @selected_payment.transaction_id %></span>
+                  </div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Date:</span>
+                    <span class="text-sm text-gray-900"><%= Calendar.strftime(@selected_payment.date, "%B %d, %Y") %></span>
+                  </div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Status:</span>
+                    <span class={"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{if @selected_payment.status == "completed", do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
+                      <%= String.upcase(@selected_payment.status) %>
+                    </span>
+                  </div>
+                </div>
+
+                <div class="border-b border-gray-200 pb-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Amount:</span>
+                    <span class="text-lg font-semibold text-gray-900">RM <%= format_amount(@selected_payment.amount) %></span>
+                  </div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Fees:</span>
+                    <span class="text-sm text-gray-900">RM <%= format_amount(@selected_payment.fees) %></span>
+                  </div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Net Amount:</span>
+                    <span class="text-sm font-medium text-gray-900">RM <%= format_amount(@selected_payment.net_amount) %></span>
+                  </div>
+                </div>
+
+                <div class="border-b border-gray-200 pb-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Payment Method:</span>
+                    <span class="text-sm text-gray-900"><%= String.replace(@selected_payment.method, "_", " ") |> String.upcase() %></span>
+                  </div>
+
+                  <%= if @selected_payment.method == "credit_card" do %>
+                    <div class="flex justify-between items-center mb-2">
+                      <span class="text-sm font-medium text-gray-500">Card:</span>
+                      <span class="text-sm text-gray-900"><%= @selected_payment.card_brand %> •••• <%= @selected_payment.card_last4 %></span>
+                    </div>
+                  <% end %>
+
+                  <%= if @selected_payment.method == "bank_transfer" do %>
+                    <div class="flex justify-between items-center mb-2">
+                      <span class="text-sm font-medium text-gray-500">Bank:</span>
+                      <span class="text-sm text-gray-900"><%= @selected_payment.bank_name %></span>
+                    </div>
+                    <div class="flex justify-between items-center mb-2">
+                      <span class="text-sm font-medium text-gray-500">Account:</span>
+                      <span class="text-sm text-gray-900">•••• <%= @selected_payment.account_last4 %></span>
+                    </div>
+                  <% end %>
+                </div>
+
+                <div class="border-b border-gray-200 pb-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-500">Booking Reference:</span>
+                    <span class="text-sm text-gray-900 font-mono"><%= @selected_payment.booking_reference %></span>
+                  </div>
+                  <div class="flex justify-between items-start mb-2">
+                    <span class="text-sm font-medium text-gray-500">Description:</span>
+                    <span class="text-sm text-gray-900 text-right"><%= @selected_payment.description %></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 flex justify-end">
+                <button
+                  phx-click="close-payment-modal"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end

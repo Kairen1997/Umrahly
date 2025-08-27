@@ -1,0 +1,22 @@
+RECEIPT
+========
+
+Receipt ID: 1
+Date: 2024-01-15
+Amount: RM 1500.00
+Status: Completed
+Method: Credit Card
+Transaction ID: TXN_001_20240115
+Booking Reference: BK001
+Package: Umrah Package - Standard Plan
+
+Card Details:
+- Brand: Visa
+- Last 4 digits: 1234
+
+Fees: RM 15.00
+Net Amount: RM 1485.00
+
+Description: Payment for Umrah Package - Standard Plan
+
+Thank you for your payment! 

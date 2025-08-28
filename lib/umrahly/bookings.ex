@@ -64,6 +64,7 @@ defmodule Umrahly.Bookings do
   def get_booking_flow_progress_by_user_id(user_id) do
     BookingFlowProgress
     |> where([bfp], bfp.user_id == ^user_id)
+    |> preload([:package, :package_schedule])
     |> Repo.all()
   end
 
@@ -220,11 +221,22 @@ defmodule Umrahly.Bookings do
   end
 
   @doc """
+  Gets the latest booking flow progress for a given user + package schedule.
+  """
+  def get_booking_flow_progress_by_schedule(user_id, package_schedule_id) do
+    BookingFlowProgress
+    |> where([bfp], bfp.user_id == ^user_id and bfp.package_schedule_id == ^package_schedule_id)
+    |> order_by([bfp], desc: bfp.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  @doc """
   Gets or creates booking flow progress for a user + package.
   Always returns a `%BookingFlowProgress{}`.
   """
   def get_or_create_booking_flow_progress(user_id, package_id, schedule_id) do
-    case get_booking_flow_progress(user_id, package_id) do
+    case get_booking_flow_progress_by_schedule(user_id, schedule_id) do
       nil ->
         create_booking_flow_progress(%{
           user_id: user_id,

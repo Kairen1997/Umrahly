@@ -56,7 +56,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
 
-  def mount(%{"package_id" => package_id, "schedule_id" => schedule_id}, _session, socket) do
+  def mount(%{"package_id" => package_id, "schedule_id" => schedule_id} = params, _session, socket) do
     # Get package and schedule details
     user_id = socket.assigns.current_user.id
     package = Packages.get_package!(package_id)
@@ -65,8 +65,19 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Helper function to check if price override should be shown
     has_price_override = schedule.price_override && Decimal.gt?(schedule.price_override, Decimal.new(0))
 
+    # Check if this is a resume request
+    is_resume = Map.get(params, "resume") == "true"
+
     #find or create booking flow progress
     progress = Bookings.get_or_create_booking_flow_progress(user_id, package_id, schedule_id)
+
+    # Debug logging for progress data
+    IO.puts("MOUNT: is_resume = #{is_resume}")
+    IO.puts("MOUNT: progress.id = #{progress.id}")
+    IO.puts("MOUNT: progress.current_step = #{progress.current_step}")
+    IO.puts("MOUNT: progress.number_of_persons = #{progress.number_of_persons}")
+    IO.puts("MOUNT: progress.travelers_data = #{inspect(progress.travelers_data)}")
+    IO.puts("MOUNT: progress.travelers_data length = #{if progress.travelers_data, do: length(progress.travelers_data), else: 0}")
 
     # Verify the schedule belongs to the package
     if schedule.package_id != String.to_integer(package_id) do
@@ -80,19 +91,43 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
       schedule_price_per_person = base_price + override_price
 
-      total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(1))
+      total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(progress.number_of_persons))
 
       # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
 
       # Initialize travelers based on number_of_persons and existing data
       travelers = cond do
-        socket.assigns[:travelers] ->
-          socket.assigns.travelers
+        # If resuming and we have existing travelers data, use it
+        is_resume && progress.travelers_data && length(progress.travelers_data) > 0 ->
+          # Debug logging
+          IO.puts("RESUME: Loading existing travelers data")
+          IO.puts("RESUME: travelers_data count: #{length(progress.travelers_data)}")
+          IO.puts("RESUME: number_of_persons: #{progress.number_of_persons}")
+          IO.puts("RESUME: travelers_data: #{inspect(progress.travelers_data)}")
+
+          # Ensure we have the right number of travelers
+          if length(progress.travelers_data) >= progress.number_of_persons do
+            # Take only the first N travelers based on number_of_persons
+            result = Enum.take(progress.travelers_data, progress.number_of_persons)
+            IO.puts("RESUME: Using existing travelers: #{inspect(result)}")
+            result
+          else
+            # Add empty travelers if we need more
+            additional_travelers = Enum.map((length(progress.travelers_data) + 1)..progress.number_of_persons, fn _ ->
+              %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+            end)
+            result = progress.travelers_data ++ additional_travelers
+            IO.puts("RESUME: Added empty travelers: #{inspect(result)}")
+            result
+          end
+        # If not resuming but we have existing travelers data, use it
         progress.travelers_data && length(progress.travelers_data) >= progress.number_of_persons ->
-          # Use existing travelers data if it has enough entries
+          IO.puts("NOT_RESUME: Using existing travelers data: #{inspect(progress.travelers_data)}")
           progress.travelers_data
+        # If booking for self, pre-fill first traveler
         progress.is_booking_for_self ->
+          IO.puts("BOOKING_FOR_SELF: Creating travelers with user details")
           # Create travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn index ->
             if index == 1 do
@@ -109,11 +144,15 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             end
           end)
         true ->
+          IO.puts("DEFAULT: Creating empty travelers list")
           # Create empty travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn _ ->
             %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
           end)
         end
+
+      IO.puts("FINAL travelers: #{inspect(travelers)}")
+      IO.puts("FINAL travelers count: #{length(travelers)}")
 
       socket =
         socket
@@ -122,7 +161,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:has_price_override, has_price_override)
         |> assign(:price_per_person, schedule_price_per_person)
         |> assign(:total_amount, total_amount)
-        |> assign(:payment_plan, "progress.payment_plan")
+        |> assign(:payment_plan, progress.payment_plan)
         |> assign(:deposit_amount, total_amount)
         |> assign(:number_of_persons, progress.number_of_persons)
         |> assign(:travelers, travelers)
@@ -142,8 +181,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:saved_package_progress, nil)
         |> assign(:saved_travelers_progress, nil)
         |> assign(:saved_payment_progress, nil)
-        |> assign(:current_step, progress.current_step)
-        |> assign(:max_steps, progress.max_steps)
         |> assign(:booking_flow_progress, progress)
         |> allow_upload(:payment_proof, accept: ~w(.pdf .jpg .jpeg .png .doc .docx), max_entries: 1, max_file_size: 5_000_000)
 

@@ -93,7 +93,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                 <div class="flex items-start justify-between">
                   <div class="flex-1">
                     <div class="flex items-center space-x-3 mb-3">
-                      <h3 class="text-lg font-semibold text-gray-900"><%= booking.package_name %></h3>
+                      <h3 class="text-lg font-semibold text-gray-900"><%= booking.package.name %></h3>
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         Step <%= booking.current_step %> of <%= booking.max_steps %>
                       </span>
@@ -103,8 +103,8 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       <div>
                         <span class="font-medium">Travel Dates:</span>
                         <div class="mt-1">
-                          <div>Departure: <%= Calendar.strftime(booking.schedule_departure, "%B %d, %Y") %></div>
-                          <div>Return: <%= Calendar.strftime(booking.schedule_return, "%B %d, %Y") %></div>
+                          <div>Departure: <%= Calendar.strftime(booking.package_schedule.departure_date, "%B %d, %Y") %></div>
+                          <div>Return: <%= Calendar.strftime(booking.package_schedule.return_date, "%B %d, %Y") %></div>
                         </div>
                       </div>
                       <div>

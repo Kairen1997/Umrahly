@@ -85,20 +85,34 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
 
-      # Only set travelers if they're not already in socket.assigns
-      travelers =
-        cond do
-          socket.assigns[:travelers] ->
-            socket.assigns.travelers
-          progress.is_booking_for_self ->
-            [%{
-              full_name: socket.assigns.current_user.full_name || "",
-              identity_card_number: socket.assigns.current_user.identity_card_number || "",
-              passport_number: "",
-              phone: socket.assigns.current_user.phone_number || ""
-            }]
-          true ->
-            progress.travelers_data || [%{full_name: "", identity_card_number: "", passport_number: "", phone: ""}]
+      # Initialize travelers based on number_of_persons and existing data
+      travelers = cond do
+        socket.assigns[:travelers] ->
+          socket.assigns.travelers
+        progress.travelers_data && length(progress.travelers_data) >= progress.number_of_persons ->
+          # Use existing travelers data if it has enough entries
+          progress.travelers_data
+        progress.is_booking_for_self ->
+          # Create travelers list based on number_of_persons
+          Enum.map(1..progress.number_of_persons, fn index ->
+            if index == 1 do
+              # First traveler - pre-fill with user details if booking for self
+              %{
+                full_name: socket.assigns.current_user.full_name || "",
+                identity_card_number: socket.assigns.current_user.identity_card_number || "",
+                passport_number: "",
+                phone: socket.assigns.current_user.phone_number || ""
+              }
+            else
+              # Additional travelers - empty fields
+              %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+            end
+          end)
+        true ->
+          # Create empty travelers list based on number_of_persons
+          Enum.map(1..progress.number_of_persons, fn _ ->
+            %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+          end)
         end
 
       socket =
@@ -263,25 +277,30 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("update_number_of_persons", %{"action" => "increase"}, socket) do
+    def handle_event("update_number_of_persons", %{"action" => "increase"}, socket) do
     current_number = socket.assigns.number_of_persons
     new_number = min(current_number + 1, 10)
 
-    # Initialize travelers based on new number of persons
-    travelers = Enum.map(1..new_number, fn index ->
-      if index == 1 and socket.assigns.is_booking_for_self do
-        # First traveler - pre-fill with user details if booking for self
-        %{
-          full_name: socket.assigns.current_user.full_name || "",
-          identity_card_number: socket.assigns.current_user.identity_card_number || "",
-          passport_number: "",
-          phone: socket.assigns.current_user.phone_number || ""
-        }
-      else
-        # Additional travelers or booking for someone else - empty fields
+    # Preserve existing travelers data and add new ones
+    existing_travelers = socket.assigns.travelers
+    travelers = if new_number > current_number do
+      # Add new travelers while preserving existing data
+      additional_travelers = Enum.map((current_number + 1)..new_number, fn _index ->
         %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
-      end
-    end)
+      end)
+
+      # Merge existing travelers with new ones
+      new_travelers = existing_travelers ++ additional_travelers
+
+      # Debug logging
+      IO.puts("INCREASE: current_number=#{current_number}, new_number=#{new_number}")
+      IO.puts("INCREASE: existing_travelers count=#{length(existing_travelers)}")
+      IO.puts("INCREASE: new_travelers count=#{length(new_travelers)}")
+
+      new_travelers
+    else
+      existing_travelers
+    end
 
     # Calculate new amounts
     package_price = socket.assigns.package.price
@@ -312,21 +331,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_number = socket.assigns.number_of_persons
     new_number = max(current_number - 1, 1)
 
-    # Initialize travelers based on new number of persons
-    travelers = Enum.map(1..new_number, fn index ->
-      if index == 1 and socket.assigns.is_booking_for_self do
-        # First traveler - pre-fill with user details if booking for self
-        %{
-          full_name: socket.assigns.current_user.full_name || "",
-          identity_card_number: socket.assigns.current_user.identity_card_number || "",
-          passport_number: "",
-          phone: socket.assigns.current_user.phone_number || ""
-        }
-      else
-        # Additional travelers or booking for someone else - empty fields
-        %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
-      end
-    end)
+    # Preserve existing travelers data when decreasing
+    existing_travelers = socket.assigns.travelers
+    travelers = if new_number < current_number do
+      # Take only the first N travelers, preserving their data
+      Enum.take(existing_travelers, new_number)
+    else
+      existing_travelers
+    end
 
     # Calculate new amounts
     package_price = socket.assigns.package.price
@@ -1306,6 +1318,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       +
                     </button>
                   </div>
+                </div>
+                <!-- Debug info -->
+                <div class="mt-2 text-xs text-gray-500">
+                  Current travelers in list: <%= length(@travelers) %> |
+                  Number of persons: <%= @number_of_persons %>
                 </div>
               </div>
 

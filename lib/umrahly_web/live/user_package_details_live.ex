@@ -575,100 +575,6 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                       </div>
                     <% end %>
 
-                <!-- Financial Impact Summary -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div class="text-center p-4 bg-red-100 rounded-lg border border-red-200">
-                    <div class="text-2xl font-bold text-red-700">RM <%= total_price %></div>
-                    <div class="text-sm text-red-600">Total Package Cost</div>
-                  </div>
-                  <div class="text-center p-4 bg-orange-100 rounded-lg border border-orange-200">
-                    <div class="text-2xl font-bold text-orange-700">RM <%= monthly_payment %></div>
-                    <div class="text-sm text-orange-600">Monthly Payment</div>
-                  </div>
-                  <div class="text-center p-4 bg-yellow-100 rounded-lg border border-yellow-200">
-                    <div class="text-2xl font-bold text-yellow-700"><%= months_to_pay %></div>
-                    <div class="text-sm text-yellow-600">Payment Duration</div>
-                  </div>
-                </div>
-
-                <!-- Financial Impact Analysis -->
-                <div class="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg">
-                  <div class="flex items-start">
-                    <svg class="w-5 h-5 mr-2 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div class="text-sm text-red-800">
-                      <div class="font-semibold mb-2">Financial Impact Analysis:</div>
-                      <ul class="list-disc list-inside space-y-1 text-xs">
-                        <li><strong>Monthly Payment:</strong> RM <%= monthly_payment %> (excluding deposit)</li>
-                        <li><strong>Payment Duration:</strong> <%= months_to_pay %> months</li>
-                        <li><strong>Income Impact:</strong> This will consume <%= affordability_percentage %>% of your monthly income</li>
-                        <li><strong>Risk Level:</strong> High - may affect your daily expenses and savings</li>
-                        <li><strong>Recommendation:</strong> Consider more affordable alternatives below</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- More Affordable Alternatives -->
-                <%= if length(affordable_alternatives) > 0 do %>
-                  <div class="mb-6">
-                    <h4 class="text-md font-semibold text-red-800 mb-3">💡 More Affordable Alternatives</h4>
-                    <p class="text-sm text-red-700 mb-4">
-                      Here are some dates that better fit your budget (≤100% of monthly income):
-                    </p>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      <%= for alternative <- affordable_alternatives do %>
-                        <div class="bg-white border-2 border-green-300 rounded-lg p-3 shadow-sm">
-                          <div class="text-center">
-                            <div class="mb-2">
-                              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                💚 Affordable
-                              </span>
-                            </div>
-                            <div class="text-base font-semibold text-gray-900">
-                              <%= Calendar.strftime(alternative.departure_date, "%B %d, %Y") %>
-                            </div>
-                            <div class="text-xs text-gray-500 mt-1">
-                              <%= Calendar.strftime(alternative.departure_date, "%A") %>
-                            </div>
-                            <div class="mt-2 space-y-1">
-                              <div class="text-xs text-gray-600">
-                                <span class="font-medium">Total Price:</span>
-                                <span class="font-bold text-green-700">RM <%= alternative.total_price %></span>
-                              </div>
-                              <div class="text-xs text-gray-600">
-                                <span class="font-medium">Affordability:</span>
-                                <span class="font-medium text-green-600">
-                                  <%= Float.round(alternative.affordability_ratio * 100, 1) %>% of income
-                                </span>
-                              </div>
-                              <div class="text-xs text-gray-600">
-                                <span class="font-medium">Score:</span>
-                                <span class="font-medium text-blue-600"><%= alternative.affordability_score %>/100</span>
-                              </div>
-                              <div class="text-xs text-gray-600">
-                                <span class="font-medium">Quota:</span>
-                                <span class="font-medium"><%= alternative.quota %></span> spots
-                              </div>
-                            </div>
-                            <div class="mt-3">
-                              <button
-                                phx-click="select_schedule"
-                                phx-value-schedule_id={alternative.id}
-                                class="w-full px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
-                              >
-                                Switch to This Date
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      <% end %>
-                    </div>
-                  </div>
-                <% end %>
-
                     <!-- Important Disclaimer -->
                     <div class="mb-6 p-4 bg-yellow-100 border border-yellow-200 rounded-lg">
                       <div class="flex items-start">
@@ -1022,20 +928,19 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                           </div>
                         </div>
                         <div class="mt-3 text-center">
-                          <span class={[
-                            "inline-flex px-3 py-2 text-xs font-semibold rounded-full",
-                            if @selected_schedule_id == schedule.id do
-                              "bg-blue-100 text-blue-800 border-2 border-blue-300"
-                            else
-                              "bg-gray-100 text-gray-600 border-2 border-gray-300"
-                            end
-                          ]}>
-                            <%= if @selected_schedule_id == schedule.id do %>
+                          <%= if @selected_schedule_id == schedule.id do %>
+                            <span class="inline-flex px-3 py-2 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-2 border-blue-300">
                               ✓ Currently Selected
-                            <% else %>
-                              Click below to select
-                            <% end %>
-                          </span>
+                            </span>
+                          <% else %>
+                            <button
+                              phx-click="select_schedule"
+                              phx-value-schedule_id={schedule.id}
+                              class="w-full px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              Select This Date
+                            </button>
+                          <% end %>
                         </div>
                       </div>
                     </div>

@@ -10,7 +10,7 @@ defmodule Umrahly.Bookings.BookingFlowProgress do
     field :payment_method, :string, default: "bank_transfer"
     field :payment_plan, :string, default: "full_payment"
     field :notes, :string
-    field :travelers_data, :map
+    field :travelers_data, {:array, :map}, default: []
     field :total_amount, :decimal
     field :deposit_amount, :decimal
     field :status, :string, default: "in_progress"

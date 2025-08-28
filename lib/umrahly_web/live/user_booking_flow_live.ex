@@ -58,16 +58,15 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
   def mount(%{"package_id" => package_id, "schedule_id" => schedule_id}, _session, socket) do
     # Get package and schedule details
+    user_id = socket.assigns.current_user.id
     package = Packages.get_package!(package_id)
     schedule = Packages.get_package_schedule!(schedule_id)
 
     # Helper function to check if price override should be shown
     has_price_override = schedule.price_override && Decimal.gt?(schedule.price_override, Decimal.new(0))
 
-    # Calculate price per person
-    base_price = package.price
-    override_price = if has_price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-    price_per_person = base_price + override_price
+    #find or create booking flow progress
+    progress = Bookings.get_or_create_booking_flow_progress(user_id, package_id, schedule_id)
 
     # Verify the schedule belongs to the package
     if schedule.package_id != String.to_integer(package_id) do
@@ -86,36 +85,41 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
 
-      # Initialize travelers with current user details for single traveler
-      travelers = [%{
-        full_name: socket.assigns.current_user.full_name || "",
-        identity_card_number: socket.assigns.current_user.identity_card_number || "",
-        passport_number: "", # Passport might not be in user profile
-        phone: socket.assigns.current_user.phone_number || ""
-      }]
-
-      # Default step to 1
-      saved_step = 1
+      # Only set travelers if they're not already in socket.assigns
+      travelers =
+        cond do
+          socket.assigns[:travelers] ->
+            socket.assigns.travelers
+          progress.is_booking_for_self ->
+            [%{
+              full_name: socket.assigns.current_user.full_name || "",
+              identity_card_number: socket.assigns.current_user.identity_card_number || "",
+              passport_number: "",
+              phone: socket.assigns.current_user.phone_number || ""
+            }]
+          true ->
+            progress.travelers_data || [%{full_name: "", identity_card_number: "", passport_number: "", phone: ""}]
+        end
 
       socket =
         socket
         |> assign(:package, package)
         |> assign(:schedule, schedule)
         |> assign(:has_price_override, has_price_override)
-        |> assign(:price_per_person, price_per_person)
+        |> assign(:price_per_person, schedule_price_per_person)
         |> assign(:total_amount, total_amount)
-        |> assign(:payment_plan, "full_payment")
+        |> assign(:payment_plan, "progress.payment_plan")
         |> assign(:deposit_amount, total_amount)
-        |> assign(:number_of_persons, 1)
+        |> assign(:number_of_persons, progress.number_of_persons)
         |> assign(:travelers, travelers)
-        |> assign(:is_booking_for_self, true)
-        |> assign(:payment_method, "bank_transfer")
-        |> assign(:notes, "")
+        |> assign(:is_booking_for_self, progress.is_booking_for_self)
+        |> assign(:payment_method, progress.payment_method)
+        |> assign(:notes, progress.notes)
         |> assign(:changeset, changeset)
         |> assign(:current_page, "packages")
         |> assign(:page_title, "Book Package")
-        |> assign(:step, saved_step)
-        |> assign(:max_steps, 5)
+        |> assign(:current_step, progress.current_step)
+        |> assign(:max_steps, progress.max_steps)
         |> assign(:requires_online_payment, false)
         |> assign(:payment_gateway_url, nil)
         |> assign(:payment_proof_file, nil)
@@ -124,6 +128,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:saved_package_progress, nil)
         |> assign(:saved_travelers_progress, nil)
         |> assign(:saved_payment_progress, nil)
+        |> assign(:current_step, progress.current_step)
+        |> assign(:max_steps, progress.max_steps)
+        |> assign(:booking_flow_progress, progress)
         |> allow_upload(:payment_proof, accept: ~w(.pdf .jpg .jpeg .png .doc .docx), max_entries: 1, max_file_size: 5_000_000)
 
       {:ok, socket}
@@ -479,37 +486,46 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-      # Handle form submission for travelers step
+      # Handle form submission for travelers step (kept for backward compatibility)
   def handle_event("validate_travelers", %{"booking" => booking_params}, socket) do
     # Extract travelers data from the form
     travelers_params = booking_params["travelers"] || []
 
     # Update travelers with form data
-    updated_travelers = Enum.map(travelers_params, fn traveler ->
-      %{
-        full_name: traveler["full_name"] || "",
-        identity_card_number: traveler["identity_card_number"] || "",
-        passport_number: traveler["passport_number"] || "",
-        phone: traveler["phone"] || ""
-      }
-    end)
+    updated_travelers =
+      Enum.with_index(travelers_params)
+      |> Enum.map(fn {traveler, idx} ->
+        existing = Enum.at(socket.assigns.travelers, idx, %{})
+        Map.merge(existing, %{
+          full_name: traveler["full_name"] || existing[:full_name] || "",
+          identity_card_number: traveler["identity_card_number"] || existing[:identity_card_number] || "",
+          passport_number: traveler["passport_number"] || existing[:passport_number] || "",
+          phone: traveler["phone"] || existing[:phone] || ""
+        })
+      end)
 
     # Validate that all required traveler information is filled
-    all_travelers_complete = Enum.all?(updated_travelers, fn traveler ->
-      traveler[:full_name] != "" and
-      traveler[:identity_card_number] != "" and
-      traveler[:phone] != ""
-    end)
+    all_travelers_complete =
+      Enum.all?(updated_travelers, fn traveler ->
+        traveler[:full_name] != "" and
+        traveler[:identity_card_number] != "" and
+        traveler[:phone] != ""
+      end)
 
-    # Update the socket with new travelers data
-    socket = assign(socket, :travelers, updated_travelers)
+    # Update booking flow progress
+    {_ok, _progress} =
+      Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: updated_travelers, last_updated: DateTime.utc_now()})
 
-    # If validation passes, show success message
-    if all_travelers_complete do
-      socket = put_flash(socket, :info, "Traveler information validated successfully!")
-    else
-      socket = put_flash(socket, :error, "Please complete all required traveler information before proceeding.")
-    end
+    socket =
+      socket
+      |> assign(:travelers, updated_travelers)
+      |> (fn s ->
+        if all_travelers_complete do
+          put_flash(s, :info, "Traveler information validated successfully!")
+        else
+          put_flash(s, :error, "Please complete all required traveler information before proceeding.")
+        end
+      end).()
 
     {:noreply, socket}
   end
@@ -519,13 +535,114 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("save_travelers_progress", %{"booking" => %{"travelers" => travelers}}, socket) do
-    # This function is deprecated - use the new TravelerDetailsLive instead
-    {:noreply, put_flash(socket, :info, "Please use the dedicated traveler details page to manage traveler information.")}
+  # Handle individual traveler field updates
+  def handle_event("update_traveler_field", %{"value" => value} = params, socket) do
+    index = String.to_integer(params["index"])
+    field = params["field"]
+    travelers = socket.assigns.travelers
+
+    # Convert field to atom for consistency
+    field_atom = String.to_atom(field)
+
+    updated_travelers = List.update_at(travelers, index, fn traveler ->
+      # Store only with atom keys for consistency
+      Map.put(traveler, field_atom, value)
+    end)
+
+    socket = assign(socket, :travelers, updated_travelers)
+
+    {:noreply, socket}
   end
 
+  # Handle saving travelers data
+  def handle_event("save_travelers", _params, socket) do
+    # Use the current travelers data from socket assigns
+    travelers = socket.assigns.travelers
+
+    # Validate that all required traveler information is filled
+    all_travelers_complete =
+      Enum.all?(travelers, fn traveler ->
+        traveler[:full_name] != "" and
+        traveler[:identity_card_number] != "" and
+        traveler[:phone] != ""
+      end)
+
+    if all_travelers_complete do
+      # Update booking flow progress
+      {_ok, _progress} =
+        Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: travelers, last_updated: DateTime.utc_now()})
+
+      socket =
+        socket
+        |> put_flash(:info, "Traveler information saved successfully!")
+
+      {:noreply, socket}
+    else
+      socket = put_flash(socket, :error, "Please complete all required traveler information before saving.")
+      {:noreply, socket}
+    end
+  end
+
+
+
+  # Handle clearing individual traveler fields
+  def handle_event("clear_traveler_field", %{"index" => index_str, "field" => field}, socket) do
+    index = String.to_integer(index_str)
+    travelers = socket.assigns.travelers
+
+    # Convert field to atom for consistency
+    field_atom = String.to_atom(field)
+
+    updated_travelers = List.update_at(travelers, index, fn traveler ->
+      Map.put(traveler, field_atom, "")
+    end)
+
+    socket = assign(socket, :travelers, updated_travelers)
+
+    {:noreply, socket}
+  end
+
+  # Handle removing a traveler (when number of persons is decreased)
+  def handle_event("remove_traveler", %{"index" => index_str}, socket) do
+    index = String.to_integer(index_str)
+    travelers = socket.assigns.travelers
+
+    if length(travelers) > 1 do
+      updated_travelers = List.delete_at(travelers, index)
+      new_number_of_persons = length(updated_travelers)
+
+      # Recalculate amounts
+      package_price = socket.assigns.package.price
+      base_price = package_price
+      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
+      schedule_price_per_person = base_price + override_price
+
+      total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
+
+      # Update deposit amount if payment plan is installment
+      deposit_amount = if socket.assigns.payment_plan == "installment" do
+        Decimal.mult(total_amount, Decimal.new("0.2"))
+      else
+        total_amount
+      end
+
+      socket =
+        socket
+        |> assign(:travelers, updated_travelers)
+        |> assign(:number_of_persons, new_number_of_persons)
+        |> assign(:total_amount, total_amount)
+        |> assign(:deposit_amount, deposit_amount)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+
+
   def handle_event("go_to_next_step", _params, socket) do
-    current_step = socket.assigns.step
+    current_step = socket.assigns.current_step
     max_steps = socket.assigns.max_steps
 
     # If we're at the final step (step 5), don't allow any step changes
@@ -535,10 +652,10 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       # Validate step bounds - be more defensive
       cond do
         current_step < 1 ->
-          socket = assign(socket, :step, 1)
+          socket = assign(socket, :current_step, 1)
           {:noreply, socket}
         current_step > max_steps ->
-          socket = assign(socket, :step, max_steps)
+          socket = assign(socket, :current_step, max_steps)
           {:noreply, socket}
         current_step == 2 ->
           # Validate travelers before allowing progression to step 3
@@ -551,7 +668,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
           if all_travelers_complete do
             new_step = current_step + 1
-            socket = assign(socket, :step, new_step)
+            # Persist to DB
+            {_ok, progress} = Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{current_step: new_step})
+
+            socket = assign(socket, :current_step, new_step)
+            socket = assign(socket, :booking_flow_progress, progress)
             {:noreply, socket}
           else
             socket = put_flash(socket, :error, "Please complete all required traveler information before proceeding.")
@@ -560,8 +681,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         current_step < max_steps ->
           new_step = current_step + 1
 
+          # Persist to DB
+          {_ok, progress} = Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{current_step: new_step})
+
           # Advance the step
-          socket = assign(socket, :step, new_step)
+          socket = assign(socket, :current_step, new_step)
+          socket = assign(socket, :booking_flow_progress, progress)
 
           {:noreply, socket}
         true ->
@@ -570,47 +695,36 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  def handle_event("next_step", params, socket) do
-    # If we're at step 5, don't allow any step changes
-    if socket.assigns.step == 5 do
+  def handle_event("next_step", _params, socket) do
+    current_step = socket.assigns.current_step
+    max_steps = socket.assigns.max_steps
+
+    if current_step >= max_steps do
       {:noreply, socket}
     else
-      # If we're at step 2, validate travelers before allowing progression
-      if socket.assigns.step == 2 do
-        travelers = socket.assigns.travelers
-        all_travelers_complete = Enum.all?(travelers, fn traveler ->
-          traveler[:full_name] != "" and
-          traveler[:identity_card_number] != "" and
-          traveler[:phone] != ""
-        end)
+      new_step = current_step + 1
 
-        if all_travelers_complete do
-          handle_event("go_to_next_step", params, socket)
-        else
-          socket = put_flash(socket, :error, "Please complete all required traveler information before proceeding.")
-          {:noreply, socket}
-        end
-      else
-        handle_event("go_to_next_step", params, socket)
-      end
+      {_ok, updated_progress} =
+        Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{current_step: new_step, last_updated: DateTime.utc_now()})
+
+      socket = assign(socket, :current_step, new_step)
+      socket = assign(socket, :booking_flow_progress, updated_progress)
+
+      {:noreply, socket}
     end
   end
 
   def handle_event("prev_step", _params, socket) do
-    # If we're at step 5, don't allow going back
-    if socket.assigns.step == 5 do
-      {:noreply, socket}
-    else
-      current_step = socket.assigns.step
 
-      if current_step > 1 do
-        new_step = current_step - 1
-        socket = assign(socket, :step, new_step)
-        {:noreply, socket}
-      else
-        {:noreply, socket}
-      end
-    end
+    current_step = socket.assigns.current_step
+    prev_step = max(current_step - 1, 1)
+
+    {_ok, updated_progress} = Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{current_step: prev_step})
+
+    socket = assign(socket, :current_step, prev_step)
+    socket = assign(socket, :booking_flow_progress, updated_progress)
+
+    {:noreply, socket}
   end
 
   def handle_event("create_booking", _params, socket) do
@@ -669,7 +783,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 # Set the payment gateway URL - the JavaScript hook will handle the redirect
                 socket
                   |> put_flash(:info, "Booking created successfully! Redirecting to payment gateway...")
-                  |> assign(:step, 5)
+                  |> assign(:current_step, 5)
                   |> assign(:payment_gateway_url, payment_url)
                   |> assign(:requires_online_payment, true)
                   |> assign(:current_booking_id, booking.id)
@@ -677,7 +791,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 # For offline payment methods, show success message
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
-                  |> assign(:step, 5)
+                  |> assign(:current_step, 5)
                   |> assign(:requires_online_payment, false)
                   |> assign(:current_booking_id, booking.id)
               end
@@ -981,7 +1095,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     <.sidebar page_title={@page_title}>
       <div id="booking-flow-container" class="max-w-4xl mx-auto space-y-6"
 
-           data-step={@step}
+           data-step={@current_step}
            data-package-id={@package.id}
            data-schedule-id={@schedule.id}>
         <!-- Progress Steps -->
@@ -989,7 +1103,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold text-gray-900 text-center flex-1">Book Your Package</h1>
             <div class="text-sm text-gray-500">
-              Step <%= @step %> of <%= @max_steps %>
+              Step <%= @current_step %> of <%= @max_steps %>
             </div>
           </div>
 
@@ -998,38 +1112,38 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
           <!-- Progress Bar -->
           <div class="w-full bg-gray-200 rounded-full h-2 mb-6">
-            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style={"width: #{Float.round((@step / @max_steps) * 100, 1)}%"}>
+            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style={"width: #{Float.round((@current_step / @max_steps) * 100, 1)}%"}>
             </div>
           </div>
 
           <!-- Step Indicators -->
           <div class="flex justify-between mb-8">
             <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @step >= 1, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
+              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 1, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
                 1
               </div>
               <span class="text-xs text-gray-600 mt-1">Package Details</span>
             </div>
             <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @step >= 2, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
+              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 2, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
                 2
               </div>
               <span class="text-xs text-gray-600 mt-1">Travelers</span>
             </div>
             <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @step >= 3, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
+              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 3, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
                 3
               </div>
               <span class="text-xs text-gray-600 mt-1">Payment</span>
             </div>
             <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @step >= 4, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
+              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 4, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
                 4
               </div>
               <span class="text-xs text-gray-600 mt-1">Review & Confirm</span>
             </div>
             <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @step >= 5, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
+              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 5, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
                 5
               </div>
               <span class="text-xs text-gray-600 mt-1">Success</span>
@@ -1038,7 +1152,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         </div>
 
         <!-- Step 1: Package Details -->
-        <%= if @step == 1 do %>
+        <%= if @current_step == 1 do %>
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Package Details</h2>
 
@@ -1141,7 +1255,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         <% end %>
 
         <!-- Step 2: Travelers -->
-        <%= if @step == 2 do %>
+        <%= if @current_step == 2 do %>
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Travelers</h2>
             <div class="space-y-6">
@@ -1196,9 +1310,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               </div>
 
               <!-- Travelers Details -->
-              <form id="travelers-form" phx-change="validate_travelers">
-                <div class="bg-gray-50 rounded-lg p-4">
-                  <h3 class="font-medium text-gray-900 mb-3">Travelers Details</h3>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="font-medium text-gray-900 mb-3">Travelers Details</h3>
 
                 <!-- Toggle for single traveler -->
                 <%= if @number_of_persons == 1 do %>
@@ -1252,70 +1365,159 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     <% end %>
                   </p>
                 <% end %>
+
                 <div class="space-y-4">
                   <%= for {traveler, index} <- Enum.with_index(@travelers) do %>
                     <div class="border border-gray-200 rounded-lg p-4">
-                      <h4 class="font-medium text-gray-800 mb-3">
-                        <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: if(index == 0, do: "Traveler #{index + 1} (Person In Charge)", else: "Traveler #{index + 1}"))) %>
-                      </h4>
+                      <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-medium text-gray-800">
+                          <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: if(index == 0, do: "Traveler #{index + 1} (Person In Charge)", else: "Traveler #{index + 1}"))) %>
+                        </h4>
+                        <%= if @number_of_persons > 1 do %>
+                          <button
+                            type="button"
+                            phx-click="remove_traveler"
+                            phx-value-index={index}
+                            class="text-red-500 hover:text-red-700 text-sm font-medium"
+                            title="Remove traveler"
+                          >
+                            Remove
+                          </button>
+                        <% end %>
+                      </div>
+
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label class="block text-sm font-medium text-gray-700 mb-1">
                             Full Name <span class="text-red-500">*</span>
                           </label>
-                          <input
-                            type="text"
-                            name={"booking[travelers][#{index}][full_name]"}
-                            value={traveler[:full_name] || ""}
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter full name"
-                            required
-                          />
+                          <div class="relative">
+                            <input
+                              type="text"
+                              value={traveler[:full_name] || ""}
+                              phx-blur="update_traveler_field"
+                              phx-value-index={index}
+                              phx-value-field="full_name"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter full name"
+                            />
+                            <%= if traveler[:full_name] && traveler[:full_name] != "" do %>
+                              <button
+                                type="button"
+                                phx-click="clear_traveler_field"
+                                phx-value-index={index}
+                                phx-value-field="full_name"
+                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
+                                title="Clear field"
+                              >
+                                ×
+                              </button>
+                            <% end %>
+                          </div>
                         </div>
+
                         <div>
                           <label class="block text-sm font-medium text-gray-700 mb-1">
                             Identity Card Number <span class="text-red-500">*</span>
                           </label>
-                          <input
-                            type="text"
-                            name={"booking[travelers][#{index}][identity_card_number]"}
-                            value={traveler[:identity_card_number] || ""}
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter identity card number"
-                            required
-                          />
+                          <div class="relative">
+                            <input
+                              type="text"
+                              value={traveler[:identity_card_number] || ""}
+                              phx-blur="update_traveler_field"
+                              phx-value-index={index}
+                              phx-value-field="identity_card_number"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter identity card number"
+                            />
+                            <%= if traveler[:identity_card_number] && traveler[:identity_card_number] != "" do %>
+                              <button
+                                type="button"
+                                phx-click="clear_traveler_field"
+                                phx-value-index={index}
+                                phx-value-field="identity_card_number"
+                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
+                                title="Clear field"
+                              >
+                                ×
+                              </button>
+                            <% end %>
+                          </div>
                         </div>
+
                         <div>
                           <label class="block text-sm font-medium text-gray-700 mb-1">
                             Passport Number
                           </label>
-                          <input
-                            type="text"
-                            name={"booking[travelers][#{index}][passport_number]"}
-                            value={traveler[:passport_number] || ""}
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter passport number (optional)"
-                          />
+                          <div class="relative">
+                            <input
+                              type="text"
+                              value={traveler[:passport_number] || ""}
+                              phx-blur="update_traveler_field"
+                              phx-value-index={index}
+                              phx-value-field="passport_number"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter passport number (optional)"
+                            />
+                            <%= if traveler[:passport_number] && traveler[:passport_number] != "" do %>
+                              <button
+                                type="button"
+                                phx-click="clear_traveler_field"
+                                phx-value-index={index}
+                                phx-value-field="passport_number"
+                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
+                                title="Clear field"
+                              >
+                                ×
+                              </button>
+                            <% end %>
+                          </div>
                         </div>
+
                         <div>
                           <label class="block text-sm font-medium text-gray-700 mb-1">
                             Phone Number <span class="text-red-500">*</span>
                           </label>
-                          <input
-                            type="text"
-                            name={"booking[travelers][#{index}][phone]"}
-                            value={traveler[:phone] || ""}
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter phone number"
-                            required
-                          />
+                          <div class="relative">
+                            <input
+                              type="text"
+                              value={traveler[:phone] || ""}
+                              phx-blur="update_traveler_field"
+                              phx-value-index={index}
+                              phx-value-field="phone"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter phone number"
+                            />
+                            <%= if traveler[:phone] && traveler[:phone] != "" do %>
+                              <button
+                                type="button"
+                                phx-click="clear_traveler_field"
+                                phx-value-index={index}
+                                phx-value-field="phone"
+                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
+                                title="Clear field"
+                              >
+                                ×
+                              </button>
+                            <% end %>
+                          </div>
                         </div>
                       </div>
                     </div>
                   <% end %>
                 </div>
+
+                                <!-- Save Button -->
+                <div class="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    phx-click="save_travelers"
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Save Traveler Information
+                  </button>
                 </div>
-              </form>
+              </div>
 
               <!-- Summary -->
               <div class="bg-gray-50 rounded-lg p-4">
@@ -1370,7 +1572,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         <% end %>
 
         <!-- Step 3: Payment -->
-        <%= if @step == 3 do %>
+        <%= if @current_step == 3 do %>
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Payment Details</h2>
 
@@ -1525,7 +1727,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         <% end %>
 
         <!-- Step 4: Review & Confirm -->
-        <%= if @step == 4 do %>
+        <%= if @current_step == 4 do %>
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Review & Confirm Booking</h2>
 
@@ -1677,7 +1879,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         <% end %>
 
         <!-- Step 5: Success -->
-        <%= if @step == 5 do %>
+        <%= if @current_step == 5 do %>
           <%= if @requires_online_payment do %>
             <!-- Online Payment Success -->
             <div

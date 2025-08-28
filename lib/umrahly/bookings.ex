@@ -5,8 +5,8 @@ defmodule Umrahly.Bookings do
 
   import Ecto.Query, warn: false
   alias Umrahly.Repo
-  alias Umrahly.Bookings.{Booking, BookingFlowProgress, TravelerDetail}
-
+  alias Umrahly.Bookings.Booking
+  alias Umrahly.Bookings.BookingFlowProgress
   @doc """
   Returns the list of bookings.
   """
@@ -59,6 +59,15 @@ defmodule Umrahly.Bookings do
   end
 
   @doc """
+  Returns the list of booking flow progress records for a specific user.
+  """
+  def get_booking_flow_progress_by_user_id(user_id) do
+    BookingFlowProgress
+    |> where([bfp], bfp.user_id == ^user_id)
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single booking flow progress record.
   """
   def get_booking_flow_progress!(id), do: Repo.get!(BookingFlowProgress, id)
@@ -95,119 +104,149 @@ defmodule Umrahly.Bookings do
     BookingFlowProgress.changeset(booking_flow_progress, attrs)
   end
 
-  # Traveler Details functions
-
   @doc """
-  Returns the list of traveler details for a specific booking.
+  Counts total bookings for a specific package schedule.
   """
-  def list_traveler_details_by_booking(booking_id) do
-    Repo.all(from td in TravelerDetail, where: td.booking_id == ^booking_id)
+  def count_bookings_for_schedule(schedule_id) do
+    Booking
+    |> where([b], b.package_schedule_id == ^schedule_id)
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
-  Returns the list of traveler details for a specific user.
+  Counts confirmed bookings for a specific package schedule.
   """
-  def list_traveler_details_by_user(user_id) do
-    Repo.all(from td in TravelerDetail, where: td.user_id == ^user_id)
+  def count_confirmed_bookings_for_schedule(schedule_id) do
+    Booking
+    |> where([b], b.package_schedule_id == ^schedule_id and b.status == "confirmed")
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
-  Gets a single traveler detail.
+  Counts total bookings for a specific package.
   """
-  def get_traveler_detail!(id), do: Repo.get!(TravelerDetail, id)
-
-  @doc """
-  Creates a traveler detail with Phase 1 (MVP) fields.
-  """
-  def create_traveler_detail_phase1(attrs \\ %{}) do
-    %TravelerDetail{}
-    |> TravelerDetail.phase1_changeset(attrs)
-    |> Repo.insert()
+  def count_bookings_for_package(package_id) do
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> where([b, ps], ps.package_id == ^package_id)
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
-  Creates a complete traveler detail with all fields.
+  Counts confirmed bookings for a specific package.
   """
-  def create_traveler_detail(attrs \\ %{}) do
-    %TravelerDetail{}
-    |> TravelerDetail.changeset(attrs)
-    |> Repo.insert()
+  def count_confirmed_bookings_for_package(package_id) do
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> where([b, ps], ps.package_id == ^package_id and b.status == "confirmed")
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
-  Updates a traveler detail with Phase 2 fields.
+  Gets all bookings with submitted payment proofs that are pending approval.
   """
-  def update_traveler_detail_phase2(%TravelerDetail{} = traveler_detail, attrs) do
-    traveler_detail
-    |> TravelerDetail.phase2_changeset(attrs)
-    |> Repo.update()
+  def get_bookings_flow_progress_pending_payment_proof_approval do
+    Booking
+    |> join(:inner, [b], u in Umrahly.Accounts.User, on: b.user_id == u.id)
+    |> join(:inner, [b, u], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> join(:inner, [b, u, ps], p in Umrahly.Packages.Package, on: ps.package_id == p.id)
+    |> where([b, u, ps, p], b.payment_proof_status == "submitted")
+    |> preload([b, u, ps, p], user: u, package_schedule: {ps, package: p})
+    |> Repo.all()
   end
 
   @doc """
-  Updates a traveler detail with Phase 3 fields.
+  Updates the payment proof status for a booking.
   """
-  def update_traveler_detail_phase3(%TravelerDetail{} = traveler_detail, attrs) do
-    traveler_detail
-    |> TravelerDetail.phase3_changeset(attrs)
-    |> Repo.update()
+  def update_payment_proof_status(%Booking{} = booking, status, _admin_notes) do
+    attrs = %{
+      "payment_proof_status" => status
+    }
+
+    case status do
+      "approved" ->
+        # Update status to confirmed when payment is approved
+        attrs = Map.put(attrs, "status", "confirmed")
+        update_booking(booking, attrs)
+      "rejected" ->
+        # Keep status as pending when payment is rejected
+        update_booking(booking, attrs)
+      _ ->
+        update_booking(booking, attrs)
+    end
   end
 
   @doc """
-  Updates a traveler detail with all fields.
+  Submits a payment proof for a booking.
   """
-  def update_traveler_detail(%TravelerDetail{} = traveler_detail, attrs) do
-    traveler_detail
-    |> TravelerDetail.changeset(attrs)
-    |> Repo.update()
+  def submit_payment_proof(%Booking{} = booking, attrs) do
+    attrs = Map.put(attrs, "payment_proof_status", "submitted")
+    attrs = Map.put(attrs, "payment_proof_submitted_at", DateTime.utc_now())
+
+    update_booking(booking, attrs)
   end
 
   @doc """
-  Deletes a traveler detail.
+  Gets all bookings for a specific user with payment information.
   """
-  def delete_traveler_detail(%TravelerDetail{} = traveler_detail) do
-    Repo.delete(traveler_detail)
+  def list_user_bookings_with_payments(user_id) do
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> join(:inner, [b, ps], p in Umrahly.Packages.Package, on: ps.package_id == p.id)
+    |> where([b, ps, p], b.user_id == ^user_id)
+    |> select([b, ps, p], %{
+      id: b.id,
+      booking_reference: fragment("'BK' || ?", b.id),
+      package_name: p.name,
+      status: b.status,
+      total_amount: b.total_amount,
+      paid_amount: b.deposit_amount,
+      payment_method: b.payment_method,
+      payment_plan: b.payment_plan,
+      booking_date: b.booking_date
+    })
+    |> Repo.all()
+  end
+
+    @doc """
+  Gets the latest booking flow progress for a given user + package.
+  """
+  def get_booking_flow_progress(user_id, package_id) do
+    BookingFlowProgress
+    |> where([bfp], bfp.user_id == ^user_id and bfp.package_id == ^package_id)
+    |> order_by([bfp], desc: bfp.inserted_at)
+    |> limit(1)
+    |> Repo.one()
   end
 
   @doc """
-  Returns an `%Ecto.Changeset{}` for tracking traveler detail changes.
+  Gets or creates booking flow progress for a user + package.
+  Always returns a `%BookingFlowProgress{}`.
   """
-  def change_traveler_detail(%TravelerDetail{} = traveler_detail, attrs \\ %{}) do
-    TravelerDetail.changeset(traveler_detail, attrs)
+  def get_or_create_booking_flow_progress(user_id, package_id, schedule_id) do
+    case get_booking_flow_progress(user_id, package_id) do
+      nil ->
+        create_booking_flow_progress(%{
+          user_id: user_id,
+          package_id: package_id,
+          package_schedule_id: schedule_id,
+          current_step: 1,
+          max_steps: 5,
+          number_of_persons: 1,
+          is_booking_for_self: true,
+          payment_method: "bank_transfer",
+          payment_plan: "full_payment",
+          status: "in_progress",
+          last_updated: DateTime.utc_now()
+        })
+        |> case do
+          {:ok, progress} -> progress
+          {:error, _changeset} -> nil
+        end
+
+      progress ->
+        progress
+    end
   end
 
-  @doc """
-  Returns an `%Ecto.Changeset{}` for Phase 1 traveler detail changes.
-  """
-  def change_traveler_detail_phase1(%TravelerDetail{} = traveler_detail, attrs \\ %{}) do
-    TravelerDetail.phase1_changeset(traveler_detail, attrs)
-  end
-
-  @doc """
-  Creates multiple traveler details for a booking.
-  """
-  def create_multiple_traveler_details(booking_id, user_id, travelers_data) do
-    Repo.transaction(fn ->
-      Enum.map_join(travelers_data, fn traveler_data ->
-        create_traveler_detail_phase1(
-          Map.merge(traveler_data, %{
-            "booking_id" => booking_id,
-            "user_id" => user_id
-          })
-        )
-      end)
-    end)
-  end
-
-  @doc """
-  Checks if a booking has all required traveler details.
-  """
-  def booking_has_complete_traveler_details?(booking_id) do
-    booking = get_booking!(booking_id)
-    traveler_count = Repo.aggregate(
-      from td in TravelerDetail, where: td.booking_id == ^booking_id,
-      select: count(td.id)
-    )
-
-    traveler_count == booking.number_of_persons
-  end
 end

@@ -8,7 +8,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
 
   def mount(_params, _session, socket) do
     # Get all active booking flows for the current user
-    active_bookings = Bookings.get_user_booking_flows(socket.assigns.current_user.id)
+    active_bookings = Bookings.get_booking_flow_progress_by_user_id(socket.assigns.current_user.id)
 
     socket =
       socket

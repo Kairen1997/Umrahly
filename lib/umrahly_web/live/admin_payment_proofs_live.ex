@@ -10,7 +10,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     # Ensure user is admin
     if socket.assigns.current_user.is_admin do
       # Get all bookings with submitted payment proofs
-      pending_proofs = Bookings.get_bookings_pending_payment_proof_approval()
+      pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
 
       socket =
         socket
@@ -24,7 +24,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
       {:ok,
        socket
        |> put_flash(:error, "Access denied. Admin privileges required.")
-       |> push_navigate(to: ~p"/")}
+       |> redirect(to: ~p"/")}
     end
   end
 
@@ -48,7 +48,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
         {:ok, _final_booking} = Bookings.update_booking(updated_booking, %{"status" => "confirmed"})
 
         # Refresh the pending proofs list
-        pending_proofs = Bookings.get_bookings_pending_payment_proof_approval()
+        pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
 
         socket =
           socket
@@ -71,7 +71,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
       {:ok, _updated_booking} ->
         # Refresh the pending proofs list
-        pending_proofs = Bookings.get_bookings_pending_payment_proof_approval()
+        pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
 
         socket =
           socket

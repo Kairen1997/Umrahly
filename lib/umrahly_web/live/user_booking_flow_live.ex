@@ -77,6 +77,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     IO.puts("MOUNT: progress.current_step = #{progress.current_step}")
     IO.puts("MOUNT: progress.number_of_persons = #{progress.number_of_persons}")
     IO.puts("MOUNT: progress.travelers_data = #{inspect(progress.travelers_data)}")
+    IO.puts("MOUNT: progress.travelers_data type = #{if progress.travelers_data, do: "#{is_map(progress.travelers_data)}", else: "nil"}")
     IO.puts("MOUNT: progress.travelers_data length = #{if progress.travelers_data, do: length(progress.travelers_data), else: 0}")
 
     # Verify the schedule belongs to the package
@@ -91,7 +92,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
       schedule_price_per_person = base_price + override_price
 
-      total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(progress.number_of_persons))
+      # We'll calculate total_amount after we know the actual number of persons
 
       # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
@@ -102,27 +103,15 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         is_resume && progress.travelers_data && length(progress.travelers_data) > 0 ->
           # Debug logging
           IO.puts("RESUME: Loading existing travelers data")
-          IO.puts("RESUME: travelers_data count: #{length(progress.travelers_data)}")
-          IO.puts("RESUME: number_of_persons: #{progress.number_of_persons}")
           IO.puts("RESUME: travelers_data: #{inspect(progress.travelers_data)}")
+          IO.puts("RESUME: number_of_persons: #{progress.number_of_persons}")
 
-          # Ensure we have the right number of travelers
-          if length(progress.travelers_data) >= progress.number_of_persons do
-            # Take only the first N travelers based on number_of_persons
-            result = Enum.take(progress.travelers_data, progress.number_of_persons)
-            IO.puts("RESUME: Using existing travelers: #{inspect(result)}")
-            result
-          else
-            # Add empty travelers if we need more
-            additional_travelers = Enum.map((length(progress.travelers_data) + 1)..progress.number_of_persons, fn _ ->
-              %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
-            end)
-            result = progress.travelers_data ++ additional_travelers
-            IO.puts("RESUME: Added empty travelers: #{inspect(result)}")
-            result
-          end
+          # Use all existing travelers and update number_of_persons to match
+          all_travelers = progress.travelers_data
+          IO.puts("RESUME: Using all existing travelers: #{inspect(all_travelers)}")
+          all_travelers
         # If not resuming but we have existing travelers data, use it
-        progress.travelers_data && length(progress.travelers_data) >= progress.number_of_persons ->
+        progress.travelers_data && length(progress.travelers_data) > 0 ->
           IO.puts("NOT_RESUME: Using existing travelers data: #{inspect(progress.travelers_data)}")
           progress.travelers_data
         # If booking for self, pre-fill first traveler
@@ -151,20 +140,27 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           end)
         end
 
+      # Update number_of_persons to match the actual number of travelers
+      actual_number_of_persons = length(travelers)
       IO.puts("FINAL travelers: #{inspect(travelers)}")
-      IO.puts("FINAL travelers count: #{length(travelers)}")
+      IO.puts("FINAL travelers count: #{actual_number_of_persons}")
+      IO.puts("UPDATED number_of_persons from #{progress.number_of_persons} to #{actual_number_of_persons}")
 
-      socket =
-        socket
-        |> assign(:package, package)
-        |> assign(:schedule, schedule)
-        |> assign(:has_price_override, has_price_override)
-        |> assign(:price_per_person, schedule_price_per_person)
-        |> assign(:total_amount, total_amount)
-        |> assign(:payment_plan, progress.payment_plan)
-        |> assign(:deposit_amount, total_amount)
-        |> assign(:number_of_persons, progress.number_of_persons)
-        |> assign(:travelers, travelers)
+      # Now calculate total amount based on actual number of persons
+      total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(actual_number_of_persons))
+      IO.puts("CALCULATED total_amount: #{total_amount} for #{actual_number_of_persons} persons")
+
+              socket =
+          socket
+          |> assign(:package, package)
+          |> assign(:schedule, schedule)
+          |> assign(:has_price_override, has_price_override)
+          |> assign(:price_per_person, schedule_price_per_person)
+          |> assign(:total_amount, total_amount)
+          |> assign(:payment_plan, progress.payment_plan)
+          |> assign(:deposit_amount, total_amount)
+          |> assign(:number_of_persons, actual_number_of_persons)
+          |> assign(:travelers, travelers)
         |> assign(:is_booking_for_self, progress.is_booking_for_self)
         |> assign(:payment_method, progress.payment_method)
         |> assign(:notes, progress.notes)
@@ -556,9 +552,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Validate that all required traveler information is filled
     all_travelers_complete =
       Enum.all?(updated_travelers, fn traveler ->
-        traveler[:full_name] != "" and
-        traveler[:identity_card_number] != "" and
-        traveler[:phone] != ""
+        traveler["full_name"] != "" and
+        traveler["identity_card_number"] != "" and
+        traveler["phone"] != ""
       end)
 
     # Update booking flow progress
@@ -611,9 +607,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Validate that all required traveler information is filled
     all_travelers_complete =
       Enum.all?(travelers, fn traveler ->
-        traveler[:full_name] != "" and
-        traveler[:identity_card_number] != "" and
-        traveler[:phone] != ""
+        traveler["full_name"] != "" and
+        traveler["identity_card_number"] != "" and
+        traveler["phone"] != ""
       end)
 
     if all_travelers_complete do
@@ -647,6 +643,45 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end)
 
     socket = assign(socket, :travelers, updated_travelers)
+
+    {:noreply, socket}
+  end
+
+  # Handle adding a new traveler
+  def handle_event("add_traveler", _params, socket) do
+    current_travelers = socket.assigns.travelers
+    new_traveler = %{
+      "full_name" => "",
+      "identity_card_number" => "",
+      "passport_number" => "",
+      "phone" => ""
+    }
+
+    updated_travelers = current_travelers ++ [new_traveler]
+    new_number_of_persons = length(updated_travelers)
+
+    # Recalculate amounts
+    package_price = socket.assigns.package.price
+    base_price = package_price
+    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
+    schedule_price_per_person = base_price + override_price
+
+    total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
+
+    # Update deposit amount if payment plan is installment
+    deposit_amount = if socket.assigns.payment_plan == "installment" do
+      Decimal.mult(total_amount, Decimal.new("0.2"))
+    else
+      total_amount
+    end
+
+    socket =
+      socket
+      |> assign(:travelers, updated_travelers)
+      |> assign(:number_of_persons, new_number_of_persons)
+      |> assign(:total_amount, total_amount)
+      |> assign(:deposit_amount, deposit_amount)
+      |> put_flash(:info, "New traveler added! Please fill in their details.")
 
     {:noreply, socket}
   end
@@ -710,9 +745,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           # Validate travelers before allowing progression to step 3
           travelers = socket.assigns.travelers
           all_travelers_complete = Enum.all?(travelers, fn traveler ->
-            traveler[:full_name] != "" and
-            traveler[:identity_card_number] != "" and
-            traveler[:phone] != ""
+            traveler["full_name"] != "" and
+            traveler["identity_card_number"] != "" and
+            traveler["phone"] != ""
           end)
 
           if all_travelers_complete do
@@ -782,9 +817,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
         # Check if all travelers have required fields filled
     all_travelers_complete = Enum.all?(travelers, fn traveler ->
-      traveler[:full_name] != "" and
-      traveler[:identity_card_number] != "" and
-      traveler[:phone] != ""
+      traveler["full_name"] != "" and
+      traveler["identity_card_number"] != "" and
+      traveler["phone"] != ""
     end)
 
     # Check if payment method is selected
@@ -1365,7 +1400,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
               <!-- Travelers Details -->
               <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="font-medium text-gray-900 mb-3">Travelers Details</h3>
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-medium text-gray-900">Travelers Details</h3>
+                  <span class="text-sm text-gray-600 bg-blue-100 px-2 py-1 rounded">
+                    Total: <%= @number_of_persons %> traveler(s)
+                  </span>
+                </div>
 
                 <!-- Toggle for single traveler -->
                 <%= if @number_of_persons == 1 do %>
@@ -1448,14 +1488,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <div class="relative">
                             <input
                               type="text"
-                              value={traveler[:full_name] || ""}
+                              value={traveler["full_name"] || ""}
                               phx-blur="update_traveler_field"
                               phx-value-index={index}
                               phx-value-field="full_name"
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               placeholder="Enter full name"
                             />
-                            <%= if traveler[:full_name] && traveler[:full_name] != "" do %>
+                            <%= if traveler["full_name"] && traveler["full_name"] != "" do %>
                               <button
                                 type="button"
                                 phx-click="clear_traveler_field"
@@ -1477,14 +1517,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <div class="relative">
                             <input
                               type="text"
-                              value={traveler[:identity_card_number] || ""}
+                              value={traveler["identity_card_number"] || ""}
                               phx-blur="update_traveler_field"
                               phx-value-index={index}
                               phx-value-field="identity_card_number"
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               placeholder="Enter identity card number"
                             />
-                            <%= if traveler[:identity_card_number] && traveler[:identity_card_number] != "" do %>
+                            <%= if traveler["identity_card_number"] && traveler["identity_card_number"] != "" do %>
                               <button
                                 type="button"
                                 phx-click="clear_traveler_field"
@@ -1506,14 +1546,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <div class="relative">
                             <input
                               type="text"
-                              value={traveler[:passport_number] || ""}
+                              value={traveler["passport_number"] || ""}
                               phx-blur="update_traveler_field"
                               phx-value-index={index}
                               phx-value-field="passport_number"
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               placeholder="Enter passport number (optional)"
                             />
-                            <%= if traveler[:passport_number] && traveler[:passport_number] != "" do %>
+                            <%= if traveler["passport_number"] && traveler["passport_number"] != "" do %>
                               <button
                                 type="button"
                                 phx-click="clear_traveler_field"
@@ -1535,14 +1575,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                           <div class="relative">
                             <input
                               type="text"
-                              value={traveler[:phone] || ""}
+                              value={traveler["phone"] || ""}
                               phx-blur="update_traveler_field"
                               phx-value-index={index}
                               phx-value-field="phone"
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               placeholder="Enter phone number"
                             />
-                            <%= if traveler[:phone] && traveler[:phone] != "" do %>
+                            <%= if traveler["phone"] && traveler["phone"] != "" do %>
                               <button
                                 type="button"
                                 phx-click="clear_traveler_field"
@@ -1561,7 +1601,18 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <% end %>
                 </div>
 
-                                <!-- Save Button -->
+                <!-- Add Traveler Button -->
+                <div class="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    phx-click="add_traveler"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium mr-4"
+                  >
+                    + Add New Traveler
+                  </button>
+                </div>
+
+                <!-- Save Button -->
                 <div class="mt-6 flex justify-center">
                   <button
                     type="button"
@@ -1595,8 +1646,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <% end %>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Details filled:</span>
-                    <span class={if Enum.all?(@travelers, fn t -> t[:full_name] != "" and t[:identity_card_number] != "" and t[:phone] != "" end), do: "text-green-600 font-medium", else: "text-red-600 font-medium"}>
-                      <%= if Enum.all?(@travelers, fn t -> t[:full_name] != "" and t[:identity_card_number] != "" and t[:phone] != "" end), do: "Complete", else: "Incomplete" %>
+                    <span class={if Enum.all?(@travelers, fn t -> t["full_name"] != "" and t["identity_card_number"] != "" and t["phone"] != "" end), do: "text-green-600 font-medium", else: "text-red-600 font-medium"}>
+                      <%= if Enum.all?(@travelers, fn t -> t["full_name"] != "" and t["identity_card_number"] != "" and t["phone"] != "" end), do: "Complete", else: "Incomplete" %>
                     </span>
                   </div>
                 </div>
@@ -1843,7 +1894,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>
                           <span class="text-gray-600">Full Name:</span>
-                          <span class="font-medium ml-2"><%= traveler[:full_name] || "" %></span>
+                          <span class="font-medium ml-2"><%= traveler["full_name"] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Identity Card:</span>

@@ -116,9 +116,9 @@ defmodule UmrahlyWeb.AdminProfileLive do
 
   def handle_event("validate-identity-contact", %{"profile" => profile_params}, socket) do
     socket = case profile_params do
-      %{"identity_card_number" => id_num, "phone_number" => phone, "address" => addr, "monthly_income" => income, "gender" => gender, "birthdate" => birthdate} ->
+      %{"identity_card_number" => id_num, "phone_number" => phone, "address" => addr, "monthly_income" => income, "gender" => gender, "birthdate" => birthdate, "passport_number" => passport, "poskod" => poskod, "city" => city, "state" => state, "citizenship" => citizenship, "emergency_contact_name" => ec_name, "emergency_contact_phone" => ec_phone, "emergency_contact_relationship" => ec_rel} ->
         cond do
-          id_num == "" and phone == "" and addr == "" and income == "" and gender == "" and birthdate == "" ->
+          id_num == "" and phone == "" and addr == "" and income == "" and gender == "" and birthdate == "" and passport == "" and poskod == "" and city == "" and state == "" and citizenship == "" and ec_name == "" and ec_phone == "" and ec_rel == "" ->
             put_flash(socket, :warning, "Please fill in at least one field")
           true ->
             socket
@@ -274,68 +274,177 @@ defmodule UmrahlyWeb.AdminProfileLive do
                 <!-- Identity and Contact Information -->
                 <div class="bg-gray-50 rounded-lg p-6">
                   <h3 class="text-lg font-semibold text-gray-900 mb-4">Identity & Contact Information</h3>
-                  <form phx-submit="save-identity-contact" phx-change="validate-identity-contact" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number</label>
-                        <input
-                          type="text"
-                          name="profile[identity_card_number]"
-                          value={@profile.identity_card_number || ""}
+                  <form phx-submit="save-identity-contact" phx-change="validate-identity-contact" class="space-y-6">
+
+                    <!-- Personal Information Section -->
+                    <div class="border-b border-gray-200 pb-4">
+                      <h4 class="text-md font-medium text-gray-800 mb-3">Personal Information</h4>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number</label>
+                          <input
+                            type="text"
+                            name="profile[identity_card_number]"
+                            value={@profile.identity_card_number || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter IC number"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Passport Number</label>
+                          <input
+                            type="text"
+                            name="profile[passport_number]"
+                            value={@profile.passport_number || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter passport number"
+                          />
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <input
+                            type="tel"
+                            name="profile[phone_number]"
+                            value={@profile.phone_number || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter phone number"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                          <select
+                            name="profile[gender]"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          >
+                            <option value="">Select gender</option>
+                            <option value="male" selected={@profile.gender == "male"}>Male</option>
+                            <option value="female" selected={@profile.gender == "female"}>Female</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income (RM)</label>
+                          <input
+                            type="number"
+                            name="profile[monthly_income]"
+                            value={@profile.monthly_income || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter monthly income"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Birth Date</label>
+                          <input
+                            type="date"
+                            name="profile[birthdate]"
+                            value={@profile.birthdate || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Citizenship</label>
+                          <input
+                            type="text"
+                            name="profile[citizenship]"
+                            value={@profile.citizenship || "Malaysia"}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter citizenship"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Address Section -->
+                    <div class="border-b border-gray-200 pb-4">
+                      <h4 class="text-md font-medium text-gray-800 mb-3">Address Information</h4>
+                      <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <textarea
+                          name="profile[address]"
+                          rows="3"
                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          placeholder="Enter IC number"
-                        />
+                          placeholder="Enter your address"
+                        ><%= @profile.address || "" %></textarea>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                          <input
+                            type="text"
+                            name="profile[city]"
+                            value={@profile.city || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter city"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                          <input
+                            type="text"
+                            name="profile[state]"
+                            value={@profile.state || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter state"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code (Poskod)</label>
+                          <input
+                            type="text"
+                            name="profile[poskod]"
+                            value={@profile.poskod || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter postal code"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Emergency Contact Section -->
+                    <div class="pb-4">
+                      <h4 class="text-md font-medium text-gray-800 mb-3">Emergency Contact</h4>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Name</label>
+                          <input
+                            type="text"
+                            name="profile[emergency_contact_name]"
+                            value={@profile.emergency_contact_name || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter emergency contact name"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Phone</label>
+                          <input
+                            type="tel"
+                            name="profile[emergency_contact_phone]"
+                            value={@profile.emergency_contact_phone || ""}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            placeholder="Enter emergency contact phone"
+                          />
+                        </div>
                       </div>
                       <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                        <input
-                          type="tel"
-                          name="profile[phone_number]"
-                          value={@profile.phone_number || ""}
-                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income (RM)</label>
-                        <input
-                          type="number"
-                          name="profile[monthly_income]"
-                          value={@profile.monthly_income || ""}
-                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          placeholder="Enter monthly income"
-                        />
-                      </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Relationship</label>
                         <select
-                          name="profile[gender]"
+                          name="profile[emergency_contact_relationship]"
                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                         >
-                          <option value="">Select gender</option>
-                          <option value="male" selected={@profile.gender == "male"}>Male</option>
-                          <option value="female" selected={@profile.gender == "female"}>Female</option>
+                          <option value="">Select relationship</option>
+                          <option value="spouse" selected={@profile.emergency_contact_relationship == "spouse"}>Spouse</option>
+                          <option value="parent" selected={@profile.emergency_contact_relationship == "parent"}>Parent</option>
+                          <option value="child" selected={@profile.emergency_contact_relationship == "child"}>Child</option>
+                          <option value="sibling" selected={@profile.emergency_contact_relationship == "sibling"}>Sibling</option>
+                          <option value="friend" selected={@profile.emergency_contact_relationship == "friend"}>Friend</option>
+                          <option value="other" selected={@profile.emergency_contact_relationship == "other"}>Other</option>
                         </select>
                       </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Birth Date</label>
-                        <input
-                          type="date"
-                          name="profile[birthdate]"
-                          value={@profile.birthdate || ""}
-                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
-                      </div>
                     </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                      <textarea
-                        name="profile[address]"
-                        rows="3"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        placeholder="Enter your address"
-                      ><%= @profile.address || "" %></textarea>
-                    </div>
+
                     <div class="flex justify-end">
                       <button
                         type="submit"

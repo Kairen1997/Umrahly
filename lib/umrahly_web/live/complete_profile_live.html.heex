@@ -13,81 +13,190 @@
 
     <!-- Page Content -->
     <main class="flex-1 bg-gray-50 p-6 overflow-auto">
-      <div class="max-w-2xl mx-auto">
+      <div class="max-w-4xl mx-auto">
         <div class="bg-white rounded-lg shadow p-6">
           <.form
             for={@changeset}
             phx-submit="save"
-            class="space-y-6"
+            class="space-y-8"
           >
-            <!-- Row 1 -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number *</label>
-                <input type="text" name="user[identity_card_number]" value={@changeset.data.identity_card_number} class="w-full border border-gray-300 rounded-lg p-2" required />
-                <%= if @changeset.errors[:identity_card_number] do %>
-                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:identity_card_number]) do %>
-                    <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+            <!-- Personal Information Section -->
+            <div class="border-b border-gray-200 pb-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+              
+              <!-- Row 1 -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number *</label>
+                  <input type="text" name="user[identity_card_number]" value={@changeset.data.identity_card_number} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:identity_card_number] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:identity_card_number]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
                   <% end %>
-                <% end %>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Passport Number</label>
+                  <input type="text" name="user[passport_number]" value={@changeset.data.passport_number} class="w-full border border-gray-300 rounded-lg p-2" />
+                  <%= if @changeset.errors[:passport_number] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:passport_number]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
               </div>
 
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                <input type="text" name="user[phone_number]" value={@changeset.data.phone_number} class="w-full border border-gray-300 rounded-lg p-2" required />
-                <%= if @changeset.errors[:phone_number] do %>
-                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:phone_number]) do %>
-                    <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+              <!-- Row 2 -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                  <input type="text" name="user[phone_number]" value={@changeset.data.phone_number} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:phone_number] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:phone_number]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
                   <% end %>
-                <% end %>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
+                  <select name="user[gender]" class="w-full border border-gray-300 rounded-lg p-2" required>
+                    <option value="">Select Gender</option>
+                    <option value="male" selected={@changeset.data.gender == "male"}>Male</option>
+                    <option value="female" selected={@changeset.data.gender == "female"}>Female</option>
+                  </select>
+                  <%= if @changeset.errors[:gender] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:gender]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+
+              <!-- Row 3 -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income (RM) *</label>
+                  <input type="number" name="user[monthly_income]" value={@changeset.data.monthly_income} step="0.01" class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:monthly_income] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:monthly_income]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+
+                <div>
+                  <.label>Birthdate *</.label>
+                  <input type="date" name="user[birthdate]" value={@changeset.data.birthdate} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:birthdate] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:birthdate]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Citizenship *</label>
+                  <input type="text" name="user[citizenship]" value={@changeset.data.citizenship || "Malaysia"} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:citizenship] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:citizenship]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
               </div>
             </div>
 
-            <!-- Row 2 -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Address *</label>
-              <textarea name="user[address]" class="w-full border border-gray-300 rounded-lg p-2" rows="3" required><%= @changeset.data.address %></textarea>
-              <%= if @changeset.errors[:address] do %>
-                <%= for {msg, _opts} <- List.wrap(@changeset.errors[:address]) do %>
-                  <p class="text-red-600 text-sm mt-1"><%= msg %></p>
-                <% end %>
-              <% end %>
-            </div>
-
-            <!-- Row 3 -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income (RM) *</label>
-                <input type="number" name="user[monthly_income]" value={@changeset.data.monthly_income} step="0.01" class="w-full border border-gray-300 rounded-lg p-2" required />
-                <%= if @changeset.errors[:monthly_income] do %>
-                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:monthly_income]) do %>
+            <!-- Address Section -->
+            <div class="border-b border-gray-200 pb-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-4">Address Information</h3>
+              
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+                <textarea name="user[address]" class="w-full border border-gray-300 rounded-lg p-2" rows="3" required><%= @changeset.data.address %></textarea>
+                <%= if @changeset.errors[:address] do %>
+                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:address]) do %>
                     <p class="text-red-600 text-sm mt-1"><%= msg %></p>
                   <% end %>
                 <% end %>
               </div>
 
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <input type="text" name="user[city]" value={@changeset.data.city} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:city] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:city]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                  <input type="text" name="user[state]" value={@changeset.data.state} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:state] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:state]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code (Poskod) *</label>
+                  <input type="text" name="user[poskod]" value={@changeset.data.poskod} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:poskod] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:poskod]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+
+            <!-- Emergency Contact Section -->
+            <div class="border-b border-gray-200 pb-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h3>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Name *</label>
+                  <input type="text" name="user[emergency_contact_name]" value={@changeset.data.emergency_contact_name} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:emergency_contact_name] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:emergency_contact_name]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Phone *</label>
+                  <input type="text" name="user[emergency_contact_phone]" value={@changeset.data.emergency_contact_phone} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <%= if @changeset.errors[:emergency_contact_phone] do %>
+                    <%= for {msg, _opts} <- List.wrap(@changeset.errors[:emergency_contact_phone]) do %>
+                      <p class="text-red-600 text-sm mt-1"><%= msg %></p>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
-                <select name="user[gender]" class="w-full border border-gray-300 rounded-lg p-2" required>
-                  <option value="">Select Gender</option>
-                  <option value="male" selected={@changeset.data.gender == "male"}>Male</option>
-                  <option value="female" selected={@changeset.data.gender == "female"}>Female</option>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Relationship *</label>
+                <select name="user[emergency_contact_relationship]" class="w-full border border-gray-300 rounded-lg p-2" required>
+                  <option value="">Select Relationship</option>
+                  <option value="spouse" selected={@changeset.data.emergency_contact_relationship == "spouse"}>Spouse</option>
+                  <option value="parent" selected={@changeset.data.emergency_contact_relationship == "parent"}>Parent</option>
+                  <option value="child" selected={@changeset.data.emergency_contact_relationship == "child"}>Child</option>
+                  <option value="sibling" selected={@changeset.data.emergency_contact_relationship == "sibling"}>Sibling</option>
+                  <option value="friend" selected={@changeset.data.emergency_contact_relationship == "friend"}>Friend</option>
+                  <option value="other" selected={@changeset.data.emergency_contact_relationship == "other"}>Other</option>
                 </select>
-                <%= if @changeset.errors[:gender] do %>
-                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:gender]) do %>
+                <%= if @changeset.errors[:emergency_contact_relationship] do %>
+                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:emergency_contact_relationship]) do %>
                     <p class="text-red-600 text-sm mt-1"><%= msg %></p>
                   <% end %>
-                <% end %>
-              </div>
-
-              <div>
-                <.label>Birthdate *</.label>
-                <input type="date" name="user[birthdate]" value={@changeset.data.birthdate} class="w-full border border-gray-300 rounded-lg p-2" required />
-                <%= if @changeset.errors[:birthdate] do %>
-                  <%= for {msg, _opts} <- List.wrap(@changeset.errors[:birthdate]) do %>
-                    <p class="text-red-600 text-sm mt-1"><%= msg %></p>
                   <% end %>
-                <% end %>
               </div>
             </div>
 

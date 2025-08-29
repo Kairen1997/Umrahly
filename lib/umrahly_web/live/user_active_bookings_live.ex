@@ -29,22 +29,27 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
     end
   end
 
-  def handle_event("abandon_booking", %{"id" => id}, socket) do
-    # Find the booking flow progress and mark it as abandoned
+  def handle_event("cancel_booking", %{"id" => id}, socket) do
+    # Find the booking flow progress and mark it as cancelled
     case Enum.find(socket.assigns.active_bookings, &(&1.id == String.to_integer(id))) do
       nil ->
         {:noreply, put_flash(socket, :error, "Booking flow not found")}
-      _booking_flow ->
-        # In a real implementation, you would call Bookings.abandon_booking_flow_progress/1
-        # For now, we'll just remove it from the list
-        updated_bookings = Enum.reject(socket.assigns.active_bookings, &(&1.id == String.to_integer(id)))
+      booking_flow ->
+        # Call the Bookings module to cancel the booking flow progress
+        case Bookings.cancel_booking_flow_progress(booking_flow.id) do
+          {:ok, _cancelled_booking} ->
+            # Remove the cancelled booking from the list
+            updated_bookings = Enum.reject(socket.assigns.active_bookings, &(&1.id == String.to_integer(id)))
 
-        socket =
-          socket
-          |> assign(:active_bookings, updated_bookings)
-          |> put_flash(:info, "Booking flow abandoned")
+            socket =
+              socket
+              |> assign(:active_bookings, updated_bookings)
+              |> put_flash(:info, "Booking has been cancelled successfully")
 
-        {:noreply, socket}
+            {:noreply, socket}
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to cancel booking. Please try again.")}
+        end
     end
   end
 
@@ -197,11 +202,11 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         Resume Booking
                       </button>
                       <button
-                        phx-click="abandon_booking"
+                        phx-click="cancel_booking"
                         phx-value-id={booking.id}
-                        class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium text-sm"
+                        class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
                       >
-                        Abandon
+                        Cancel Booking
                       </button>
                     </div>
                   </div>

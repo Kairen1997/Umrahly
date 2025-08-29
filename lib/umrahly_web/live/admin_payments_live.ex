@@ -82,25 +82,24 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       filtered_query
       |> select([bfp, u, p], %{
         id: bfp.id,
-        user_name: fragment("COALESCE(?, 'Unknown')", u.full_name),
-        user_email: fragment("COALESCE(?, 'No email')", u.email),
-        package_name: fragment("COALESCE(?, 'Unknown Package')", p.name),
-        amount: fragment("CASE WHEN ? IS NOT NULL THEN CONCAT('RM ', FORMAT(?, 0)) ELSE 'RM 0' END", bfp.total_amount, bfp.total_amount),
-        raw_amount: bfp.total_amount,
-        payment_method: fragment("COALESCE(?, 'Not specified')", bfp.payment_method),
-        payment_plan: fragment("COALESCE(?, 'Not specified')", bfp.payment_plan),
-        status: fragment("COALESCE(?, 'unknown')", bfp.status),
-        transaction_id: fragment("CONCAT('TXN-', LPAD(?, 6, '0'))", bfp.id),
-        payment_date: fragment("DATE_FORMAT(?, '%Y-%m-%d')", bfp.inserted_at),
-        booking_reference: fragment("CONCAT('BK-', LPAD(?, 6, '0'))", bfp.id),
-        number_of_persons: fragment("COALESCE(?, 1)", bfp.number_of_persons),
-        current_step: fragment("COALESCE(?, 1)", bfp.current_step),
-        max_steps: fragment("COALESCE(?, 4)", bfp.max_steps),
+        user_name: u.full_name,
+        user_email: u.email,
+        package_name: p.name,
+        total_amount: bfp.total_amount,
+        payment_method: bfp.payment_method,
+        payment_plan: bfp.payment_plan,
+        status: bfp.status,
+        number_of_persons: bfp.number_of_persons,
+        current_step: bfp.current_step,
+        max_steps: bfp.max_steps,
         inserted_at: bfp.inserted_at,
-        updated_at: bfp.updated_at
+        updated_at: bfp.updated_at,
+        travelers_data: bfp.travelers_data
       })
       |> order_by([bfp, u, p], [desc: bfp.inserted_at])
       |> Repo.all()
+      |> Enum.flat_map(&expand_traveler_data/1)
+      |> Enum.map(&format_payment_data/1)
     rescue
       e ->
         IO.inspect(e, label: "Error fetching payments data")
@@ -134,25 +133,33 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       filtered_query
       |> select([bfp, u, p], %{
         id: bfp.id,
-        user_name: fragment("COALESCE(?, 'Unknown')", u.full_name),
-        user_email: fragment("COALESCE(?, 'No email')", u.email),
-        package_name: fragment("COALESCE(?, 'Unknown Package')", p.name),
-        amount: fragment("CASE WHEN ? IS NOT NULL THEN CONCAT('RM ', FORMAT(?, 0)) ELSE 'RM 0' END", bfp.total_amount, bfp.total_amount),
-        raw_amount: bfp.total_amount,
-        payment_method: fragment("COALESCE(?, 'Not specified')", bfp.payment_method),
-        payment_plan: fragment("COALESCE(?, 'Not specified')", bfp.payment_plan),
-        status: fragment("COALESCE(?, 'unknown')", bfp.status),
-        transaction_id: fragment("CONCAT('TXN-', LPAD(?, 6, '0'))", bfp.id),
-        payment_date: fragment("DATE_FORMAT(?, '%Y-%m-%d')", bfp.inserted_at),
-        booking_reference: fragment("CONCAT('BK-', LPAD(?, 6, '0'))", bfp.id),
-        number_of_persons: fragment("COALESCE(?, 1)", bfp.number_of_persons),
-        current_step: fragment("COALESCE(?, 1)", bfp.current_step),
-        max_steps: fragment("COALESCE(?, 4)", bfp.max_steps),
+        user_name: u.full_name,
+        user_email: u.email,
+        package_name: p.name,
+        total_amount: bfp.total_amount,
+        payment_method: bfp.payment_method,
+        payment_plan: bfp.payment_plan,
+        status: bfp.status,
+        number_of_persons: bfp.number_of_persons,
+        current_step: bfp.current_step,
+        max_steps: bfp.max_steps,
         inserted_at: bfp.inserted_at,
-        updated_at: bfp.updated_at
+        updated_at: bfp.updated_at,
+        travelers_data: bfp.travelers_data
       })
       |> order_by([bfp, u, p], [desc: bfp.inserted_at])
       |> Repo.all()
+      |> Enum.flat_map(&expand_traveler_data/1)
+      |> Enum.filter(fn payment ->
+        search_pattern = String.downcase(search_term)
+
+        String.contains?(String.downcase(payment.user_name || ""), search_pattern) or
+        String.contains?(String.downcase(payment.user_email || ""), search_pattern) or
+        String.contains?(String.downcase(payment.package_name || ""), search_pattern) or
+        String.contains?(String.downcase(payment.traveler_name || ""), search_pattern) or
+        String.contains?(String.downcase(payment.traveler_identity || ""), search_pattern)
+      end)
+      |> Enum.map(&format_payment_data/1)
     rescue
       e ->
         IO.inspect(e, label: "Error searching payments")
@@ -161,6 +168,90 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   end
 
   defp search_payments(_search_term, status_filter), do: get_payments_data(status_filter)
+
+  # Expand traveler data to show individual travelers
+  defp expand_traveler_data(booking) do
+    case booking.travelers_data do
+      nil ->
+        # If no travelers data, create a single entry with user info
+        [%{booking |
+          traveler_name: booking.user_name || "Unknown",
+          traveler_identity: "No ID",
+          traveler_phone: "No phone",
+          traveler_address: "No address",
+          traveler_city: "No city",
+          traveler_state: "No state",
+          traveler_citizenship: "No citizenship"
+        }]
+      travelers when is_list(travelers) ->
+        Enum.map(travelers, fn traveler ->
+          %{booking |
+            traveler_name: traveler["full_name"] || "Unknown Traveler",
+            traveler_identity: traveler["identity_card_number"] || traveler["passport_number"] || "No ID",
+            traveler_phone: traveler["phone"] || "No phone",
+            traveler_address: traveler["address"] || "No address",
+            traveler_city: traveler["city"] || "No city",
+            traveler_state: traveler["state"] || "No state",
+            traveler_citizenship: traveler["citizenship"] || traveler["nationality"] || "No citizenship"
+          }
+        end)
+      _ ->
+        # Fallback for unexpected data types
+        [%{booking |
+          traveler_name: booking.user_name || "Unknown",
+          traveler_identity: "No ID",
+          traveler_phone: "No phone",
+          traveler_address: "No address",
+          traveler_city: "No city",
+          traveler_state: "No state",
+          traveler_citizenship: "No citizenship"
+        }]
+    end
+  end
+
+  defp format_payment_data(payment) do
+    %{
+      id: payment.id,
+      user_name: payment.user_name || "Unknown",
+      user_email: payment.user_email || "No email",
+      package_name: payment.package_name || "Unknown Package",
+      amount: format_amount(payment.total_amount),
+      raw_amount: payment.total_amount,
+      payment_method: payment.payment_method || "Not specified",
+      payment_plan: payment.payment_plan || "Not specified",
+      status: payment.status || "unknown",
+      transaction_id: "TXN-#{String.pad_leading("#{payment.id}", 6, "0")}",
+      payment_date: format_date(payment.inserted_at),
+      booking_reference: "BK-#{String.pad_leading("#{payment.id}", 6, "0")}",
+      number_of_persons: payment.number_of_persons || 1,
+      current_step: payment.current_step || 1,
+      max_steps: payment.max_steps || 4,
+      inserted_at: payment.inserted_at,
+      updated_at: payment.updated_at,
+      # Traveler information
+      traveler_name: payment.traveler_name || payment.user_name || "Unknown",
+      traveler_identity: payment.traveler_identity || "No ID",
+      traveler_phone: payment.traveler_phone || "No phone",
+      traveler_address: payment.traveler_address || "No address",
+      traveler_city: payment.traveler_city || "No city",
+      traveler_state: payment.traveler_state || "No state",
+      traveler_citizenship: payment.traveler_citizenship || "No citizenship"
+    }
+  end
+
+  defp format_amount(nil), do: "RM 0"
+  defp format_amount(%Decimal{} = amount) do
+    "RM #{Decimal.round(amount, 0)}"
+  end
+  defp format_amount(amount) when is_number(amount) do
+    "RM #{amount}"
+  end
+  defp format_amount(amount), do: "RM #{amount}"
+
+  defp format_date(nil), do: "Unknown"
+  defp format_date(datetime) do
+    Calendar.strftime(datetime, "%Y-%m-%d")
+  end
 
   def render(assigns) do
     ~H"""
@@ -195,7 +286,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                   type="text"
                   name="search"
                   value={@search_term}
-                  placeholder="Search by customer name, email, or package..."
+                  placeholder="Search by traveler name, user name, email, or package..."
                   class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button type="submit" class="px-4 py-2 bg-gray-600 text-white rounded-r-lg hover:bg-gray-700 transition-colors">
@@ -248,7 +339,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
               <thead class="bg-gray-50">
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment ID</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Traveler</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booked By</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Package</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
@@ -262,7 +354,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
               <tbody class="bg-white divide-y divide-gray-200">
                 <%= if Enum.empty?(@payments) do %>
                   <tr>
-                    <td colspan="10" class="px-6 py-8 text-center text-gray-500">
+                    <td colspan="11" class="px-6 py-8 text-center text-gray-500">
                       <div class="flex flex-col items-center">
                         <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -276,6 +368,19 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                   <%= for payment <- @payments do %>
                     <tr class="hover:bg-gray-50">
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#<%= payment.id %></td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900 font-medium"><%= payment.traveler_name %></div>
+                        <div class="text-sm text-gray-500">
+                          <%= if payment.traveler_identity != "No ID" do %>
+                            ID: <%= payment.traveler_identity %>
+                          <% end %>
+                        </div>
+                        <div class="text-xs text-gray-400">
+                          <%= if payment.traveler_phone != "No phone" do %>
+                            📞 <%= payment.traveler_phone %>
+                          <% end %>
+                        </div>
+                      </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm text-gray-900"><%= payment.user_name %></div>
                         <div class="text-sm text-gray-500"><%= payment.user_email %></div>

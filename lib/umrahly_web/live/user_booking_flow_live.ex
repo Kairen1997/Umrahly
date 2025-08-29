@@ -125,18 +125,58 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 full_name: socket.assigns.current_user.full_name || "",
                 identity_card_number: socket.assigns.current_user.identity_card_number || "",
                 passport_number: "",
-                phone: socket.assigns.current_user.phone_number || ""
+                phone: socket.assigns.current_user.phone_number || "",
+                date_of_birth: "",
+                address: "",
+                poskod: "",
+                city: "",
+                state: "",
+                citizenship: "Malaysia",
+                emergency_contact_name: "",
+                emergency_contact_phone: "",
+                emergency_contact_relationship: "",
+                room_type: "standard"
               }
             else
               # Additional travelers - empty fields
-              %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+              %{
+                full_name: "",
+                identity_card_number: "",
+                passport_number: "",
+                phone: "",
+                date_of_birth: "",
+                address: "",
+                poskod: "",
+                city: "",
+                state: "",
+                citizenship: "Malaysia",
+                emergency_contact_name: "",
+                emergency_contact_phone: "",
+                emergency_contact_relationship: "",
+                room_type: "standard"
+              }
             end
           end)
         true ->
           IO.puts("DEFAULT: Creating empty travelers list")
           # Create empty travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn _ ->
-            %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+            %{
+              full_name: "",
+              identity_card_number: "",
+              passport_number: "",
+              phone: "",
+              date_of_birth: "",
+              address: "",
+              poskod: "",
+              city: "",
+              state: "",
+              citizenship: "Malaysia",
+              emergency_contact_name: "",
+              emergency_contact_phone: "",
+              emergency_contact_relationship: "",
+              room_type: "standard"
+            }
           end)
         end
 
@@ -200,14 +240,39 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         current_count = length(travelers_params)
         if number_of_persons > current_count do
           additional_travelers = Enum.map((current_count + 1)..number_of_persons, fn _ ->
-            %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+            %{
+              full_name: "",
+              identity_card_number: "",
+              passport_number: "",
+              phone: "",
+              date_of_birth: "",
+              address: "",
+              poskod: "",
+              city: "",
+              state: "",
+              citizenship: "Malaysia",
+              emergency_contact_name: "",
+              emergency_contact_phone: "",
+              emergency_contact_relationship: "",
+              room_type: "standard"
+            }
           end)
           Enum.map(travelers_params, fn traveler ->
             %{
               full_name: traveler["full_name"] || "",
               identity_card_number: traveler["identity_card_number"] || "",
               passport_number: traveler["passport_number"] || "",
-              phone: traveler["phone"] || ""
+              phone: traveler["phone"] || "",
+              date_of_birth: traveler["date_of_birth"] || "",
+              address: traveler["address"] || "",
+              poskod: traveler["poskod"] || "",
+              city: traveler["city"] || "",
+              state: traveler["state"] || "",
+              citizenship: traveler["citizenship"] || "Malaysia",
+              emergency_contact_name: traveler["emergency_contact_name"] || "",
+              emergency_contact_phone: traveler["emergency_contact_phone"] || "",
+              emergency_contact_relationship: traveler["emergency_contact_relationship"] || "",
+              room_type: traveler["room_type"] || "standard"
             }
           end) ++ additional_travelers
         else
@@ -217,7 +282,17 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               full_name: traveler["full_name"] || "",
               identity_card_number: traveler["identity_card_number"] || "",
               passport_number: traveler["passport_number"] || "",
-              phone: traveler["phone"] || ""
+              phone: traveler["phone"] || "",
+              date_of_birth: traveler["date_of_birth"] || "",
+              address: traveler["address"] || "",
+              poskod: traveler["poskod"] || "",
+              city: traveler["city"] || "",
+              state: traveler["state"] || "",
+              citizenship: traveler["citizenship"] || "Malaysia",
+              emergency_contact_name: traveler["emergency_contact_name"] || "",
+              emergency_contact_phone: traveler["emergency_contact_phone"] || "",
+              emergency_contact_relationship: traveler["emergency_contact_relationship"] || "",
+              room_type: traveler["room_type"] || "standard"
             }
           end), number_of_persons)
         end
@@ -290,7 +365,17 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         full_name: socket.assigns.current_user.full_name || "",
         identity_card_number: socket.assigns.current_user.identity_card_number || "",
         passport_number: "",
-        phone: socket.assigns.current_user.phone_number || ""
+        phone: socket.assigns.current_user.phone_number || "",
+        date_of_birth: "",
+        address: "",
+        poskod: "",
+        city: "",
+        state: "",
+        citizenship: "Malaysia",
+        emergency_contact_name: "",
+        emergency_contact_phone: "",
+        emergency_contact_relationship: "",
+        room_type: "standard"
       }]
     else
       # Booking for someone else - empty fields
@@ -298,14 +383,51 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         full_name: "",
         identity_card_number: "",
         passport_number: "",
-        phone: ""
+        phone: "",
+        date_of_birth: "",
+        address: "",
+        poskod: "",
+        city: "",
+        state: "",
+        citizenship: "Malaysia",
+        emergency_contact_name: "",
+        emergency_contact_phone: "",
+        emergency_contact_relationship: "",
+        room_type: "standard"
       }]
+    end
+
+    # If we're toggling to booking for self, also update the travelers list to match the current number of persons
+    final_travelers = if new_is_booking_for_self and socket.assigns.number_of_persons > 1 do
+      # Keep the first traveler with user details, add empty travelers for the rest
+      first_traveler = List.first(travelers)
+      additional_travelers = Enum.map(2..socket.assigns.number_of_persons, fn _ ->
+        %{
+          full_name: "",
+          identity_card_number: "",
+          passport_number: "",
+          phone: "",
+          date_of_birth: "",
+          address: "",
+          poskod: "",
+          city: "",
+          state: "",
+          citizenship: "Malaysia",
+          emergency_contact_name: "",
+          emergency_contact_phone: "",
+          emergency_contact_relationship: "",
+          room_type: "standard"
+        }
+      end)
+      [first_traveler] ++ additional_travelers
+    else
+      travelers
     end
 
     socket =
       socket
       |> assign(:is_booking_for_self, new_is_booking_for_self)
-      |> assign(:travelers, travelers)
+      |> assign(:travelers, final_travelers)
 
     {:noreply, socket}
   end
@@ -319,7 +441,22 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     travelers = if new_number > current_number do
       # Add new travelers while preserving existing data
       additional_travelers = Enum.map((current_number + 1)..new_number, fn _index ->
-        %{full_name: "", identity_card_number: "", passport_number: "", phone: ""}
+        %{
+          full_name: "",
+          identity_card_number: "",
+          passport_number: "",
+          phone: "",
+          date_of_birth: "",
+          address: "",
+          poskod: "",
+          city: "",
+          state: "",
+          citizenship: "Malaysia",
+          emergency_contact_name: "",
+          emergency_contact_phone: "",
+          emergency_contact_relationship: "",
+          room_type: "standard"
+        }
       end)
 
       # Merge existing travelers with new ones
@@ -607,9 +744,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Validate that all required traveler information is filled
     all_travelers_complete =
       Enum.all?(travelers, fn traveler ->
-        traveler["full_name"] != "" and
-        traveler["identity_card_number"] != "" and
-        traveler["phone"] != ""
+        (traveler["full_name"] || traveler[:full_name] || "") != "" and
+        (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "" and
+        (traveler["phone"] || traveler[:phone] || "") != "" and
+        (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "" and
+        (traveler["address"] || traveler[:address] || "") != "" and
+        (traveler["poskod"] || traveler[:poskod] || "") != "" and
+        (traveler["city"] || traveler[:city] || "") != "" and
+        (traveler["state"] || traveler[:state] || "") != "" and
+        (traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || "") != "" and
+        (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != ""
       end)
 
     if all_travelers_complete do
@@ -617,9 +761,30 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       {_ok, _progress} =
         Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: travelers, last_updated: DateTime.utc_now()})
 
+      # Clear the form by resetting travelers to empty values while preserving the structure
+      cleared_travelers = Enum.map(travelers, fn _traveler ->
+        %{
+          full_name: "",
+          identity_card_number: "",
+          passport_number: "",
+          phone: "",
+          date_of_birth: "",
+          address: "",
+          poskod: "",
+          city: "",
+          state: "",
+          citizenship: "Malaysia",
+          emergency_contact_name: "",
+          emergency_contact_phone: "",
+          emergency_contact_relationship: "",
+          room_type: "standard"
+        }
+      end)
+
       socket =
         socket
-        |> put_flash(:info, "Traveler information saved successfully!")
+        |> assign(:travelers, cleared_travelers)
+        |> put_flash(:info, "Traveler information saved successfully! ✅ Form has been automatically cleared and is ready for the next entry.")
 
       {:noreply, socket}
     else
@@ -647,6 +812,64 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
+  # Handle clearing all fields for a specific traveler
+  def handle_event("clear_all_traveler_fields", %{"index" => index_str}, socket) do
+    index = String.to_integer(index_str)
+    travelers = socket.assigns.travelers
+
+    updated_travelers = List.update_at(travelers, index, fn _traveler ->
+      %{
+        full_name: "",
+        identity_card_number: "",
+        passport_number: "",
+        phone: "",
+        date_of_birth: "",
+        address: "",
+        poskod: "",
+        city: "",
+        state: "",
+        citizenship: "Malaysia",
+        emergency_contact_name: "",
+        emergency_contact_phone: "",
+        emergency_contact_relationship: "",
+        room_type: "standard"
+      }
+    end)
+
+    socket = assign(socket, :travelers, updated_travelers)
+
+    {:noreply, socket}
+  end
+
+  # Handle clearing all fields for all travelers
+  def handle_event("clear_all_fields", _params, socket) do
+    cleared_travelers = Enum.map(socket.assigns.travelers, fn _traveler ->
+      %{
+        full_name: "",
+        identity_card_number: "",
+        passport_number: "",
+        phone: "",
+        date_of_birth: "",
+        address: "",
+        poskod: "",
+        city: "",
+        state: "",
+        citizenship: "Malaysia",
+        emergency_contact_name: "",
+        emergency_contact_phone: "",
+        emergency_contact_relationship: "",
+        room_type: "standard"
+      }
+    end)
+
+    socket =
+      socket
+      |> assign(:travelers, cleared_travelers)
+      |> put_flash(:info, "All fields have been cleared.")
+
+    {:noreply, socket}
+  end
+
   # Handle adding a new traveler
   def handle_event("add_traveler", _params, socket) do
     current_travelers = socket.assigns.travelers
@@ -654,7 +877,17 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       "full_name" => "",
       "identity_card_number" => "",
       "passport_number" => "",
-      "phone" => ""
+      "phone" => "",
+      "date_of_birth" => "",
+      "address" => "",
+      "poskod" => "",
+      "city" => "",
+      "state" => "",
+      "citizenship" => "Malaysia",
+      "emergency_contact_name" => "",
+      "emergency_contact_phone" => "",
+      "emergency_contact_relationship" => "",
+      "room_type" => "standard"
     }
 
     updated_travelers = current_travelers ++ [new_traveler]
@@ -745,9 +978,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           # Validate travelers before allowing progression to step 3
           travelers = socket.assigns.travelers
           all_travelers_complete = Enum.all?(travelers, fn traveler ->
-            traveler["full_name"] != "" and
-            traveler["identity_card_number"] != "" and
-            traveler["phone"] != ""
+            (traveler["full_name"] || traveler[:full_name] || "") != "" and
+            (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "" and
+            (traveler["phone"] || traveler[:phone] || "") != "" and
+            (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "" and
+            (traveler["address"] || traveler[:address] || "") != "" and
+            (traveler["poskod"] || traveler[:poskod] || "") != "" and
+            (traveler["city"] || traveler[:city] || "") != "" and
+            (traveler["state"] || traveler[:state] || "") != "" and
+            (traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || "") != "" and
+            (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != ""
           end)
 
           if all_travelers_complete do
@@ -817,9 +1057,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
         # Check if all travelers have required fields filled
     all_travelers_complete = Enum.all?(travelers, fn traveler ->
-      traveler["full_name"] != "" and
-      traveler["identity_card_number"] != "" and
-      traveler["phone"] != ""
+      (traveler["full_name"] || traveler[:full_name] || "") != "" and
+      (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "" and
+      (traveler["phone"] || traveler[:phone] || "") != "" and
+      (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "" and
+      (traveler["address"] || traveler[:address] || "") != "" and
+      (traveler["poskod"] || traveler[:poskod] || "") != "" and
+      (traveler["city"] || traveler[:city] || "") != "" and
+      (traveler["state"] || traveler[:state] || "") != "" and
+      (traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || "") != "" and
+      (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != ""
     end)
 
     # Check if payment method is selected
@@ -1361,6 +1608,22 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 </div>
               <% end %>
 
+              <!-- Auto-clear Information -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                      <strong>Auto-clear Feature:</strong> After saving traveler information, the form will automatically clear to prepare for the next entry. You can also manually clear fields using the "Clear All" buttons.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Number of Persons -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1444,7 +1707,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       </div>
                       <div class="ml-3">
                         <p class="text-sm text-blue-700">
-                          <strong>Important:</strong> When selecting more than 1 traveler, you must provide complete details for each person including full name, identity card number, and phone number. Passport number is optional.
+                          <strong>Important:</strong> When selecting more than 1 traveler, you must provide complete details for each person including full name, identity card number, phone number, date of birth, address details, and emergency contact information. Passport number is optional.
                         </p>
                       </div>
                     </div>
@@ -1453,9 +1716,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 <% else %>
                   <p class="text-sm text-gray-600 mb-4">
                     <%= if @is_booking_for_self do %>
-                      Please provide your travel details. Your profile information has been pre-filled. Passport number is optional.
+                      Please provide your travel details. Your profile information has been pre-filled. Date of birth, address details, and emergency contact information are required. Passport number is optional.
                     <% else %>
-                      Please provide the traveler's details. Passport number is optional.
+                      Please provide the traveler's details. Date of birth, address details, and emergency contact information are required. Passport number is optional.
                     <% end %>
                   </p>
                 <% end %>
@@ -1467,133 +1730,578 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                         <h4 class="font-medium text-gray-800">
                           <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: if(index == 0, do: "Traveler #{index + 1} (Person In Charge)", else: "Traveler #{index + 1}"))) %>
                         </h4>
-                        <%= if @number_of_persons > 1 do %>
+                        <div class="flex space-x-2">
                           <button
                             type="button"
-                            phx-click="remove_traveler"
+                            phx-click="clear_all_traveler_fields"
                             phx-value-index={index}
-                            class="text-red-500 hover:text-red-700 text-sm font-medium"
-                            title="Remove traveler"
+                            class="text-orange-500 hover:text-orange-700 text-sm font-medium"
+                            title="Clear all fields for this traveler"
                           >
-                            Remove
+                            Clear All
                           </button>
-                        <% end %>
+                          <%= if @number_of_persons > 1 do %>
+                            <button
+                              type="button"
+                              phx-click="remove_traveler"
+                              phx-value-index={index}
+                              class="text-red-500 hover:text-red-700 text-sm font-medium"
+                              title="Remove traveler"
+                            >
+                              Remove
+                            </button>
+                          <% end %>
+                        </div>
                       </div>
 
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Full Name <span class="text-red-500">*</span>
-                          </label>
-                          <div class="relative">
-                            <input
-                              type="text"
-                              value={traveler["full_name"] || ""}
-                              phx-blur="update_traveler_field"
-                              phx-value-index={index}
-                              phx-value-field="full_name"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Enter full name"
-                            />
-                            <%= if traveler["full_name"] && traveler["full_name"] != "" do %>
-                              <button
-                                type="button"
-                                phx-click="clear_traveler_field"
-                                phx-value-index={index}
-                                phx-value-field="full_name"
-                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
-                                title="Clear field"
-                              >
-                                ×
-                              </button>
-                            <% end %>
+                      <div class="space-y-6">
+                        <!-- Section 1: Traveler's Information -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <h5 class="font-medium text-blue-900 mb-3">Section 1: Traveler's Information</h5>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Full Name <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][full_name]"}
+                                  value={traveler["full_name"] || traveler[:full_name] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="full_name"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["full_name"] || traveler[:full_name] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter full name"
+                                  required
+                                />
+                                <%= if (traveler["full_name"] || traveler[:full_name] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["full_name"] || traveler[:full_name] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="full_name"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Identity Card Number <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][identity_card_number]"}
+                                  value={traveler["identity_card_number"] || traveler[:identity_card_number] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="identity_card_number"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter identity card number"
+                                  required
+                                />
+                                <%= if (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="identity_card_number"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Phone Number <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][phone]"}
+                                  value={traveler["phone"] || traveler[:phone] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="phone"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["phone"] || traveler[:phone] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter phone number"
+                                  required
+                                />
+                                <%= if (traveler["phone"] || traveler[:phone] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["phone"] || traveler[:phone] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="phone"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Date of Birth <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="date"
+                                  name={"travelers[#{index}][date_of_birth]"}
+                                  value={traveler["date_of_birth"] || traveler[:date_of_birth] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="date_of_birth"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  required
+                                />
+                                <%= if (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="date_of_birth"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Passport Number
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][passport_number]"}
+                                  value={traveler["passport_number"] || traveler[:passport_number] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="passport_number"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["passport_number"] || traveler[:passport_number] || "") != "", do: "border-blue-500 bg-blue-50", else: "border-gray-300"}"}
+                                  placeholder="Enter passport number (optional)"
+                                />
+                                <%= if (traveler["passport_number"] || traveler[:passport_number] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["passport_number"] || traveler[:passport_number] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="passport_number"
+                                  class="mt-1 text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
                           </div>
                         </div>
 
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Identity Card Number <span class="text-red-500">*</span>
-                          </label>
-                          <div class="relative">
-                            <input
-                              type="text"
-                              value={traveler["identity_card_number"] || ""}
-                              phx-blur="update_traveler_field"
-                              phx-value-index={index}
-                              phx-value-field="identity_card_number"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Enter identity card number"
-                            />
-                            <%= if traveler["identity_card_number"] && traveler["identity_card_number"] != "" do %>
-                              <button
-                                type="button"
-                                phx-click="clear_traveler_field"
-                                phx-value-index={index}
-                                phx-value-field="identity_card_number"
-                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
-                                title="Clear field"
-                              >
-                                ×
-                              </button>
-                            <% end %>
+                        <!-- Section 2: Address Information -->
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <h5 class="font-medium text-green-900 mb-3">Section 2: Address Information</h5>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Address <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <textarea
+                                  name={"travelers[#{index}][address]"}
+                                  rows="2"
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="address"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["address"] || traveler[:address] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter full address"
+                                  required
+                                ><%= traveler["address"] || traveler[:address] || "" %></textarea>
+                                <%= if (traveler["address"] || traveler[:address] || "") != "" do %>
+                                  <div class="absolute right-2 top-2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["address"] || traveler[:address] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="address"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Poskod <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][poskod]"}
+                                  value={traveler["poskod"] || traveler[:poskod] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="poskod"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["poskod"] || traveler[:poskod] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter poskod"
+                                  required
+                                />
+                                <%= if (traveler["poskod"] || traveler[:poskod] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["poskod"] || traveler[:poskod] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="poskod"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                City <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][city]"}
+                                  value={traveler["city"] || traveler[:city] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="city"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["city"] || traveler[:city] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter city"
+                                  required
+                                />
+                                <%= if (traveler["city"] || traveler[:city] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["city"] || traveler[:city] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="city"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                State <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <select
+                                  name={"travelers[#{index}][state]"}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="state"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["state"] || traveler[:state] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  required
+                                >
+                                  <option value="">Select state</option>
+                                  <option value="Johor" selected={traveler["state"] == "Johor" || traveler[:state] == "Johor"}>Johor</option>
+                                  <option value="Kedah" selected={traveler["state"] == "Kedah" || traveler[:state] == "Kedah"}>Kedah</option>
+                                  <option value="Kelantan" selected={traveler["state"] == "Kelantan" || traveler[:state] == "Kelantan"}>Kelantan</option>
+                                  <option value="Melaka" selected={traveler["state"] == "Melaka" || traveler[:state] == "Melaka"}>Melaka</option>
+                                  <option value="Negeri Sembilan" selected={traveler["state"] == "Negeri Sembilan" || traveler[:state] == "Negeri Sembilan"}>Negeri Sembilan</option>
+                                  <option value="Pahang" selected={traveler["state"] == "Pahang" || traveler[:state] == "Pahang"}>Pahang</option>
+                                  <option value="Perak" selected={traveler["state"] == "Perak" || traveler[:state] == "Perak"}>Perak</option>
+                                  <option value="Perlis" selected={traveler["state"] == "Perlis" || traveler[:state] == "Perlis"}>Perlis</option>
+                                  <option value="Pulau Pinang" selected={traveler["state"] == "Pulau Pinang" || traveler[:state] == "Pulau Pinang"}>Pulau Pinang</option>
+                                  <option value="Sabah" selected={traveler["state"] == "Sabah" || traveler[:state] == "Sabah"}>Sabah</option>
+                                  <option value="Sarawak" selected={traveler["state"] == "Sarawak" || traveler[:state] == "Sarawak"}>Sarawak</option>
+                                  <option value="Selangor" selected={traveler["state"] == "Selangor" || traveler[:state] == "Selangor"}>Selangor</option>
+                                  <option value="Terengganu" selected={traveler["state"] == "Terengganu" || traveler[:state] == "Terengganu"}>Terengganu</option>
+                                  <option value="Kuala Lumpur" selected={traveler["state"] == "Kuala Lumpur" || traveler[:state] == "Kuala Lumpur"}>Kuala Lumpur</option>
+                                  <option value="Labuan" selected={traveler["state"] == "Labuan" || traveler[:state] == "Labuan"}>Labuan</option>
+                                  <option value="Putrajaya" selected={traveler["state"] == "Putrajaya" || traveler[:state] == "Putrajaya"}>Putrajaya</option>
+                                </select>
+                                <%= if (traveler["state"] || traveler[:state] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["state"] || traveler[:state] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="state"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Citizenship <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <select
+                                  name={"travelers[#{index}][citizenship]"}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="citizenship"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["citizenship"] || traveler[:citizenship] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  required
+                                >
+                                  <option value="Malaysia" selected={traveler["citizenship"] == "Malaysia" || traveler[:citizenship] == "Malaysia"}>Malaysia</option>
+                                  <option value="Singapore" selected={traveler["citizenship"] == "Singapore" || traveler[:citizenship] == "Singapore"}>Singapore</option>
+                                  <option value="Indonesia" selected={traveler["citizenship"] == "Indonesia" || traveler[:citizenship] == "Indonesia"}>Indonesia</option>
+                                  <option value="Thailand" selected={traveler["citizenship"] == "Thailand" || traveler[:citizenship] == "Thailand"}>Thailand</option>
+                                  <option value="Philippines" selected={traveler["citizenship"] == "Philippines" || traveler[:citizenship] == "Philippines"}>Philippines</option>
+                                  <option value="Brunei" selected={traveler["citizenship"] == "Brunei" || traveler[:citizenship] == "Brunei"}>Brunei</option>
+                                  <option value="Other" selected={traveler["citizenship"] == "Other" || traveler[:citizenship] == "Other"}>Other</option>
+                                </select>
+                                <%= if (traveler["citizenship"] || traveler[:citizenship] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Passport Number
-                          </label>
-                          <div class="relative">
-                            <input
-                              type="text"
-                              value={traveler["passport_number"] || ""}
-                              phx-blur="update_traveler_field"
-                              phx-value-index={index}
-                              phx-value-field="passport_number"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Enter passport number (optional)"
-                            />
-                            <%= if traveler["passport_number"] && traveler["passport_number"] != "" do %>
-                              <button
-                                type="button"
-                                phx-click="clear_traveler_field"
-                                phx-value-index={index}
-                                phx-value-field="passport_number"
-                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
-                                title="Clear field"
-                              >
-                                ×
-                              </button>
-                            <% end %>
-                          </div>
-                        </div>
+                        <!-- Section 3: Emergency Contact and Room Type -->
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                          <h5 class="font-medium text-purple-900 mb-3">Section 3: Emergency Contact and Room Type</h5>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Emergency Contact Name <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][emergency_contact_name]"}
+                                  value={traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="emergency_contact_name"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter emergency contact name"
+                                  required
+                                />
+                                <%= if (traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["emergency_contact_name"] || traveler[:emergency_contact_name] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="emergency_contact_name"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
 
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Phone Number <span class="text-red-500">*</span>
-                          </label>
-                          <div class="relative">
-                            <input
-                              type="text"
-                              value={traveler["phone"] || ""}
-                              phx-blur="update_traveler_field"
-                              phx-value-index={index}
-                              phx-value-field="phone"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Enter phone number"
-                            />
-                            <%= if traveler["phone"] && traveler["phone"] != "" do %>
-                              <button
-                                type="button"
-                                phx-click="clear_traveler_field"
-                                phx-value-index={index}
-                                phx-value-field="phone"
-                                class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500"
-                                title="Clear field"
-                              >
-                                ×
-                              </button>
-                            <% end %>
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Emergency Contact Phone <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <input
+                                  type="text"
+                                  name={"travelers[#{index}][emergency_contact_phone]"}
+                                  value={traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || ""}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="emergency_contact_phone"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  placeholder="Enter emergency contact phone"
+                                  required
+                                />
+                                <%= if (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="emergency_contact_phone"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Emergency Contact Relationship <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <select
+                                  name={"travelers[#{index}][emergency_contact_relationship]"}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="emergency_contact_relationship"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["emergency_contact_relationship"] || traveler[:emergency_contact_relationship] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  required
+                                >
+                                  <option value="">Select relationship</option>
+                                  <option value="Spouse" selected={traveler["emergency_contact_relationship"] == "Spouse" || traveler[:emergency_contact_relationship] == "Spouse"}>Spouse</option>
+                                  <option value="Parent" selected={traveler["emergency_contact_relationship"] == "Parent" || traveler[:emergency_contact_relationship] == "Parent"}>Parent</option>
+                                  <option value="Child" selected={traveler["emergency_contact_relationship"] == "Child" || traveler[:emergency_contact_relationship] == "Child"}>Child</option>
+                                  <option value="Sibling" selected={traveler["emergency_contact_relationship"] == "Sibling" || traveler[:emergency_contact_relationship] == "Sibling"}>Sibling</option>
+                                  <option value="Friend" selected={traveler["emergency_contact_relationship"] == "Friend" || traveler[:emergency_contact_relationship] == "Friend"}>Friend</option>
+                                  <option value="Other" selected={traveler["emergency_contact_relationship"] == "Other" || traveler[:emergency_contact_relationship] == "Other"}>Other</option>
+                                </select>
+                                <%= if (traveler["emergency_contact_relationship"] || traveler[:emergency_contact_relationship] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <%= if (traveler["emergency_contact_relationship"] || traveler[:emergency_contact_relationship] || "") != "" do %>
+                                <button
+                                  type="button"
+                                  phx-click="clear_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="emergency_contact_relationship"
+                                  class="mt-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                  title="Clear field"
+                                >
+                                  Clear field
+                                </button>
+                              <% end %>
+                            </div>
+
+                            <div>
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Room Type <span class="text-red-500">*</span>
+                              </label>
+                              <div class="relative">
+                                <select
+                                  name={"travelers[#{index}][room_type]"}
+                                  phx-blur="update_traveler_field"
+                                  phx-value-index={index}
+                                  phx-value-field="room_type"
+                                  class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["room_type"] || traveler[:room_type] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
+                                  required
+                                >
+                                  <option value="standard" selected={traveler["room_type"] == "standard" || traveler[:room_type] == "standard"}>Standard</option>
+                                  <option value="deluxe" selected={traveler["room_type"] == "deluxe" || traveler[:room_type] == "deluxe"}>Deluxe</option>
+                                  <option value="suite" selected={traveler["room_type"] == "suite" || traveler[:room_type] == "suite"}>Suite</option>
+                                  <option value="family" selected={traveler["room_type"] == "family" || traveler[:room_type] == "family"}>Family</option>
+                                </select>
+                                <%= if (traveler["room_type"] || traveler[:room_type] || "") != "" do %>
+                                  <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  </div>
+                                <% end %>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1612,14 +2320,21 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </button>
                 </div>
 
-                <!-- Save Button -->
-                <div class="mt-6 flex justify-center">
+                <!-- Action Buttons -->
+                <div class="mt-6 flex justify-center space-x-4">
                   <button
                     type="button"
                     phx-click="save_travelers"
                     class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
                   >
                     Save Traveler Information
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="clear_all_fields"
+                    class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium"
+                  >
+                    Clear All Fields
                   </button>
                 </div>
               </div>
@@ -1646,8 +2361,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <% end %>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Details filled:</span>
-                    <span class={if Enum.all?(@travelers, fn t -> t["full_name"] != "" and t["identity_card_number"] != "" and t["phone"] != "" end), do: "text-green-600 font-medium", else: "text-red-600 font-medium"}>
-                      <%= if Enum.all?(@travelers, fn t -> t["full_name"] != "" and t["identity_card_number"] != "" and t["phone"] != "" end), do: "Complete", else: "Incomplete" %>
+                    <span class={if Enum.all?(@travelers, fn t -> (t["full_name"] || t[:full_name] || "") != "" and (t["identity_card_number"] || t[:identity_card_number] || "") != "" and (t["phone"] || t[:phone] || "") != "" and (t["date_of_birth"] || t[:date_of_birth] || "") != "" and (t["address"] || t[:address] || "") != "" and (t["poskod"] || t[:poskod] || "") != "" and (t["city"] || t[:city] || "") != "" and (t["state"] || t[:state] || "") != "" and (t["emergency_contact_name"] || t[:emergency_contact_name] || "") != "" and (t["emergency_contact_phone"] || t[:emergency_contact_phone] || "") != "" end), do: "text-green-600 font-medium", else: "text-red-600 font-medium"}>
+                      <%= if Enum.all?(@travelers, fn t -> (t["full_name"] || t[:full_name] || "") != "" and (t["identity_card_number"] || t[:identity_card_number] || "") != "" and (t["phone"] || t[:phone] || "") != "" and (t["date_of_birth"] || t[:date_of_birth] || "") != "" and (t["address"] || t[:address] || "") != "" and (t["poskod"] || t[:poskod] || "") != "" and (t["city"] || t[:city] || "") != "" and (t["state"] || t[:state] || "") != "" and (t["emergency_contact_name"] || t[:emergency_contact_name] || "") != "" and (t["emergency_contact_phone"] || t[:emergency_contact_phone] || "") != "" end), do: "Complete", else: "Incomplete" %>
+                    </span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Form status:</span>
+                    <span class={if Enum.all?(@travelers, fn t -> (t["full_name"] || t[:full_name] || "") == "" and (t["identity_card_number"] || t[:identity_card_number] || "") == "" and (t["phone"] || t[:phone] || "") == "" end), do: "text-blue-600 font-medium", else: "text-gray-600 font-medium"}>
+                      <%= if Enum.all?(@travelers, fn t -> (t["full_name"] || t[:full_name] || "") == "" and (t["identity_card_number"] || t[:identity_card_number] || "") == "" and (t["phone"] || t[:phone] || "") == "" end), do: "Ready for new entry", else: "Has data" %>
                     </span>
                   </div>
                 </div>

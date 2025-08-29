@@ -594,6 +594,122 @@ const BookingProgress = {
   }
 };
 
+// Travelers Form Hooks
+const TravelersForm = {
+  mounted() {
+    this.setupFormValidation();
+    this.setupConfirmationDialogs();
+    this.setupSuccessMessage();
+  },
+
+  setupFormValidation() {
+    const form = this.el;
+    const inputs = form.querySelectorAll('input[required]');
+    const saveButton = form.querySelector('button[type="submit"]');
+
+    // Real-time validation
+    inputs.forEach(input => {
+      input.addEventListener('blur', () => {
+        this.validateField(input);
+      });
+      
+      input.addEventListener('input', () => {
+        this.validateField(input);
+      });
+    });
+
+    // Form submission validation
+    form.addEventListener('submit', (e) => {
+      if (!this.validateForm()) {
+        e.preventDefault();
+        this.showValidationError("Please complete all required fields before saving.");
+      }
+    });
+  },
+
+  setupConfirmationDialogs() {
+    // Handle remove traveler confirmation
+    this.handleEvent("remove_traveler", (event) => {
+      const index = event.target.getAttribute('phx-value-index');
+      const travelerName = event.target.closest('.border').querySelector('input[name*="[full_name]"]').value;
+      
+      if (travelerName && travelerName.trim() !== "") {
+        return confirm(`Are you sure you want to remove ${travelerName}?`);
+      } else {
+        return confirm("Are you sure you want to remove this traveler?");
+      }
+    });
+  },
+
+  setupSuccessMessage() {
+    // Listen for successful save events
+    this.handleEvent("save_travelers_success", () => {
+      this.showSuccessMessage();
+    });
+  },
+
+  validateField(input) {
+    const value = input.value.trim();
+    const isValid = value !== "";
+    
+    if (isValid) {
+      input.classList.remove('border-red-500');
+      input.classList.add('border-green-500');
+    } else {
+      input.classList.remove('border-green-500');
+      input.classList.add('border-red-500');
+    }
+    
+    return isValid;
+  },
+
+  validateForm() {
+    const requiredInputs = this.el.querySelectorAll('input[required]');
+    let isValid = true;
+    
+    requiredInputs.forEach(input => {
+      if (!this.validateField(input)) {
+        isValid = false;
+      }
+    });
+    
+    return isValid;
+  },
+
+  showValidationError(message) {
+    // Create or update error message
+    let errorDiv = this.el.querySelector('.validation-error');
+    if (!errorDiv) {
+      errorDiv = document.createElement('div');
+      errorDiv.className = 'validation-error bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4';
+      this.el.appendChild(errorDiv);
+    }
+    errorDiv.textContent = message;
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      if (errorDiv) {
+        errorDiv.remove();
+      }
+    }, 5000);
+  },
+
+  showSuccessMessage() {
+    const successMessage = document.getElementById('travelers-success-message');
+    if (successMessage) {
+      successMessage.classList.remove('hidden');
+      
+      // Auto-hide after 10 seconds
+      setTimeout(() => {
+        successMessage.classList.add('hidden');
+      }, 10000);
+    }
+  }
+};
+
+// Register the hook
+window.TravelersForm = TravelersForm;
+
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {

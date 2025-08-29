@@ -157,6 +157,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                     <span>Travelers</span>
                     <span>Payment</span>
                     <span>Review</span>
+                    <span>Success</span>
                   </div>
                 </div>
               </div>

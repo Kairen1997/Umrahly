@@ -190,6 +190,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(actual_number_of_persons))
       IO.puts("CALCULATED total_amount: #{total_amount} for #{actual_number_of_persons} persons")
 
+              # Check if we have saved payment progress
+              saved_payment_progress = has_payment_progress?(progress)
+
+              # Use saved deposit amount if available, otherwise use total amount
+              deposit_amount = if progress.deposit_amount do
+                progress.deposit_amount
+              else
+                total_amount
+              end
+
               socket =
           socket
           |> assign(:package, package)
@@ -197,13 +207,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           |> assign(:has_price_override, has_price_override)
           |> assign(:price_per_person, schedule_price_per_person)
           |> assign(:total_amount, total_amount)
-          |> assign(:payment_plan, progress.payment_plan)
-          |> assign(:deposit_amount, total_amount)
+          |> assign(:payment_plan, progress.payment_plan || "full_payment")
+          |> assign(:deposit_amount, deposit_amount)
           |> assign(:number_of_persons, actual_number_of_persons)
           |> assign(:travelers, travelers)
         |> assign(:is_booking_for_self, progress.is_booking_for_self)
-        |> assign(:payment_method, progress.payment_method)
-        |> assign(:notes, progress.notes)
+        |> assign(:payment_method, progress.payment_method || "")
+        |> assign(:notes, progress.notes || "")
         |> assign(:changeset, changeset)
         |> assign(:current_page, "packages")
         |> assign(:page_title, "Book Package")
@@ -216,7 +226,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:show_payment_proof_form, false)
         |> assign(:saved_package_progress, nil)
         |> assign(:saved_travelers_progress, nil)
-        |> assign(:saved_payment_progress, nil)
+        |> assign(:saved_payment_progress, saved_payment_progress)
         |> assign(:booking_flow_progress, progress)
         |> allow_upload(:payment_proof, accept: ~w(.pdf .jpg .jpeg .png .doc .docx), max_entries: 1, max_file_size: 5_000_000)
 
@@ -337,6 +347,18 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> Bookings.change_booking(attrs)
       |> Map.put(:action, :validate)
 
+    # Save payment information to database when validating
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        payment_method: booking_params["payment_method"],
+        payment_plan: payment_plan,
+        deposit_amount: deposit_amount,
+        notes: booking_params["notes"] || "",
+        last_updated: DateTime.utc_now()
+      }
+    )
+
     socket =
       socket
       |> assign(:total_amount, total_amount)
@@ -347,6 +369,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> assign(:payment_plan, payment_plan)
       |> assign(:notes, booking_params["notes"] || "")
       |> assign(:changeset, changeset)
+      |> assign(:booking_flow_progress, progress)
 
     {:noreply, socket}
   end
@@ -424,10 +447,21 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       travelers
     end
 
+    # Save updated travelers and payment information to database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        travelers_data: final_travelers,
+        is_booking_for_self: new_is_booking_for_self,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
     socket =
       socket
       |> assign(:is_booking_for_self, new_is_booking_for_self)
       |> assign(:travelers, final_travelers)
+      |> assign(:booking_flow_progress, progress)
 
     {:noreply, socket}
   end
@@ -543,6 +577,18 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         Decimal.mult(socket.assigns.total_amount, Decimal.new("0.2"))
     end
 
+    # Save payment plan to database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        payment_plan: payment_plan,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
+    # Update the booking flow progress in socket
+    socket = assign(socket, :booking_flow_progress, progress)
+
     socket =
       socket
       |> assign(:payment_plan, payment_plan)
@@ -562,8 +608,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     # Update the payment method immediately for responsive UI
     socket = assign(socket, :payment_method, payment_method)
 
+    # Save payment method to database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        payment_method: payment_method,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
+    # Update the booking flow progress in socket
+    socket = assign(socket, :booking_flow_progress, progress)
+
     # Add flash message to confirm the change
-    socket = put_flash(socket, :info, "Payment method changed to #{String.replace(payment_method, "_", " ") |> String.capitalize()}")
+    socket = put_flash(socket, :info, "Payment method changed to #{String.replace(payment_method, "_", " ") |> String.capitalize()} and saved")
 
     {:noreply, socket}
   end
@@ -571,23 +629,154 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   def handle_event("update_notes", %{"booking" => %{"notes" => notes}}, socket) do
     socket = assign(socket, :notes, notes)
 
+    # Save notes to database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        notes: notes,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
+    # Update the booking flow progress in socket
+    socket = assign(socket, :booking_flow_progress, progress)
+
     {:noreply, socket}
   end
 
-  def handle_event("submit_payment_proof", %{"payment_proof_notes" => notes} = _params, socket) do
-    handle_payment_proof_submission(notes, socket)
-  end
+    def handle_event("submit_payment_proof", params, socket) do
+    # Debug logging
+    IO.puts("SUBMIT_PAYMENT_PROOF: params = #{inspect(params)}")
+    IO.puts("SUBMIT_PAYMENT_PROOF: current_booking_id = #{inspect(socket.assigns[:current_booking_id])}")
+    IO.puts("SUBMIT_PAYMENT_PROOF: uploads = #{inspect(socket.assigns.uploads.payment_proof.entries)}")
 
-  # Fallback handler for submit_payment_proof
-  def handle_event("submit_payment_proof", params, socket) do
-    # Check if we have a file but no notes
-    if Map.has_key?(params, "payment_proof_notes") do
-      # Handle the case where notes might be empty string
-      notes = params["payment_proof_notes"] || ""
-      handle_payment_proof_submission(notes, socket)
-    else
-      socket = put_flash(socket, :error, "Invalid form submission. Please try again.")
-      {:noreply, socket}
+    # Extract notes from params
+    notes = Map.get(params, "payment_proof_notes", "")
+
+    # Check if we have a current booking ID
+    case socket.assigns[:current_booking_id] do
+      nil ->
+        IO.puts("SUBMIT_PAYMENT_PROOF: No current_booking_id found")
+        socket = put_flash(socket, :error, "No booking found. Please create a booking first.")
+        {:noreply, socket}
+
+      booking_id ->
+        IO.puts("SUBMIT_PAYMENT_PROOF: Processing booking_id = #{booking_id}")
+        # Get the booking from the database
+        try do
+          booking = Bookings.get_booking!(booking_id)
+          IO.puts("SUBMIT_PAYMENT_PROOF: Found booking = #{inspect(booking)}")
+
+          # Check if payment proof has already been submitted
+          if booking.payment_proof_status == "submitted" do
+            IO.puts("SUBMIT_PAYMENT_PROOF: Payment proof already submitted")
+            socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
+            {:noreply, socket}
+          else
+            # Check if there are uploaded files - also check for any file input in params
+            has_uploaded_files = !Enum.empty?(socket.assigns.uploads.payment_proof.entries)
+            has_file_in_params = Map.has_key?(params, "payment_proof_file") && params["payment_proof_file"] != ""
+
+            if !has_uploaded_files && !has_file_in_params do
+              IO.puts("SUBMIT_PAYMENT_PROOF: No files uploaded")
+              socket = put_flash(socket, :error, "Please select a file to upload.")
+              {:noreply, socket}
+            else
+              # Handle file upload - either through upload system or params
+              filename = nil
+
+              if has_uploaded_files do
+                IO.puts("SUBMIT_PAYMENT_PROOF: Processing #{length(socket.assigns.uploads.payment_proof.entries)} uploaded files")
+                # Consume the uploaded files
+                uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn %{path: path}, entry ->
+                  # Create a unique filename to avoid conflicts
+                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
+                  extension = Path.extname(entry.client_name)
+                  filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
+
+                  # Ensure upload directory exists and save the file
+                  upload_path = ensure_upload_directory()
+                  file_path = Path.join(upload_path, filename)
+
+                  IO.puts("SUBMIT_PAYMENT_PROOF: Saving file to #{file_path}")
+                  # Copy the uploaded file to the destination
+                  case File.cp(path, file_path) do
+                    :ok ->
+                      IO.puts("SUBMIT_PAYMENT_PROOF: File saved successfully as #{filename}")
+                      {:ok, filename}
+                    {:error, reason} ->
+                      IO.puts("SUBMIT_PAYMENT_PROOF: Failed to save file: #{inspect(reason)}")
+                      {:error, "Failed to save file: #{inspect(reason)}"}
+                  end
+                end)
+
+                # Get the first successful upload
+                successful_uploads = Enum.filter(uploaded_files, fn
+                  {:ok, _filename} -> true
+                  {:error, _reason} -> false
+                end)
+
+                if !Enum.empty?(successful_uploads) do
+                  {:ok, filename} = List.first(successful_uploads)
+                  IO.puts("SUBMIT_PAYMENT_PROOF: Using uploaded filename = #{filename}")
+                end
+              else if has_file_in_params do
+                # Handle file from params (fallback for when upload system doesn't work)
+                filename = params["payment_proof_file"]
+                IO.puts("SUBMIT_PAYMENT_PROOF: Using filename from params = #{filename}")
+              end
+
+              if filename do
+                # Prepare payment proof attributes
+                attrs = %{
+                  "payment_proof_file" => filename,
+                  "payment_proof_notes" => notes || ""
+                }
+                IO.puts("SUBMIT_PAYMENT_PROOF: Submitting with attrs = #{inspect(attrs)}")
+
+                case Bookings.submit_payment_proof(booking, attrs) do
+                  {:ok, updated_booking} ->
+                    IO.puts("SUBMIT_PAYMENT_PROOF: Successfully updated booking = #{inspect(updated_booking)}")
+                    socket =
+                      socket
+                      |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
+                      |> assign(:show_payment_proof_form, false)
+                      |> assign(:payment_proof_notes, notes || "")
+                      |> assign(:payment_proof_file, filename)
+
+                    {:noreply, socket}
+
+                  {:error, %Ecto.Changeset{} = changeset} ->
+                    IO.puts("SUBMIT_PAYMENT_PROOF: Changeset error = #{inspect(changeset.errors)}")
+                    socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
+                    {:noreply, socket}
+
+                  {:error, error} ->
+                    IO.puts("SUBMIT_PAYMENT_PROOF: Unexpected error = #{inspect(error)}")
+                    socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
+                    {:noreply, socket}
+                end
+              else
+                socket = put_flash(socket, :error, "Failed to process uploaded file.")
+                {:noreply, socket}
+              end
+            end
+          end
+        end
+      rescue
+        Ecto.QueryError ->
+          IO.puts("SUBMIT_PAYMENT_PROOF: Ecto.QueryError")
+          socket = put_flash(socket, :error, "Invalid booking ID.")
+          {:noreply, socket}
+        Ecto.NoResultsError ->
+          IO.puts("SUBMIT_PAYMENT_PROOF: Ecto.NoResultsError")
+          socket = put_flash(socket, :error, "Booking not found.")
+          {:noreply, socket}
+        error ->
+          IO.puts("SUBMIT_PAYMENT_PROOF: Unexpected error = #{inspect(error)}")
+          socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
+          {:noreply, socket}
+      end
     end
   end
 
@@ -639,16 +828,80 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("update_deposit_amount", %{"booking" => %{"deposit_amount" => deposit_amount_str}}, socket) do
+    def handle_event("update_deposit_amount", %{"booking" => %{"deposit_amount" => deposit_amount_str}}, socket) do
     try do
       deposit_amount = Decimal.new(deposit_amount_str)
       socket = assign(socket, :deposit_amount, deposit_amount)
+
+      # Save deposit amount to database
+      {_ok, progress} = Bookings.update_booking_flow_progress(
+        socket.assigns.booking_flow_progress,
+        %{
+          deposit_amount: deposit_amount,
+          last_updated: DateTime.utc_now()
+        }
+      )
+
+      # Update the booking flow progress in socket
+      socket = assign(socket, :booking_flow_progress, progress)
 
       {:noreply, socket}
     rescue
       _ ->
         {:noreply, socket}
     end
+  end
+
+    # Save all payment information at once
+  def handle_event("save_payment_info", _params, socket) do
+    # Save all current payment information to database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        payment_method: socket.assigns.payment_method,
+        payment_plan: socket.assigns.payment_plan,
+        deposit_amount: socket.assigns.deposit_amount,
+        notes: socket.assigns.notes,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
+    # Update the booking flow progress in socket
+    socket = assign(socket, :booking_flow_progress, progress)
+
+    socket = put_flash(socket, :info, "Payment information saved successfully! ✅")
+
+    {:noreply, socket}
+  end
+
+  # Clear all payment information
+  def handle_event("clear_payment_info", _params, socket) do
+    # Clear all payment information from database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        payment_method: nil,
+        payment_plan: "full_payment",
+        deposit_amount: socket.assigns.total_amount,
+        notes: "",
+        last_updated: DateTime.utc_now()
+      }
+    )
+
+    # Update the booking flow progress in socket
+    socket = assign(socket, :booking_flow_progress, progress)
+
+    # Reset local assigns
+    socket =
+      socket
+      |> assign(:payment_method, "")
+      |> assign(:payment_plan, "full_payment")
+      |> assign(:deposit_amount, socket.assigns.total_amount)
+      |> assign(:notes, "")
+
+    socket = put_flash(socket, :info, "Payment information cleared successfully! 🗑️")
+
+    {:noreply, socket}
   end
 
     def handle_event("update_traveler", %{"index" => index_str, "field" => field, "value" => value}, socket) do
@@ -908,12 +1161,22 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       total_amount
     end
 
+    # Save updated payment information to database
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        deposit_amount: deposit_amount,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
     socket =
       socket
       |> assign(:travelers, updated_travelers)
       |> assign(:number_of_persons, new_number_of_persons)
       |> assign(:total_amount, total_amount)
       |> assign(:deposit_amount, deposit_amount)
+      |> assign(:booking_flow_progress, progress)
       |> put_flash(:info, "New traveler added! Please fill in their details.")
 
     {:noreply, socket}
@@ -943,12 +1206,22 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         total_amount
       end
 
+      # Save updated payment information to database
+      {_ok, progress} = Bookings.update_booking_flow_progress(
+        socket.assigns.booking_flow_progress,
+        %{
+          deposit_amount: deposit_amount,
+          last_updated: DateTime.utc_now()
+        }
+      )
+
       socket =
         socket
         |> assign(:travelers, updated_travelers)
         |> assign(:number_of_persons, new_number_of_persons)
         |> assign(:total_amount, total_amount)
         |> assign(:deposit_amount, deposit_amount)
+        |> assign(:booking_flow_progress, progress)
 
       {:noreply, socket}
     else
@@ -1163,104 +1436,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
 
-  # Helper function to handle payment proof submission
-  defp handle_payment_proof_submission(notes, socket) do
 
-      # Check if we have a current booking ID
-      case socket.assigns[:current_booking_id] do
-        nil ->
-          socket = put_flash(socket, :error, "No booking found. Please create a booking first.")
-          {:noreply, socket}
-
-        booking_id ->
-          # Get the booking from the database
-          try do
-            booking = Bookings.get_booking!(booking_id)
-
-            # Check if payment proof has already been submitted
-            if booking.payment_proof_status == "submitted" do
-              socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
-              {:noreply, socket}
-            else
-              # Check if there are uploaded files
-              if Enum.empty?(socket.assigns.uploads.payment_proof.entries) do
-                socket = put_flash(socket, :error, "Please select a file to upload.")
-                {:noreply, socket}
-              else
-                # Consume the uploaded files
-                uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
-                  # Create a unique filename to avoid conflicts
-                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
-                  extension = Path.extname(entry.client_name)
-                  filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
-
-                  # Ensure upload directory exists and save the file
-                  upload_path = ensure_upload_directory()
-                  file_path = Path.join(upload_path, filename)
-
-                  # Copy the uploaded file to the destination
-                  case File.cp(entry.path, file_path) do
-                    :ok ->
-                      {:ok, filename}
-                    {:error, reason} ->
-                      {:error, "Failed to save file: #{inspect(reason)}"}
-                  end
-                end)
-
-                # Filter out any failed uploads
-                successful_uploads = Enum.filter(uploaded_files, fn
-                  {:ok, _filename} -> true
-                  {:error, _reason} -> false
-                end)
-
-                if Enum.empty?(successful_uploads) do
-                  socket = put_flash(socket, :error, "Failed to process uploaded file.")
-                  {:noreply, socket}
-                else
-                  # Get the first successful upload
-                  {:ok, filename} = List.first(successful_uploads)
-
-                  # Prepare payment proof attributes
-                  attrs = %{
-                    "payment_proof_file" => filename,
-                    "payment_proof_notes" => notes || ""
-                  }
-
-                  case Bookings.submit_payment_proof(booking, attrs) do
-                    {:ok, _updated_booking} ->
-                      socket =
-                        socket
-                        |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
-                        |> assign(:show_payment_proof_form, false)
-                        |> assign(:payment_proof_notes, notes || "")
-                        |> assign(:payment_proof_file, filename)
-
-                      {:noreply, socket}
-
-                    {:error, %Ecto.Changeset{} = _changeset} ->
-                      socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
-                      {:noreply, socket}
-
-                    {:error, _error} ->
-                      socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
-                      {:noreply, socket}
-                  end
-                end
-              end
-            end
-          rescue
-            Ecto.QueryError ->
-              socket = put_flash(socket, :error, "Invalid booking ID.")
-              {:noreply, socket}
-            Ecto.NoResultsError ->
-              socket = put_flash(socket, :error, "Booking not found.")
-              {:noreply, socket}
-            _error ->
-              socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
-              {:noreply, socket}
-          end
-      end
-  end
 
   # Generate payment gateway URL (placeholder - replace with actual payment gateway integration)
   defp generate_payment_gateway_url(booking, assigns) do
@@ -1421,6 +1597,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     upload_path
   end
 
+  # Helper function to check if payment progress exists
+  defp has_payment_progress?(progress) do
+    progress.payment_method || progress.payment_plan || progress.notes || progress.deposit_amount
+  end
+
   def render(assigns) do
     ~H"""
     <.sidebar page_title={@page_title}>
@@ -1500,6 +1681,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     <p class="text-sm text-blue-700">
                       <strong>Progress Available!</strong> You have saved progress in later steps. You can continue to review and complete your booking.
                     </p>
+                    <div class="mt-2 text-xs text-blue-600">
+                      <%= if @saved_payment_progress do %>
+                        <strong>Payment:</strong> Information saved ✓
+                      <% end %>
+                      <%= if @saved_travelers_progress do %>
+                        <strong>Travelers:</strong> Information saved ✓
+                      <% end %>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1602,6 +1791,24 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     <div class="ml-3">
                       <p class="text-sm text-green-700">
                         <strong>Progress Saved!</strong> Your travelers information has been saved. You can continue or go back to make changes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+
+              <!-- Payment Progress Status -->
+              <%= if @saved_payment_progress do %>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
+                    <div class="ml-3">
+                      <p class="text-sm text-blue-700">
+                        <strong>Payment Progress Available!</strong> You have saved payment information. You can continue to step 3 to review or modify it.
                       </p>
                     </div>
                   </div>
@@ -2133,11 +2340,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                                   required
                                 >
                                   <option value="Malaysia" selected={traveler["citizenship"] == "Malaysia" || traveler[:citizenship] == "Malaysia"}>Malaysia</option>
-                                  <option value="Singapore" selected={traveler["citizenship"] == "Singapore" || traveler[:citizenship] == "Singapore"}>Singapore</option>
-                                  <option value="Indonesia" selected={traveler["citizenship"] == "Indonesia" || traveler[:citizenship] == "Indonesia"}>Indonesia</option>
-                                  <option value="Thailand" selected={traveler["citizenship"] == "Thailand" || traveler[:citizenship] == "Thailand"}>Thailand</option>
-                                  <option value="Philippines" selected={traveler["citizenship"] == "Philippines" || traveler[:citizenship] == "Philippines"}>Philippines</option>
-                                  <option value="Brunei" selected={traveler["citizenship"] == "Brunei" || traveler[:citizenship] == "Brunei"}>Brunei</option>
                                   <option value="Other" selected={traveler["citizenship"] == "Other" || traveler[:citizenship] == "Other"}>Other</option>
                                 </select>
                                 <%= if (traveler["citizenship"] || traveler[:citizenship] || "") != "" do %>
@@ -2403,23 +2605,78 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Payment Details</h2>
 
             <form phx-submit="validate_booking" class="space-y-6" novalidate>
-              <!-- Progress Status -->
-              <%= if @saved_payment_progress do %>
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                      <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                      </svg>
-                    </div>
-                    <div class="ml-3">
-                      <p class="text-sm text-green-700">
-                        <strong>Progress Saved!</strong> Your payment information has been saved. You can continue or go back to make changes.
-                      </p>
+                                      <!-- Progress Status -->
+            <%= if @saved_payment_progress do %>
+              <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-green-700">
+                      <strong>Progress Saved!</strong> Your payment information has been saved. You can continue or go back to make changes.
+                    </p>
+                    <div class="mt-2 text-xs text-green-600">
+                      <strong>Saved:</strong>
+                      <%= if @payment_method != "", do: "Payment Method: #{String.replace(@payment_method, "_", " ") |> String.capitalize()}" %>
+                      <%= if @payment_plan != "full_payment", do: ", Payment Plan: #{String.replace(@payment_plan, "_", " ")}" %>
+                      <%= if @notes != "", do: ", Notes: #{String.slice(@notes, 0, 50)}#{if String.length(@notes) > 50, do: "...", else: ""}" %>
                     </div>
                   </div>
                 </div>
-              <% end %>
+              </div>
+            <% end %>
+
+            <!-- Payment Progress Summary -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h3 class="font-medium text-blue-900 mb-3">Payment Progress Summary</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div class="space-y-2">
+                  <div class="flex items-center">
+                    <span class="text-blue-700">Payment Method:</span>
+                    <span class="ml-2 font-medium">
+                      <%= if @payment_method != "", do: String.replace(@payment_method, "_", " ") |> String.capitalize(), else: "Not selected" %>
+                    </span>
+                    <%= if @payment_method != "" do %>
+                      <svg class="w-4 h-4 text-green-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    <% end %>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="text-blue-700">Payment Plan:</span>
+                    <span class="ml-2 font-medium">
+                      <%= String.replace(@payment_plan, "_", " ") |> String.capitalize() %>
+                    </span>
+                    <svg class="w-4 h-4 text-green-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <div class="flex items-center">
+                    <span class="text-blue-700">Notes:</span>
+                    <span class="ml-2 font-medium">
+                      <%= if @notes != "", do: "Added", else: "None" %>
+                    </span>
+                    <%= if @notes != "" do %>
+                      <svg class="w-4 h-4 text-green-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    <% end %>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="text-blue-700">Deposit Amount:</span>
+                    <span class="ml-2 font-medium">RM <%= @deposit_amount %></span>
+                    <svg class="w-4 h-4 text-green-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
 
               <!-- Payment Plan -->
               <div>
@@ -2540,13 +2797,29 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 >
                   Back
                 </button>
-                <button
-                  type="button"
-                  phx-click="go_to_next_step"
-                  class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Continue
-                </button>
+                <div class="flex space-x-3">
+                  <button
+                    type="button"
+                    phx-click="clear_payment_info"
+                    class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="save_payment_info"
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Save Payment Info
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="go_to_next_step"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2572,6 +2845,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       <p class="text-sm text-green-700">
                         <strong>Progress Saved!</strong> Your booking information has been saved. You can now review and confirm your booking.
                       </p>
+                      <div class="mt-2 text-xs text-green-600">
+                        <%= if @saved_payment_progress do %>
+                          <strong>Payment:</strong> Method, plan, and notes saved ✓
+                        <% end %>
+                        <%= if @saved_travelers_progress do %>
+                          <strong>Travelers:</strong> All details saved ✓
+                        <% end %>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2615,19 +2896,59 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>
                           <span class="text-gray-600">Full Name:</span>
-                          <span class="font-medium ml-2"><%= traveler["full_name"] || "" %></span>
+                          <span class="font-medium ml-2"><%= traveler[:full_name] || traveler["full_name"] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Identity Card:</span>
-                          <span class="font-medium ml-2"><%= traveler[:identity_card_number] || "" %></span>
+                          <span class="font-medium ml-2"><%= traveler[:identity_card_number] || traveler["identity_card_number"] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Passport Number:</span>
-                          <span class="font-medium ml-2"><%= traveler[:passport_number] || "" %></span>
+                          <span class="font-medium ml-2"><%= traveler[:passport_number] || traveler["passport_number"] || "" %></span>
                         </div>
                         <div>
                           <span class="text-gray-600">Phone:</span>
-                          <span class="font-medium ml-2"><%= traveler[:phone] || "" %></span>
+                          <span class="font-medium ml-2"><%= traveler[:phone] || traveler["phone"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Date of Birth:</span>
+                          <span class="font-medium ml-2"><%= traveler[:date_of_birth] || traveler["date_of_birth"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Address:</span>
+                          <span class="font-medium ml-2"><%= traveler[:address] || traveler["address"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Poskod:</span>
+                          <span class="font-medium ml-2"><%= traveler[:poskod] || traveler["poskod"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">City:</span>
+                          <span class="font-medium ml-2"><%= traveler[:city] || traveler["city"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">State:</span>
+                          <span class="font-medium ml-2"><%= traveler[:state] || traveler["state"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Citizenship:</span>
+                          <span class="font-medium ml-2"><%= traveler[:citizenship] || traveler["citizenship"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Emergency Contact:</span>
+                          <span class="font-medium ml-2"><%= traveler[:emergency_contact_name] || traveler["emergency_contact_name"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Emergency Phone:</span>
+                          <span class="font-medium ml-2"><%= traveler[:emergency_contact_phone] || traveler["emergency_contact_phone"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Emergency Relationship:</span>
+                          <span class="font-medium ml-2"><%= traveler[:emergency_contact_relationship] || traveler["emergency_contact_relationship"] || "" %></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Room Type:</span>
+                          <span class="font-medium ml-2"><%= traveler[:room_type] || traveler["room_type"] || "" %></span>
                         </div>
                       </div>
                     </div>
@@ -2816,7 +3137,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </p>
 
                   <%= if @show_payment_proof_form do %>
-                    <form phx-submit="submit_payment_proof" method="post" class="space-y-4 text-left" enctype="multipart/form-data" id="payment-proof-form">
+                    <form phx-submit="submit_payment_proof" class="space-y-4 text-left" id="payment-proof-form">
                       <div>
                         <label class="block text-sm font-medium text-blue-900 mb-2">
                           Payment Proof File <span class="text-red-500">*</span>

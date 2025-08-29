@@ -7,7 +7,6 @@ defmodule Umrahly.Bookings do
   alias Umrahly.Repo
   alias Umrahly.Bookings.Booking
   alias Umrahly.Bookings.BookingFlowProgress
-
   @doc """
   Returns the list of bookings.
   """
@@ -46,198 +45,220 @@ defmodule Umrahly.Bookings do
   end
 
   @doc """
-  Returns a data structure for tracking booking changes.
+  Returns an `%Ecto.Changeset{}` for tracking booking changes.
   """
-  def change_booking(%Booking{} = booking, _attrs \\ %{}) do
-    Booking.changeset(booking, %{})
+  def change_booking(%Booking{} = booking, attrs \\ %{}) do
+    Booking.changeset(booking, attrs)
   end
 
   @doc """
-  Gets all bookings for a specific package schedule.
+  Returns the list of booking flow progress records.
   """
-  def get_bookings_for_schedule(schedule_id) do
-    Repo.all(from b in Booking, where: b.package_schedule_id == ^schedule_id)
+  def list_booking_flow_progress do
+    Repo.all(BookingFlowProgress)
   end
 
   @doc """
-  Gets confirmed bookings for a specific package schedule.
+  Returns the list of booking flow progress records for a specific user.
   """
-  def get_confirmed_bookings_for_schedule(schedule_id) do
-    Repo.all(from b in Booking, where: b.package_schedule_id == ^schedule_id and b.status == "confirmed")
+  def get_booking_flow_progress_by_user_id(user_id) do
+    BookingFlowProgress
+    |> where([bfp], bfp.user_id == ^user_id)
+    |> preload([:package, :package_schedule])
+    |> Repo.all()
   end
 
   @doc """
-  Counts total bookings for a package schedule.
+  Gets a single booking flow progress record.
+  """
+  def get_booking_flow_progress!(id), do: Repo.get!(BookingFlowProgress, id)
+
+  @doc """
+  Creates a booking flow progress record.
+  """
+  def create_booking_flow_progress(attrs \\ %{}) do
+    %BookingFlowProgress{}
+    |> BookingFlowProgress.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a booking flow progress record.
+  """
+  def update_booking_flow_progress(%BookingFlowProgress{} = booking_flow_progress, attrs) do
+    booking_flow_progress
+    |> BookingFlowProgress.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a booking flow progress record.
+  """
+  def delete_booking_flow_progress(%BookingFlowProgress{} = booking_flow_progress) do
+    Repo.delete(booking_flow_progress)
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking booking flow progress changes.
+  """
+  def change_booking_flow_progress(%BookingFlowProgress{} = booking_flow_progress, attrs \\ %{}) do
+    BookingFlowProgress.changeset(booking_flow_progress, attrs)
+  end
+
+  @doc """
+  Counts total bookings for a specific package schedule.
   """
   def count_bookings_for_schedule(schedule_id) do
-    Repo.aggregate(
-      from(b in Booking, where: b.package_schedule_id == ^schedule_id),
-      :count,
-      :id
-    )
+    Booking
+    |> where([b], b.package_schedule_id == ^schedule_id)
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
   Counts confirmed bookings for a specific package schedule.
   """
   def count_confirmed_bookings_for_schedule(schedule_id) do
-    Repo.aggregate(
-      from(b in Booking, where: b.package_schedule_id == ^schedule_id and b.status == "confirmed"),
-      :count,
-      :id
-    )
+    Booking
+    |> where([b], b.package_schedule_id == ^schedule_id and b.status == "confirmed")
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
-  Gets all bookings for a specific package (across all schedules).
-  """
-  def get_bookings_for_package(package_id) do
-    # Get all package schedules for this package, then get bookings for those schedules
-    alias Umrahly.Packages
-
-    package_schedules = Packages.get_package_schedules(package_id)
-    schedule_ids = Enum.map(package_schedules, & &1.id)
-
-    if length(schedule_ids) > 0 do
-      Repo.all(from b in Booking, where: b.package_schedule_id in ^schedule_ids)
-    else
-      []
-    end
-  end
-
-  @doc """
-  Gets confirmed bookings for a specific package (across all schedules).
-  """
-  def get_confirmed_bookings_for_package(package_id) do
-    # Get all package schedules for this package, then get confirmed bookings for those schedules
-    alias Umrahly.Packages
-
-    package_schedules = Packages.get_package_schedules(package_id)
-    schedule_ids = Enum.map(package_schedules, & &1.id)
-
-    if length(schedule_ids) > 0 do
-      Repo.all(from b in Booking, where: b.package_schedule_id in ^schedule_ids and b.status == "confirmed")
-    else
-      []
-    end
-  end
-
-  @doc """
-  Counts total bookings for a package (across all schedules).
+  Counts total bookings for a specific package.
   """
   def count_bookings_for_package(package_id) do
-    # Get all package schedules for this package, then count bookings for those schedules
-    alias Umrahly.Packages
-
-    package_schedules = Packages.get_package_schedules(package_id)
-    schedule_ids = Enum.map(package_schedules, & &1.id)
-
-    if length(schedule_ids) > 0 do
-      Repo.aggregate(from(b in Booking, where: b.package_schedule_id in ^schedule_ids), :count, :id)
-    else
-      0
-    end
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> where([b, ps], ps.package_id == ^package_id)
+    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
-  Counts confirmed bookings for a package (across all schedules).
+  Counts confirmed bookings for a specific package.
   """
   def count_confirmed_bookings_for_package(package_id) do
-    # Get all package schedules for this package, then count confirmed bookings for those schedules
-    alias Umrahly.Packages
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> where([b, ps], ps.package_id == ^package_id and b.status == "confirmed")
+    |> Repo.aggregate(:count, :id)
+  end
 
-    package_schedules = Packages.get_package_schedules(package_id)
-    schedule_ids = Enum.map(package_schedules, & &1.id)
+  @doc """
+  Gets all bookings with submitted payment proofs that are pending approval.
+  """
+  def get_bookings_flow_progress_pending_payment_proof_approval do
+    Booking
+    |> join(:inner, [b], u in Umrahly.Accounts.User, on: b.user_id == u.id)
+    |> join(:inner, [b, u], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> join(:inner, [b, u, ps], p in Umrahly.Packages.Package, on: ps.package_id == p.id)
+    |> where([b, u, ps, p], b.payment_proof_status == "submitted")
+    |> preload([b, u, ps, p], user: u, package_schedule: {ps, package: p})
+    |> Repo.all()
+  end
 
-    if length(schedule_ids) > 0 do
-      Repo.aggregate(from(b in Booking, where: b.package_schedule_id in ^schedule_ids and b.status == "confirmed"), :count, :id)
-    else
-      0
+  @doc """
+  Updates the payment proof status for a booking.
+  """
+  def update_payment_proof_status(%Booking{} = booking, status, _admin_notes) do
+    attrs = %{
+      "payment_proof_status" => status
+    }
+
+    case status do
+      "approved" ->
+        # Update status to confirmed when payment is approved
+        attrs = Map.put(attrs, "status", "confirmed")
+        update_booking(booking, attrs)
+      "rejected" ->
+        # Keep status as pending when payment is rejected
+        update_booking(booking, attrs)
+      _ ->
+        update_booking(booking, attrs)
     end
   end
 
-  # Booking Flow Progress Functions
+  @doc """
+  Submits a payment proof for a booking.
+  """
+  def submit_payment_proof(%Booking{} = booking, attrs) do
+    attrs = Map.put(attrs, "payment_proof_status", "submitted")
+    attrs = Map.put(attrs, "payment_proof_submitted_at", DateTime.utc_now())
+
+    update_booking(booking, attrs)
+  end
 
   @doc """
-  Gets or creates a booking flow progress record for a user and package schedule.
+  Gets all bookings for a specific user with payment information.
   """
-  def get_or_create_booking_flow_progress(user_id, package_id, package_schedule_id) do
-    case Repo.get_by(BookingFlowProgress, user_id: user_id, package_schedule_id: package_schedule_id, status: "in_progress") do
+  def list_user_bookings_with_payments(user_id) do
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> join(:inner, [b, ps], p in Umrahly.Packages.Package, on: ps.package_id == p.id)
+    |> where([b, ps, p], b.user_id == ^user_id)
+    |> select([b, ps, p], %{
+      id: b.id,
+      booking_reference: fragment("'BK' || ?", b.id),
+      package_name: p.name,
+      status: b.status,
+      total_amount: b.total_amount,
+      paid_amount: b.deposit_amount,
+      payment_method: b.payment_method,
+      payment_plan: b.payment_plan,
+      booking_date: b.booking_date
+    })
+    |> Repo.all()
+  end
+
+    @doc """
+  Gets the latest booking flow progress for a given user + package.
+  """
+  def get_booking_flow_progress(user_id, package_id) do
+    BookingFlowProgress
+    |> where([bfp], bfp.user_id == ^user_id and bfp.package_id == ^package_id)
+    |> order_by([bfp], desc: bfp.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets the latest booking flow progress for a given user + package schedule.
+  """
+  def get_booking_flow_progress_by_schedule(user_id, package_schedule_id) do
+    BookingFlowProgress
+    |> where([bfp], bfp.user_id == ^user_id and bfp.package_schedule_id == ^package_schedule_id)
+    |> order_by([bfp], desc: bfp.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets or creates booking flow progress for a user + package.
+  Always returns a `%BookingFlowProgress{}`.
+  """
+  def get_or_create_booking_flow_progress(user_id, package_id, schedule_id) do
+    case get_booking_flow_progress_by_schedule(user_id, schedule_id) do
       nil ->
-        # Create new progress record
-        %BookingFlowProgress{}
-        |> BookingFlowProgress.changeset(%{
+        create_booking_flow_progress(%{
           user_id: user_id,
           package_id: package_id,
-          package_schedule_id: package_schedule_id,
+          package_schedule_id: schedule_id,
           current_step: 1,
-          max_steps: 4,
+          max_steps: 5,
           number_of_persons: 1,
           is_booking_for_self: true,
           payment_method: "bank_transfer",
           payment_plan: "full_payment",
-          notes: "",
-          travelers_data: [],
-          total_amount: nil,
-          deposit_amount: nil,
           status: "in_progress",
           last_updated: DateTime.utc_now()
         })
-        |> Repo.insert()
+        |> case do
+          {:ok, progress} -> progress
+          {:error, _changeset} -> nil
+        end
+
       progress ->
-        {:ok, progress}
+        progress
     end
   end
 
-  @doc """
-  Updates the booking flow progress.
-  """
-  def update_booking_flow_progress(%BookingFlowProgress{} = progress, attrs) do
-    progress
-    |> BookingFlowProgress.changeset(Map.merge(attrs, %{last_updated: DateTime.utc_now()}))
-    |> Repo.update()
-  end
-
-  @doc """
-  Gets all in-progress booking flows for a user.
-  """
-  def get_user_booking_flows(user_id) do
-    Repo.all(
-      from p in BookingFlowProgress,
-      join: pack in Umrahly.Packages.Package, on: p.package_id == pack.id,
-      join: ps in Umrahly.Packages.PackageSchedule, on: p.package_schedule_id == ps.id,
-      where: p.user_id == ^user_id and p.status == "in_progress",
-      select: %{
-        id: p.id,
-        current_step: p.current_step,
-        max_steps: p.max_steps,
-        package_name: pack.name,
-        package_id: pack.id,
-        schedule_departure: ps.departure_date,
-        schedule_return: ps.return_date,
-        number_of_persons: p.number_of_persons,
-        total_amount: p.total_amount,
-        last_updated: p.last_updated
-      },
-      order_by: [desc: p.last_updated]
-    )
-  end
-
-  @doc """
-  Completes a booking flow progress (marks as completed).
-  """
-  def complete_booking_flow_progress(%BookingFlowProgress{} = progress) do
-    progress
-    |> BookingFlowProgress.changeset(%{status: "completed"})
-    |> Repo.update()
-  end
-
-  @doc """
-  Abandons a booking flow progress (marks as abandoned).
-  """
-  def abandon_booking_flow_progress(%BookingFlowProgress{} = progress) do
-    progress
-    |> BookingFlowProgress.changeset(%{status: "abandoned"})
-    |> Repo.update()
-  end
 end

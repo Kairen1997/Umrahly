@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Gateway Test - Umrahly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <h1 class="text-3xl font-bold text-center text-gray-900 mb-8">Payment Gateway Test</h1>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Test Payment Gateway URLs</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <h3 class="font-medium text-gray-700 mb-2">Stripe (Credit Card)</h3>
+                        <div class="bg-gray-50 p-3 rounded border">
+                            <code class="text-sm text-blue-600 break-all">
+                                https://checkout.stripe.com/pay/cs_test_12345678_abcdef1234567890
+                            </code>
+                        </div>
+                        <button 
+                            onclick="testPaymentGateway('https://checkout.stripe.com/pay/cs_test_12345678_abcdef1234567890')"
+                            class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                            Test Stripe
+                        </button>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-medium text-gray-700 mb-2">PayPal (Online Banking)</h3>
+                        <div class="bg-gray-50 p-3 rounded border">
+                            <code class="text-sm text-blue-600 break-all">
+                                https://www.sandbox.paypal.com/checkoutnow?token=PAY-12345678-ABCD
+                            </code>
+                        </div>
+                        <button 
+                            onclick="testPaymentGateway('https://www.sandbox.paypal.com/checkoutnow?token=PAY-12345678-ABCD')"
+                            class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                            Test PayPal
+                        </button>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-medium text-gray-700 mb-2">E-Wallet (Boost/Touch 'n Go)</h3>
+                        <div class="bg-gray-50 p-3 rounded border">
+                            <code class="text-sm text-blue-600 break-all">
+                                https://demo-ewallet-gateway.com/pay/EW-12345678-ABCD
+                            </code>
+                        </div>
+                        <button 
+                            onclick="testPaymentGateway('https://demo-ewallet-gateway.com/pay/EW-12345678-ABCD')"
+                            class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                            Test E-Wallet
+                        </button>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-medium text-gray-700 mb-2">Generic Payment Gateway</h3>
+                        <div class="bg-gray-50 p-3 rounded border">
+                            <code class="text-sm text-blue-600 break-all">
+                                https://demo-payment-gateway.com/payment/TXN-12345678-ABCD
+                            </code>
+                        </div>
+                        <button 
+                            onclick="testPaymentGateway('https://demo-payment-gateway.com/payment/TXN-12345678-ABCD')"
+                            class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                            Test Generic
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">How It Works</h2>
+                <div class="space-y-3 text-gray-600">
+                    <p>1. <strong>User selects online payment method</strong> (Credit Card, Online Banking, E-Wallet)</p>
+                    <p>2. <strong>User completes booking form</strong> with traveler details and payment information</p>
+                    <p>3. <strong>System creates booking</strong> and generates payment gateway URL</p>
+                    <p>4. <strong>User is redirected immediately</strong> to the external payment gateway</p>
+                    <p>5. <strong>User completes payment</strong> on the external gateway</p>
+                    <p>6. <strong>User returns to dashboard</strong> after successful payment</p>
+                </div>
+                
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="font-medium text-blue-900 mb-2">Supported Payment Methods</h3>
+                    <ul class="text-sm text-blue-700 space-y-1">
+                        <li>• <strong>Credit Card:</strong> Stripe Checkout</li>
+                        <li>• <strong>Online Banking:</strong> PayPal (FPX)</li>
+                        <li>• <strong>E-Wallet:</strong> Boost, Touch 'n Go</li>
+                        <li>• <strong>Offline:</strong> Bank Transfer, Cash</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function testPaymentGateway(url) {
+            // Open payment gateway in new tab
+            window.open(url, '_blank');
+            
+            // Show success message
+            alert('Payment gateway opened in new tab! This simulates the redirect behavior.');
+        }
+    </script>
+</body>
+</html> 

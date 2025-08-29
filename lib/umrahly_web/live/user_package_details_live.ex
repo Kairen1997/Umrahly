@@ -13,6 +13,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
       socket
       |> assign(:current_user, current_user)
       |> assign(:selected_schedule_id, nil)
+      |> assign(:show_budget_warning, false)
 
     {:ok, socket}
   end
@@ -49,6 +50,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
           |> assign(:current_user, current_user)
           |> assign(:ranked_schedules, ranked_schedules)
           |> assign(:selected_schedule_id, selected_schedule_id)
+          |> assign(:show_budget_warning, false)
           |> assign(:current_page, "packages")
           |> assign(:page_title, package.name)
 
@@ -68,18 +70,46 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
 
       # Handle schedule selection with proper error handling
   def handle_event("select_schedule", %{"schedule_id" => schedule_id}, socket) do
-    # Convert the string schedule_id to an integer to match the database IDs
-    case Integer.parse(schedule_id) do
-      {new_selected_id, _} ->
-        updated_socket =
-          socket
-          |> assign(:selected_schedule_id, new_selected_id)
-          |> put_flash(:info, "Schedule #{new_selected_id} selected!")
-        {:noreply, updated_socket}
-      :error ->
-        updated_socket = put_flash(socket, :error, "Failed to parse schedule ID")
-        {:noreply, updated_socket}
+    # Handle clear selection (empty string)
+    if schedule_id == "" do
+      updated_socket =
+        socket
+        |> assign(:selected_schedule_id, nil)
+        |> put_flash(:info, "Schedule selection cleared!")
+      {:noreply, updated_socket}
+    else
+      # Convert the string schedule_id to an integer to match the database IDs
+      case Integer.parse(schedule_id) do
+        {new_selected_id, _} ->
+          # Check if this schedule has budget warning
+          selected_schedule = Enum.find(socket.assigns.ranked_schedules, & &1.id == new_selected_id)
+          show_warning = if selected_schedule && selected_schedule.affordability_ratio && selected_schedule.affordability_ratio > 1.0, do: true, else: false
+
+          updated_socket =
+            socket
+            |> assign(:selected_schedule_id, new_selected_id)
+            |> assign(:show_budget_warning, show_warning)
+            |> put_flash(:info, "Schedule #{new_selected_id} selected!")
+          {:noreply, updated_socket}
+        :error ->
+          updated_socket = put_flash(socket, :error, "Failed to parse schedule ID")
+          {:noreply, updated_socket}
+      end
     end
+  end
+
+  # Handle closing the budget warning modal
+  def handle_event("close_budget_warning", _params, socket) do
+    # Just hide the warning modal, keep the schedule selected
+    socket = assign(socket, :show_budget_warning, false)
+    {:noreply, socket}
+  end
+
+  # Handle showing the budget warning modal
+  def handle_event("show_budget_warning", _params, socket) do
+    # Show the warning modal
+    socket = assign(socket, :show_budget_warning, true)
+    {:noreply, socket}
   end
 
     # Rank schedules by affordability based on user's monthly income
@@ -356,6 +386,422 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                 </div>
               </div>
             </div>
+
+            <!-- Budget Warning Module -->
+            <%= if @current_user && @current_user.monthly_income && selected_schedule.affordability_ratio && selected_schedule.affordability_ratio > 1.0 do %>
+              <!-- Show Budget Warning Button if warning is hidden -->
+              <%= if !@show_budget_warning do %>
+                <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center text-sm text-red-800">
+                      <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span>
+                        <strong>Budget Warning:</strong> This package exceeds your monthly income by
+                        <%= Float.round(selected_schedule.affordability_ratio * 100, 1) %>%.
+                      </span>
+                    </div>
+                    <button
+                      phx-click="show_budget_warning"
+                      class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      View Full Warning
+                    </button>
+                  </div>
+                </div>
+              <% end %>
+
+              <!-- Budget Warning Popup Modal -->
+              <%= if @show_budget_warning do %>
+              <%
+                # Calculate warning details
+                total_price = selected_schedule.total_price
+                monthly_income = @current_user.monthly_income
+                affordability_ratio = selected_schedule.affordability_ratio
+                affordability_percentage = Float.round(affordability_ratio * 100, 1)
+
+                # Calculate payment details
+                departure_date = selected_schedule.departure_date
+                today = Date.utc_today()
+                months_until_departure = Date.diff(departure_date, today) |> div(30)
+                months_to_pay = max(1, months_until_departure - 1)
+
+                # Calculate monthly payment
+                deposit_amount = ceil(total_price * 0.2)
+                remaining_amount = total_price - deposit_amount
+                monthly_payment = if months_to_pay > 0, do: ceil(remaining_amount / months_to_pay), else: remaining_amount
+
+                # Find more affordable alternatives
+                affordable_alternatives = Enum.filter(@ranked_schedules, fn s ->
+                  s.affordability_ratio && s.affordability_ratio <= 1.0 && s.id != selected_schedule.id
+                end) |> Enum.take(3)
+              %>
+
+              <!-- Budget Warning Popup Modal -->
+              <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-fade-in" id="budget-warning-modal">
+                <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+                  <!-- Modal Header -->
+                  <div class="flex items-center justify-between p-6 border-b border-gray-200 bg-red-50">
+                    <div class="flex items-center">
+                      <svg class="w-8 h-8 mr-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <div>
+                        <h3 class="text-2xl font-bold text-red-900">⚠️ Budget Warning</h3>
+                        <p class="text-sm text-red-700 mt-1">
+                          This package exceeds your monthly income by <strong><%= affordability_percentage %>%</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      phx-click="close_budget_warning"
+                      class="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- Modal Content -->
+                  <div class="p-6">
+                    <!-- Warning Message -->
+                    <div class="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg">
+                      <div class="flex items-start">
+                        <svg class="w-5 h-5 mr-3 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div class="text-sm text-red-800">
+                          <p class="mb-2">
+                            The total cost of <strong>RM <%= total_price %></strong> is <strong><%= affordability_percentage %>% of your monthly income</strong> (RM <%= monthly_income %>).
+                            This could significantly impact your financial stability.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Financial Impact Summary -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div class="text-center p-4 bg-red-100 rounded-lg border border-red-200">
+                        <div class="text-2xl font-bold text-red-700">RM <%= total_price %></div>
+                        <div class="text-sm text-red-600">Total Package Cost</div>
+                      </div>
+                      <div class="text-center p-4 bg-orange-100 rounded-lg border border-orange-200">
+                        <div class="text-2xl font-bold text-orange-700">RM <%= monthly_payment %></div>
+                        <div class="text-sm text-orange-600">Monthly Payment</div>
+                      </div>
+                      <div class="text-center p-4 bg-yellow-100 rounded-lg border border-yellow-200">
+                        <div class="text-2xl font-bold text-yellow-700"><%= months_to_pay %></div>
+                        <div class="text-sm text-yellow-600">Payment Duration</div>
+                      </div>
+                    </div>
+
+                    <!-- Financial Impact Analysis -->
+                    <div class="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg">
+                      <div class="flex items-start">
+                        <svg class="w-5 h-5 mr-2 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div class="text-sm text-red-800">
+                          <div class="font-semibold mb-2">Financial Impact Analysis:</div>
+                          <ul class="list-disc list-inside space-y-1 text-xs">
+                            <li><strong>Monthly Payment:</strong> RM <%= monthly_payment %> (excluding deposit)</li>
+                            <li><strong>Payment Duration:</strong> <%= months_to_pay %> months</li>
+                            <li><strong>Income Impact:</strong> This will consume <%= affordability_percentage %>% of your monthly income</li>
+                            <li><strong>Risk Level:</strong> High - may affect your daily expenses and savings</li>
+                            <li><strong>Recommendation:</strong> Consider more affordable alternatives below</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- More Affordable Alternatives -->
+                    <%= if length(affordable_alternatives) > 0 do %>
+                      <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-red-800 mb-3">💡 More Affordable Alternatives</h4>
+                        <p class="text-sm text-red-700 mb-4">
+                          Here are some dates that better fit your budget (≤100% of monthly income):
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          <%= for alternative <- affordable_alternatives do %>
+                            <div class="bg-white border-2 border-green-300 rounded-lg p-3 shadow-sm">
+                              <div class="text-center">
+                                <div class="mb-2">
+                                  <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    💚 Affordable
+                                  </span>
+                                </div>
+                                <div class="text-base font-semibold text-gray-900">
+                                  <%= Calendar.strftime(alternative.departure_date, "%B %d, %Y") %>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                  <%= Calendar.strftime(alternative.departure_date, "%A") %>
+                                </div>
+                                <div class="mt-2 space-y-1">
+                                  <div class="text-xs text-gray-600">
+                                    <span class="font-medium">Total Price:</span>
+                                    <span class="font-bold text-green-700">RM <%= alternative.total_price %></span>
+                                  </div>
+                                  <div class="text-xs text-gray-600">
+                                    <span class="font-medium">Affordability:</span>
+                                    <span class="font-medium text-green-600">
+                                      <%= Float.round(alternative.affordability_ratio * 100, 1) %>% of income
+                                    </span>
+                                  </div>
+                                  <div class="text-xs text-gray-600">
+                                    <span class="font-medium">Score:</span>
+                                    <span class="font-medium text-blue-600"><%= alternative.affordability_score %>/100</span>
+                                  </div>
+                                  <div class="text-xs text-gray-600">
+                                    <span class="font-medium">Quota:</span>
+                                    <span class="font-medium"><%= alternative.quota %></span> spots
+                                  </div>
+                                </div>
+                                <div class="mt-3">
+                                  <button
+                                    phx-click="select_schedule"
+                                    phx-value-schedule_id={alternative.id}
+                                    class="w-full px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                                  >
+                                    Switch to This Date
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          <% end %>
+                        </div>
+                      </div>
+                    <% end %>
+
+                    <!-- Important Disclaimer -->
+                    <div class="mb-6 p-4 bg-yellow-100 border border-yellow-200 rounded-lg">
+                      <div class="flex items-start">
+                        <svg class="w-5 h-5 mr-2 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div class="text-sm text-yellow-800">
+                          <div class="font-semibold mb-1">Important Disclaimer:</div>
+                          <p>While you can still proceed with this booking, we strongly recommend choosing a more affordable option to ensure financial stability. Consider your monthly expenses and emergency savings before committing to this payment plan.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Modal Footer -->
+                  <div class="flex flex-col sm:flex-row gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                    <button
+                      phx-click="select_schedule"
+                      phx-value-schedule_id=""
+                      class="px-6 py-3 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Clear Selection
+                    </button>
+                    <a
+                      href="/packages"
+                      class="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors text-center"
+                    >
+                      Browse Other Packages
+                    </a>
+                    <button
+                      phx-click="close_budget_warning"
+                      class="px-6 py-3 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Close Warning
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <% end %>
+            <% end %>
+
+            <!-- Installment Payment Plan -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <div class="flex items-center mb-4">
+                <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-900">Installment Payment Plan</h3>
+              </div>
+
+              <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div class="flex items-center text-sm text-green-800">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    <strong>Payment Schedule:</strong> Complete all payments at least 1 month before departure to secure your booking.
+                  </span>
+                </div>
+              </div>
+
+              <%
+                # Calculate installment details
+                total_price = selected_schedule.total_price
+                departure_date = selected_schedule.departure_date
+                today = Date.utc_today()
+
+                # Calculate deposit (20% of total price)
+                deposit_amount = ceil(total_price * 0.2)
+                remaining_amount = total_price - deposit_amount
+
+                # Calculate months until departure (excluding the last month)
+                months_until_departure = Date.diff(departure_date, today) |> div(30)
+                months_to_pay = max(1, months_until_departure - 1)
+
+                # Calculate monthly payment amount (excluding deposit)
+                monthly_payment = if months_to_pay > 0, do: ceil(remaining_amount / months_to_pay), else: remaining_amount
+
+                # Calculate remaining amount for the last payment
+                total_paid = monthly_payment * (months_to_pay - 1)
+                last_payment = remaining_amount - total_paid
+              %>
+
+              <!-- Payment Summary -->
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                  <div class="text-2xl font-bold text-blue-600">RM <%= total_price %></div>
+                  <div class="text-sm text-gray-600">Total Amount</div>
+                </div>
+                <div class="text-center p-4 bg-orange-50 rounded-lg">
+                  <div class="text-2xl font-bold text-orange-600">RM <%= deposit_amount %></div>
+                  <div class="text-sm text-gray-600">Deposit (20%)</div>
+                </div>
+                <div class="text-center p-4 bg-green-50 rounded-lg">
+                  <div class="text-2xl font-bold text-green-600"><%= months_to_pay %></div>
+                  <div class="text-sm text-gray-600">Monthly Payments</div>
+                </div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                  <div class="text-2xl font-bold text-purple-600">RM <%= monthly_payment %></div>
+                  <div class="text-sm text-gray-600">Monthly Amount</div>
+                </div>
+              </div>
+
+              <!-- Deposit Information -->
+              <div class="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div class="flex items-center text-sm text-orange-800">
+                  <svg class="w-4 h-4 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                  <span>
+                    <strong>Deposit Required:</strong> Pay RM <%= deposit_amount %> (20% of total) upfront to secure your booking.
+                    The remaining RM <%= remaining_amount %> will be split into <%= months_to_pay %> monthly installments.
+                  </span>
+                </div>
+              </div>
+
+              <!-- Monthly Payment Schedule Table -->
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Payment #
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Type
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Due Date
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Amount
+                      </th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200">
+                    <!-- Deposit Row -->
+                    <tr class="bg-orange-50">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                        0
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          Deposit
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-sm text-gray-900">
+                        <%= Calendar.strftime(today, "%B %d, %Y") %>
+                        <span class="ml-1 text-xs text-orange-600">(Immediate)</span>
+                      </td>
+                      <td class="px-4 py-3 text-sm font-semibold text-gray-900">
+                        RM <%= deposit_amount %>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          Due Now
+                        </span>
+                      </td>
+                    </tr>
+
+                    <!-- Monthly Installments -->
+                    <%= for month <- 1..months_to_pay do %>
+                      <%
+                        # Calculate due date for each month
+                        due_date = Date.add(today, month * 30)
+                        is_last_payment = month == months_to_pay
+                        payment_amount = if is_last_payment, do: last_payment, else: monthly_payment
+                        payment_status = if Date.compare(due_date, today) == :gt, do: "Upcoming", else: "Overdue"
+                      %>
+                      <tr class={if month == months_to_pay, do: "bg-yellow-50", else: ""}>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                          <%= month %>
+                          <%= if is_last_payment do %>
+                            <span class="ml-1 text-xs text-yellow-600">(Final)</span>
+                          <% end %>
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Installment
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                          <%= Calendar.strftime(due_date, "%B %d, %Y") %>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-semibold text-gray-900">
+                          RM <%= payment_amount %>
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class={[
+                            "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                            case payment_status do
+                              "Upcoming" -> "bg-blue-100 text-blue-800"
+                              "Overdue" -> "bg-red-100 text-red-800"
+                              _ -> "bg-gray-100 text-gray-800"
+                            end
+                          ]}>
+                            <%= payment_status %>
+                          </span>
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Important Notes -->
+              <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="w-5 h-5 mr-2 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div class="text-sm text-yellow-800">
+                    <div class="font-semibold mb-1">Important Payment Terms:</div>
+                    <ul class="list-disc list-inside space-y-1 text-xs">
+                      <li><strong>Deposit:</strong> RM <%= deposit_amount %> (20%) must be paid immediately to secure your booking</li>
+                      <li>All remaining installments must be completed at least 1 month before departure</li>
+                      <li>Late payments may result in booking cancellation and deposit forfeiture</li>
+                      <li>Final payment amount may vary slightly due to rounding</li>
+                      <li>Contact support if you need to adjust your payment schedule</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           <% end %>
         <% end %>
 
@@ -482,20 +928,19 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                           </div>
                         </div>
                         <div class="mt-3 text-center">
-                          <span class={[
-                            "inline-flex px-3 py-2 text-xs font-semibold rounded-full",
-                            if @selected_schedule_id == schedule.id do
-                              "bg-blue-100 text-blue-800 border-2 border-blue-300"
-                            else
-                              "bg-gray-100 text-gray-600 border-2 border-gray-300"
-                            end
-                          ]}>
-                            <%= if @selected_schedule_id == schedule.id do %>
+                          <%= if @selected_schedule_id == schedule.id do %>
+                            <span class="inline-flex px-3 py-2 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-2 border-blue-300">
                               ✓ Currently Selected
-                            <% else %>
-                              Click below to select
-                            <% end %>
-                          </span>
+                            </span>
+                          <% else %>
+                            <button
+                              phx-click="select_schedule"
+                              phx-value-schedule_id={schedule.id}
+                              class="w-full px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              Select This Date
+                            </button>
+                          <% end %>
                         </div>
                       </div>
                     </div>
@@ -540,6 +985,28 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
               <% end %>
             </h3>
 
+            <!-- Budget Summary for Users with Income Info -->
+            <%= if @current_user && @current_user.monthly_income do %>
+              <%
+                recommended_count = Enum.count(@ranked_schedules, & &1.is_recommended)
+                warning_count = Enum.count(@ranked_schedules, fn s -> s.affordability_ratio && s.affordability_ratio > 1.0 end)
+                total_count = length(@ranked_schedules)
+              %>
+              <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex items-center text-sm text-blue-800">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    <strong>Budget Summary:</strong>
+                    <%= recommended_count %> affordable dates,
+                    <%= warning_count %> dates exceed your monthly income (RM <%= @current_user.monthly_income %>),
+                    <%= total_count %> total available dates.
+                  </span>
+                </div>
+              </div>
+            <% end %>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <%= for schedule <- @ranked_schedules do %>
                 <div class={[
@@ -549,6 +1016,8 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                       "border-2 border-blue-500 bg-blue-50 shadow-md"
                     schedule.is_recommended ->
                       "border-2 border-green-300 bg-green-50"
+                    schedule.affordability_ratio && schedule.affordability_ratio > 1.0 ->
+                      "border-2 border-red-300 bg-red-50"
                     true ->
                       "border-gray-200 hover:border-blue-300"
                   end
@@ -560,6 +1029,14 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                           ⭐ Recommended
                         </span>
                       </div>
+                    <% else %>
+                      <%= if schedule.affordability_ratio && schedule.affordability_ratio > 1.0 do %>
+                        <div class="mb-2">
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            ⚠️ Budget Warning
+                          </span>
+                        </div>
+                      <% end %>
                     <% end %>
                     <div class="text-base font-semibold text-gray-900">
                       <%= Calendar.strftime(schedule.departure_date, "%B %d, %Y") %>
@@ -610,6 +1087,18 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                           <% end %>
                         </span>
                       </div>
+
+                      <!-- Budget Warning for Non-Recommended Schedules -->
+                      <%= if schedule.affordability_ratio && schedule.affordability_ratio > 1.0 do %>
+                        <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                          <div class="flex items-center text-xs text-red-700">
+                            <svg class="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            <span class="font-medium"> Exceeds monthly income by <%= Float.round((schedule.affordability_ratio - 1.0) * 100, 1) %>%</span>
+                          </div>
+                        </div>
+                      <% end %>
                     <% end %>
 
                     <button
@@ -617,17 +1106,24 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                       phx-value-schedule_id={schedule.id}
                       class={[
                         "mt-2 w-full px-3 py-2 rounded-lg text-xs font-medium text-center block transition-colors",
-                        if @selected_schedule_id == schedule.id do
-                          "bg-blue-600 text-white border-2 border-blue-700"
-                        else
-                          "bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-300"
+                        cond do
+                          @selected_schedule_id == schedule.id ->
+                            "bg-blue-600 text-white border-2 border-blue-700"
+                          schedule.affordability_ratio && schedule.affordability_ratio > 1.0 ->
+                            "bg-red-100 text-red-700 hover:bg-red-200 border-2 border-red-300"
+                          true ->
+                            "bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-300"
                         end
                       ]}
                     >
                       <%= if @selected_schedule_id == schedule.id do %>
                         ✓ Selected
                       <% else %>
-                        Select This Date
+                        <%= if schedule.affordability_ratio && schedule.affordability_ratio > 1.0 do %>
+                          ⚠️ Select (Budget Risk)
+                        <% else %>
+                          Select This Date
+                        <% end %>
                       <% end %>
                     </button>
                   </div>
@@ -739,6 +1235,62 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
         </div>
       </div>
     </.sidebar>
+
+    <!-- CSS for Modal Animations -->
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+      }
+
+      .animate-slide-up {
+        animation: slideUp 0.3s ease-out;
+      }
+    </style>
+
+    <!-- JavaScript for Modal Behavior -->
+    <script>
+      // Close modal when clicking outside
+      document.addEventListener('click', function(event) {
+        const modal = document.getElementById('budget-warning-modal');
+        if (modal && event.target === modal) {
+          // Hide the modal by triggering the close event
+          const closeButton = modal.querySelector('button[phx-click="close_budget_warning"]');
+          if (closeButton) {
+            closeButton.click();
+          }
+        }
+      });
+
+      // Close modal with Escape key
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+          const modal = document.getElementById('budget-warning-modal');
+          if (modal) {
+            // Hide the modal by triggering the close event
+            const closeButton = modal.querySelector('button[phx-click="close_budget_warning"]');
+            if (closeButton) {
+              closeButton.click();
+            }
+          }
+        }
+      });
+    </script>
     """
   end
 end

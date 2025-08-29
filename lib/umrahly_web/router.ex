@@ -70,6 +70,9 @@ defmodule UmrahlyWeb.Router do
     live "/packages", UserPackagesLive, :index
     live "/packages/:id", UserPackageDetailsLive, :show
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new
+    live "/payments", UserPaymentsLive, :index
+    live "/payments/:tab", UserPaymentsLive, :index
+    get "/receipts/:id/download", PageController, :download_receipt
   end
 
   scope "/", UmrahlyWeb do
@@ -99,6 +102,7 @@ defmodule UmrahlyWeb.Router do
       live "/package-schedules/:id", AdminPackageScheduleViewLive, :show
       live "/package-schedules/:id/edit", AdminPackageScheduleEditLive, :edit
       live "/payments", AdminPaymentsLive, :index
+      live "/payment-proofs", AdminPaymentProofsLive, :index
       live "/flights", AdminFlightsLive, :index
       live "/activity-log", AdminActivityLogLive, :index
       live "/profile", AdminProfileLive, :edit

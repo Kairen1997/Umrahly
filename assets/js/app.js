@@ -64,6 +64,29 @@ const FormValidationHook = {
   }
 };
 
+// Custom hook for debugging form submissions
+const FormDebug = {
+  mounted() {
+    console.log("FormDebug hook mounted for form:", this.el);
+    
+    this.el.addEventListener("submit", (e) => {
+      console.log("Form submission triggered!");
+      console.log("Form action:", this.el.action);
+      console.log("Form method:", this.el.method);
+      console.log("Form enctype:", this.el.enctype);
+      
+      const formData = new FormData(this.el);
+      console.log("Form data entries:");
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+      
+      // Don't prevent default - let Phoenix handle it
+      console.log("Allowing form submission to continue...");
+    });
+  }
+};
+
 // Custom hook for debugging button clicks
 const DebugClick = {
   mounted() {
@@ -75,6 +98,101 @@ const DebugClick = {
       console.log("Button element:", this.el);
       console.log("Package ID:", this.el.dataset.packageId);
     });
+  }
+};
+
+// Custom hook for payment gateway redirect
+const PaymentGatewayRedirect = {
+  mounted() {
+    console.log("PaymentGatewayRedirect hook mounted");
+    
+    // Check if this is an online payment that requires immediate redirect
+    const requiresOnlinePayment = this.el.dataset.requiresOnlinePayment === "true";
+    const paymentGatewayUrl = this.el.dataset.paymentGatewayUrl;
+    
+    if (requiresOnlinePayment && paymentGatewayUrl) {
+      console.log("Redirecting to payment gateway:", paymentGatewayUrl);
+      
+      // Small delay to show the success message before redirect
+      setTimeout(() => {
+        // Open payment gateway in new tab/window
+        window.open(paymentGatewayUrl, '_blank');
+        
+        // Also redirect the current page to dashboard
+        window.location.href = '/dashboard';
+      }, 1500);
+    }
+  }
+};
+
+// Custom hook for receipt downloads
+const DownloadReceipt = {
+  mounted() {
+    console.log("DownloadReceipt hook mounted");
+    
+    this.el.addEventListener("click", (e) => {
+      e.preventDefault();
+      
+      const receiptId = this.el.dataset.receiptId;
+      console.log("Download receipt clicked for ID:", receiptId);
+      
+      // Push event to LiveView to get receipt data
+      this.pushEvent("download-receipt", { receipt_id: receiptId });
+    });
+    
+    // Listen for the response from the server
+    this.handleEvent("receipt_download_ready", (data) => {
+      console.log("Receipt download ready:", data);
+      this.downloadFile(data.file_path, data.filename);
+    });
+  },
+  
+  downloadFile(filePath, filename) {
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = filePath;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log("File download initiated:", filename);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      alert("Failed to download receipt. Please try again.");
+    }
+  }
+};
+
+// Custom hook for terms validation
+const TermsValidation = {
+  mounted() {
+    console.log("TermsValidation hook mounted");
+    
+    const termsCheckbox = this.el;
+    const confirmButton = document.getElementById("confirm-booking-btn");
+    
+    if (termsCheckbox && confirmButton) {
+      const validateTerms = () => {
+        if (termsCheckbox.checked) {
+          confirmButton.disabled = false;
+          confirmButton.classList.remove("opacity-50", "cursor-not-allowed");
+        } else {
+          confirmButton.disabled = true;
+          confirmButton.classList.add("opacity-50", "cursor-not-allowed");
+        }
+      };
+      
+      // Initial validation
+      validateTerms();
+      
+      // Add event listener
+      termsCheckbox.addEventListener("change", validateTerms);
+    }
   }
 };
 
@@ -444,7 +562,153 @@ const AddItemDebugHook = {
   }
 };
 
+// Booking Progress Hook - Disabled to fix step progression issue
+const BookingProgress = {
+  mounted() {
+    this.step = this.el.dataset.step;
+    this.packageId = this.el.dataset.packageId;
+    this.scheduleId = this.el.dataset.scheduleId;
+    
+    // Disabled all progress saving to fix step progression
+    console.log("BookingProgress hook mounted but disabled for debugging");
+    
+    // Notify when page is fully loaded
+    if (document.readyState === "complete") {
+      this.pushEvent("page_loaded", {});
+    } else {
+      window.addEventListener("load", () => {
+        this.pushEvent("page_loaded", {});
+      });
+    }
+  },
+  
+  destroyed() {
+    // Clean up event listeners
+    console.log("BookingProgress hook destroyed");
+  },
+  
+  updated() {
+    // Update step when it changes
+    this.step = this.el.dataset.step;
+    console.log("BookingProgress hook updated, new step:", this.step);
+  }
+};
 
+// Travelers Form Hooks
+const TravelersForm = {
+  mounted() {
+    this.setupFormValidation();
+    this.setupConfirmationDialogs();
+    this.setupSuccessMessage();
+  },
+
+  setupFormValidation() {
+    const form = this.el;
+    const inputs = form.querySelectorAll('input[required]');
+    const saveButton = form.querySelector('button[type="submit"]');
+
+    // Real-time validation
+    inputs.forEach(input => {
+      input.addEventListener('blur', () => {
+        this.validateField(input);
+      });
+      
+      input.addEventListener('input', () => {
+        this.validateField(input);
+      });
+    });
+
+    // Form submission validation
+    form.addEventListener('submit', (e) => {
+      if (!this.validateForm()) {
+        e.preventDefault();
+        this.showValidationError("Please complete all required fields before saving.");
+      }
+    });
+  },
+
+  setupConfirmationDialogs() {
+    // Handle remove traveler confirmation
+    this.handleEvent("remove_traveler", (event) => {
+      const index = event.target.getAttribute('phx-value-index');
+      const travelerName = event.target.closest('.border').querySelector('input[name*="[full_name]"]').value;
+      
+      if (travelerName && travelerName.trim() !== "") {
+        return confirm(`Are you sure you want to remove ${travelerName}?`);
+      } else {
+        return confirm("Are you sure you want to remove this traveler?");
+      }
+    });
+  },
+
+  setupSuccessMessage() {
+    // Listen for successful save events
+    this.handleEvent("save_travelers_success", () => {
+      this.showSuccessMessage();
+    });
+  },
+
+  validateField(input) {
+    const value = input.value.trim();
+    const isValid = value !== "";
+    
+    if (isValid) {
+      input.classList.remove('border-red-500');
+      input.classList.add('border-green-500');
+    } else {
+      input.classList.remove('border-green-500');
+      input.classList.add('border-red-500');
+    }
+    
+    return isValid;
+  },
+
+  validateForm() {
+    const requiredInputs = this.el.querySelectorAll('input[required]');
+    let isValid = true;
+    
+    requiredInputs.forEach(input => {
+      if (!this.validateField(input)) {
+        isValid = false;
+      }
+    });
+    
+    return isValid;
+  },
+
+  showValidationError(message) {
+    // Create or update error message
+    let errorDiv = this.el.querySelector('.validation-error');
+    if (!errorDiv) {
+      errorDiv = document.createElement('div');
+      errorDiv.className = 'validation-error bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4';
+      this.el.appendChild(errorDiv);
+    }
+    errorDiv.textContent = message;
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      if (errorDiv) {
+        errorDiv.remove();
+      }
+    }, 5000);
+  },
+
+  showSuccessMessage() {
+    const successMessage = document.getElementById('travelers-success-message');
+    if (successMessage) {
+      successMessage.classList.remove('hidden');
+      
+      // Auto-hide after 10 seconds
+      setTimeout(() => {
+        successMessage.classList.add('hidden');
+      }, 10000);
+    }
+  }
+};
+
+// Register the hook
+window.TravelersForm = TravelersForm;
 
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
@@ -453,13 +717,18 @@ let liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},
   hooks: {
     FileUploadHook,
-    FormValidationHook,
+    // FormValidationHook, // Temporarily disabled to fix form issues
+    FormDebug,
     AutoDismissFlash,
     PackageDetails,
     ScheduleDetails,
     AutoScroll,
     AddItemDebugHook,
-    DebugClick
+    DebugClick,
+    BookingProgress,
+    TermsValidation,
+    PaymentGatewayRedirect,
+    DownloadReceipt
   }
 })
 

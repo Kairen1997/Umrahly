@@ -36,7 +36,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
         {:noreply, put_flash(socket, :error, "Booking flow not found")}
       booking_flow ->
         # Call the Bookings module to cancel the booking flow progress
-        case Bookings.update_booking_flow_progress(booking_flow, %{status: "abandoned", last_updated: DateTime.utc_now()}) do
+        case Bookings.cancel_booking_flow_progress(booking_flow.id) do
           {:ok, _cancelled_booking} ->
             # Remove the cancelled booking from the list
             updated_bookings = Enum.reject(socket.assigns.active_bookings, &(&1.id == String.to_integer(id)))

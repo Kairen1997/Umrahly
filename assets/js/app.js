@@ -122,7 +122,7 @@ const DateFieldUpdate = {
     });
   }
 };
-};
+
 
 // Custom hook for payment gateway redirect
 const PaymentGatewayRedirect = {

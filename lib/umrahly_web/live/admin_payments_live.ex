@@ -76,6 +76,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
           "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
           "abandoned" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
+          "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
           _ -> base_query
         end
 
@@ -127,6 +128,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
           "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
           "abandoned" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
+          "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
           _ -> base_query
         end
 
@@ -331,6 +333,15 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                 ]}>
                 Abandoned
               </button>
+              <button
+                phx-click="filter_by_status"
+                phx-value-status="canceled"
+                class={[
+                  "px-4 py-2 rounded-lg transition-colors",
+                  if(@filter_status == "canceled", do: "bg-red-600 text-white", else: "bg-gray-200 text-gray-700 hover:bg-gray-300")
+                ]}>
+                Canceled
+              </button>
             </div>
           </div>
 
@@ -397,6 +408,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                             "completed" -> "bg-green-100 text-green-800"
                             "in_progress" -> "bg-blue-100 text-blue-800"
                             "abandoned" -> "bg-red-100 text-red-800"
+                            "canceled" -> "bg-red-100 text-red-800"
                             _ -> "bg-gray-100 text-gray-800"
                           end
                         ]}>
@@ -463,6 +475,12 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
               <div class="text-sm font-medium text-red-600">Abandoned</div>
               <div class="text-2xl font-bold text-red-900">
                 <%= @payments |> Enum.filter(& &1.status == "abandoned") |> length() %>
+              </div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg">
+              <div class="text-sm font-medium text-red-600">Canceled</div>
+              <div class="text-2xl font-bold text-red-900">
+                <%= @payments |> Enum.filter(& &1.status == "canceled") |> length() %>
               </div>
             </div>
           </div>

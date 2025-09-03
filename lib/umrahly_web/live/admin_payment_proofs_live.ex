@@ -15,6 +15,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
       socket =
         socket
         |> assign(:page_title, "Payment Proof Management")
+        |> assign(:current_page, :admin_payment_proofs)
         |> assign(:pending_proofs, pending_proofs)
         |> assign(:selected_booking, nil)
         |> assign(:admin_notes, "")
@@ -90,7 +91,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
 
   def render(assigns) do
     ~H"""
-    <.admin_layout page_title={@page_title}>
+    <.admin_layout page_title={@page_title} current_page={@current_page}>
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="mb-8">
           <h1 class="text-3xl font-bold text-gray-900">Payment Proof Management</h1>

@@ -116,44 +116,46 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           progress.travelers_data
         # If booking for self, pre-fill first traveler
         progress.is_booking_for_self ->
-          IO.puts("BOOKING_FOR_SELF: Creating travelers with user details")
           # Create travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn index ->
             if index == 1 do
               # First traveler - pre-fill with user details if booking for self
               %{
-                full_name: socket.assigns.current_user.full_name || "",
-                identity_card_number: socket.assigns.current_user.identity_card_number || "",
-                passport_number: "",
-                phone: socket.assigns.current_user.phone_number || "",
-                date_of_birth: "",
-                address: "",
-                poskod: "",
-                city: "",
-                state: "",
-                citizenship: "Malaysia",
-                emergency_contact_name: "",
-                emergency_contact_phone: "",
-                emergency_contact_relationship: "",
-                room_type: "standard"
+                "full_name" => socket.assigns.current_user.full_name || "",
+                "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+                "passport_number" => socket.assigns.current_user.passport_number || "",
+                "phone" => socket.assigns.current_user.phone_number || "",
+                "date_of_birth" => case socket.assigns.current_user.birthdate do
+                  nil -> ""
+                  birthdate -> Date.to_string(birthdate)
+                end,
+                "address" => socket.assigns.current_user.address || "",
+                "poskod" => socket.assigns.current_user.poskod || "",
+                "city" => socket.assigns.current_user.city || "",
+                "state" => socket.assigns.current_user.state || "",
+                "citizenship" => socket.assigns.current_user.citizenship || "",
+                "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+                "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+                "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || "",
+                "room_type" => "standard"
               }
             else
               # Additional travelers - empty fields
               %{
-                full_name: "",
-                identity_card_number: "",
-                passport_number: "",
-                phone: "",
-                date_of_birth: "",
-                address: "",
-                poskod: "",
-                city: "",
-                state: "",
-                citizenship: "Malaysia",
-                emergency_contact_name: "",
-                emergency_contact_phone: "",
-                emergency_contact_relationship: "",
-                room_type: "standard"
+                "full_name" => "",
+                "identity_card_number" => "",
+                "passport_number" => "",
+                "phone" => "",
+                "date_of_birth" => "",
+                "address" => "",
+                "poskod" => "",
+                "city" => "",
+                "state" => "",
+                "citizenship" => "",
+                "emergency_contact_name" => "",
+                "emergency_contact_phone" => "",
+                "emergency_contact_relationship" => "",
+                "room_type" => "standard"
               }
             end
           end)
@@ -162,20 +164,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           # Create empty travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn _ ->
             %{
-              full_name: "",
-              identity_card_number: "",
-              passport_number: "",
-              phone: "",
-              date_of_birth: "",
-              address: "",
-              poskod: "",
-              city: "",
-              state: "",
-              citizenship: "Malaysia",
-              emergency_contact_name: "",
-              emergency_contact_phone: "",
-              emergency_contact_relationship: "",
-              room_type: "standard"
+              "full_name" => "",
+              "identity_card_number" => "",
+              "passport_number" => "",
+              "phone" => "",
+              "date_of_birth" => "",
+              "address" => "",
+              "poskod" => "",
+              "city" => "",
+              "state" => "",
+              "citizenship" => "",
+              "emergency_contact_name" => "",
+              "emergency_contact_phone" => "",
+              "emergency_contact_relationship" => "",
+              "room_type" => "standard"
             }
           end)
         end
@@ -185,6 +187,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       IO.puts("FINAL travelers: #{inspect(travelers)}")
       IO.puts("FINAL travelers count: #{actual_number_of_persons}")
       IO.puts("UPDATED number_of_persons from #{progress.number_of_persons} to #{actual_number_of_persons}")
+
+
 
       # Now calculate total amount based on actual number of persons
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(actual_number_of_persons))
@@ -251,60 +255,101 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         if number_of_persons > current_count do
           additional_travelers = Enum.map((current_count + 1)..number_of_persons, fn _ ->
             %{
-              full_name: "",
-              identity_card_number: "",
-              passport_number: "",
-              phone: "",
-              date_of_birth: "",
-              address: "",
-              poskod: "",
-              city: "",
-              state: "",
-              citizenship: "Malaysia",
-              emergency_contact_name: "",
-              emergency_contact_phone: "",
-              emergency_contact_relationship: "",
-              room_type: "standard"
+              "full_name" => "",
+              "identity_card_number" => "",
+              "passport_number" => "",
+              "phone" => "",
+              "date_of_birth" => "",
+              "address" => "",
+              "poskod" => "",
+              "city" => "",
+              "state" => "",
+              "citizenship" => "",
+              "emergency_contact_name" => "",
+              "emergency_contact_phone" => "",
+              "emergency_contact_relationship" => "",
+              "room_type" => "standard"
             }
           end)
-          Enum.map(travelers_params, fn traveler ->
+          mapped_travelers = Enum.map(travelers_params, fn traveler ->
             %{
-              full_name: traveler["full_name"] || "",
-              identity_card_number: traveler["identity_card_number"] || "",
-              passport_number: traveler["passport_number"] || "",
-              phone: traveler["phone"] || "",
-              date_of_birth: traveler["date_of_birth"] || "",
-              address: traveler["address"] || "",
-              poskod: traveler["poskod"] || "",
-              city: traveler["city"] || "",
-              state: traveler["state"] || "",
-              citizenship: traveler["citizenship"] || "Malaysia",
-              emergency_contact_name: traveler["emergency_contact_name"] || "",
-              emergency_contact_phone: traveler["emergency_contact_phone"] || "",
-              emergency_contact_relationship: traveler["emergency_contact_relationship"] || "",
-              room_type: traveler["room_type"] || "standard"
+              "full_name" => traveler["full_name"] || "",
+              "identity_card_number" => traveler["identity_card_number"] || "",
+              "passport_number" => traveler["passport_number"] || "",
+              "phone" => traveler["phone"] || "",
+              "date_of_birth" => traveler["date_of_birth"] || "",
+              "address" => traveler["address"] || "",
+              "poskod" => traveler["poskod"] || "",
+              "city" => traveler["city"] || "",
+              "state" => traveler["state"] || "",
+              "citizenship" => traveler["citizenship"] || "",
+              "emergency_contact_name" => traveler["emergency_contact_name"] || "",
+              "emergency_contact_phone" => traveler["emergency_contact_phone"] || "",
+              "emergency_contact_relationship" => traveler["emergency_contact_relationship"] || "",
+              "room_type" => traveler["room_type"] || "standard"
             }
-          end) ++ additional_travelers
+          end)
+
+          all_travelers = mapped_travelers ++ additional_travelers
+
+                  # Ensure the first traveler always has the address if booking for self
+        final_travelers = if socket.assigns.is_booking_for_self and length(all_travelers) > 0 do
+          first_traveler = List.first(all_travelers)
+          updated_first_traveler = Map.put(first_traveler, "address", socket.assigns.current_user.address || "")
+          [updated_first_traveler] ++ List.delete_at(all_travelers, 0)
+        else
+          all_travelers
+        end
+
+          final_travelers
         else
           # If number of persons decreased, truncate the list
-          Enum.take(Enum.map(travelers_params, fn traveler ->
+          taken_travelers = Enum.take(Enum.map(travelers_params, fn traveler ->
             %{
-              full_name: traveler["full_name"] || "",
-              identity_card_number: traveler["identity_card_number"] || "",
-              passport_number: traveler["passport_number"] || "",
-              phone: traveler["phone"] || "",
-              date_of_birth: traveler["date_of_birth"] || "",
-              address: traveler["address"] || "",
-              poskod: traveler["poskod"] || "",
-              city: traveler["city"] || "",
-              state: traveler["state"] || "",
-              citizenship: traveler["citizenship"] || "Malaysia",
-              emergency_contact_name: traveler["emergency_contact_name"] || "",
-              emergency_contact_phone: traveler["emergency_contact_phone"] || "",
-              emergency_contact_relationship: traveler["emergency_contact_relationship"] || "",
-              room_type: traveler["room_type"] || "standard"
+              "full_name" => traveler["full_name"] || "",
+              "identity_card_number" => traveler["identity_card_number"] || "",
+              "passport_number" => traveler["passport_number"] || "",
+              "phone" => traveler["phone"] || "",
+              "date_of_birth" => traveler["date_of_birth"] || "",
+              "address" => traveler["address"] || "",
+              "poskod" => traveler["poskod"] || "",
+              "city" => traveler["city"] || "",
+              "state" => traveler["state"] || "",
+              "citizenship" => traveler["citizenship"] || "",
+              "emergency_contact_name" => traveler["emergency_contact_name"] || "",
+              "emergency_contact_phone" => traveler["emergency_contact_phone"] || "",
+              "emergency_contact_relationship" => traveler["emergency_contact_relationship"] || "",
+              "room_type" => traveler["room_type"] || "standard"
             }
           end), number_of_persons)
+
+          # Ensure the first traveler always has the profile details if booking for self
+          final_travelers = if socket.assigns.is_booking_for_self and length(taken_travelers) > 0 do
+            first_traveler = List.first(taken_travelers)
+            updated_first_traveler = Map.merge(first_traveler, %{
+              "full_name" => socket.assigns.current_user.full_name || "",
+              "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+              "passport_number" => socket.assigns.current_user.passport_number || "",
+              "phone" => socket.assigns.current_user.phone_number || "",
+              "date_of_birth" => case socket.assigns.current_user.birthdate do
+                nil -> ""
+                birthdate -> Date.to_string(birthdate)
+              end,
+              "address" => socket.assigns.current_user.address || "",
+              "poskod" => socket.assigns.current_user.poskod || "",
+              "city" => socket.assigns.current_user.city || "",
+              "state" => socket.assigns.current_user.state || "",
+              "citizenship" => socket.assigns.current_user.citizenship || "",
+              "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+              "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+              "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+            })
+            [updated_first_traveler] ++ List.delete_at(taken_travelers, 0)
+          else
+            taken_travelers
+          end
+
+          final_travelers
         end
     end
 
@@ -385,38 +430,41 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     travelers = if new_is_booking_for_self do
       # Booking for self - pre-fill with user details
       [%{
-        full_name: socket.assigns.current_user.full_name || "",
-        identity_card_number: socket.assigns.current_user.identity_card_number || "",
-        passport_number: "",
-        phone: socket.assigns.current_user.phone_number || "",
-        date_of_birth: "",
-        address: "",
-        poskod: "",
-        city: "",
-        state: "",
-        citizenship: "Malaysia",
-        emergency_contact_name: "",
-        emergency_contact_phone: "",
-        emergency_contact_relationship: "",
-        room_type: "standard"
+        "full_name" => socket.assigns.current_user.full_name || "",
+        "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+        "passport_number" => socket.assigns.current_user.passport_number || "",
+        "phone" => socket.assigns.current_user.phone_number || "",
+        "date_of_birth" => case socket.assigns.current_user.birthdate do
+          nil -> ""
+          birthdate -> Date.to_string(birthdate)
+        end,
+        "address" => socket.assigns.current_user.address || "",
+        "poskod" => socket.assigns.current_user.poskod || "",
+        "city" => socket.assigns.current_user.city || "",
+        "state" => socket.assigns.current_user.state || "",
+          "citizenship" => socket.assigns.current_user.citizenship || "",
+        "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+        "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+        "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || "",
+        "room_type" => "standard"
       }]
     else
       # Booking for someone else - empty fields
       [%{
-        full_name: "",
-        identity_card_number: "",
-        passport_number: "",
-        phone: "",
-        date_of_birth: "",
-        address: "",
-        poskod: "",
-        city: "",
-        state: "",
-        citizenship: "Malaysia",
-        emergency_contact_name: "",
-        emergency_contact_phone: "",
-        emergency_contact_relationship: "",
-        room_type: "standard"
+        "full_name" => "",
+        "identity_card_number" => "",
+        "passport_number" => "",
+        "phone" => "",
+        "date_of_birth" => "",
+        "address" => "",
+        "poskod" => "",
+        "city" => "",
+        "state" => "",
+        "citizenship" => "",
+        "emergency_contact_name" => "",
+        "emergency_contact_phone" => "",
+        "emergency_contact_relationship" => "",
+        "room_type" => "standard"
       }]
     end
 
@@ -426,20 +474,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       first_traveler = List.first(travelers)
       additional_travelers = Enum.map(2..socket.assigns.number_of_persons, fn _ ->
         %{
-          full_name: "",
-          identity_card_number: "",
-          passport_number: "",
-          phone: "",
-          date_of_birth: "",
-          address: "",
-          poskod: "",
-          city: "",
-          state: "",
-          citizenship: "Malaysia",
-          emergency_contact_name: "",
-          emergency_contact_phone: "",
-          emergency_contact_relationship: "",
-          room_type: "standard"
+          "full_name" => "",
+          "identity_card_number" => "",
+          "passport_number" => "",
+          "phone" => "",
+          "date_of_birth" => "",
+          "address" => "",
+          "poskod" => "",
+          "city" => "",
+          "state" => "",
+          "citizenship" => "",
+          "emergency_contact_name" => "",
+          "emergency_contact_phone" => "",
+          "emergency_contact_relationship" => "",
+          "room_type" => "standard"
         }
       end)
       [first_traveler] ++ additional_travelers
@@ -476,32 +524,55 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       # Add new travelers while preserving existing data
       additional_travelers = Enum.map((current_number + 1)..new_number, fn _index ->
         %{
-          full_name: "",
-          identity_card_number: "",
-          passport_number: "",
-          phone: "",
-          date_of_birth: "",
-          address: "",
-          poskod: "",
-          city: "",
-          state: "",
-          citizenship: "Malaysia",
-          emergency_contact_name: "",
-          emergency_contact_phone: "",
-          emergency_contact_relationship: "",
-          room_type: "standard"
+          "full_name" => "",
+          "identity_card_number" => "",
+          "passport_number" => "",
+          "phone" => "",
+          "date_of_birth" => "",
+          "address" => "",
+          "poskod" => "",
+          "city" => "",
+          "state" => "",
+          "citizenship" => "",
+          "emergency_contact_name" => "",
+          "emergency_contact_phone" => "",
+          "emergency_contact_relationship" => "",
+          "room_type" => "standard"
         }
       end)
 
       # Merge existing travelers with new ones
       new_travelers = existing_travelers ++ additional_travelers
 
-      # Debug logging
-      IO.puts("INCREASE: current_number=#{current_number}, new_number=#{new_number}")
-      IO.puts("INCREASE: existing_travelers count=#{length(existing_travelers)}")
-      IO.puts("INCREASE: new_travelers count=#{length(new_travelers)}")
+      # Ensure the first traveler always has the address if booking for self
+      final_travelers = if socket.assigns.is_booking_for_self and length(new_travelers) > 0 do
+        first_traveler = List.first(new_travelers)
+        updated_first_traveler = Map.merge(first_traveler, %{
+          "full_name" => socket.assigns.current_user.full_name || "",
+          "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+          "passport_number" => socket.assigns.current_user.passport_number || "",
+          "phone" => socket.assigns.current_user.phone_number || "",
+          "date_of_birth" => case socket.assigns.current_user.birthdate do
+            nil -> ""
+            birthdate -> Date.to_string(birthdate)
+          end,
+          "address" => socket.assigns.current_user.address || "",
+          "poskod" => socket.assigns.current_user.poskod || "",
+          "city" => socket.assigns.current_user.city || "",
+          "state" => socket.assigns.current_user.state || "",
+          "citizenship" => socket.assigns.current_user.citizenship || "",
+          "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+          "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+          "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+        })
+        [updated_first_traveler] ++ List.delete_at(new_travelers, 0)
+      else
+        new_travelers
+      end
 
-      new_travelers
+
+
+      final_travelers
     else
       existing_travelers
     end
@@ -539,7 +610,35 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     existing_travelers = socket.assigns.travelers
     travelers = if new_number < current_number do
       # Take only the first N travelers, preserving their data
-      Enum.take(existing_travelers, new_number)
+      taken_travelers = Enum.take(existing_travelers, new_number)
+
+      # Ensure the first traveler always has the address if booking for self
+      final_travelers = if socket.assigns.is_booking_for_self and length(taken_travelers) > 0 do
+        first_traveler = List.first(taken_travelers)
+        updated_first_traveler = Map.merge(first_traveler, %{
+          "full_name" => socket.assigns.current_user.full_name || "",
+          "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+          "passport_number" => socket.assigns.current_user.passport_number || "",
+          "phone" => socket.assigns.current_user.phone_number || "",
+          "date_of_birth" => case socket.assigns.current_user.birthdate do
+            nil -> ""
+            birthdate -> Date.to_string(birthdate)
+          end,
+          "address" => socket.assigns.current_user.address || "",
+          "poskod" => socket.assigns.current_user.poskod || "",
+          "city" => socket.assigns.current_user.city || "",
+          "state" => socket.assigns.current_user.state || "",
+          "citizenship" => socket.assigns.current_user.citizenship || "",
+          "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+          "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+          "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+        })
+        [updated_first_traveler] ++ List.delete_at(taken_travelers, 0)
+      else
+        taken_travelers
+      end
+
+      final_travelers
     else
       existing_travelers
     end
@@ -908,15 +1007,26 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
 
-    # Convert field to atom for consistency
-    field_atom = String.to_atom(field)
-
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      # Store only with atom keys for consistency
-      Map.put(traveler, field_atom, value)
+      # Store with string keys for consistency with the form
+      Map.put(traveler, field, value)
     end)
 
-    socket = assign(socket, :travelers, updated_travelers)
+    # Ensure the first traveler always has the address if booking for self
+    final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
+      first_traveler = List.first(updated_travelers)
+      updated_first_traveler = Map.merge(first_traveler, %{
+        "full_name" => socket.assigns.current_user.full_name || "",
+        "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+        "phone" => socket.assigns.current_user.phone_number || "",
+        "address" => socket.assigns.current_user.address || ""
+      })
+      [updated_first_traveler] ++ List.delete_at(updated_travelers, 0)
+    else
+      updated_travelers
+    end
+
+    socket = assign(socket, :travelers, final_travelers)
 
     {:noreply, socket}
   end
@@ -932,16 +1042,42 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> Enum.map(fn {traveler, idx} ->
         existing = Enum.at(socket.assigns.travelers, idx, %{})
         Map.merge(existing, %{
-          full_name: traveler["full_name"] || existing[:full_name] || "",
-          identity_card_number: traveler["identity_card_number"] || existing[:identity_card_number] || "",
-          passport_number: traveler["passport_number"] || existing[:passport_number] || "",
-          phone: traveler["phone"] || existing[:phone] || ""
+          "full_name" => traveler["full_name"] || existing["full_name"] || existing[:full_name] || "",
+          "identity_card_number" => traveler["identity_card_number"] || existing["identity_card_number"] || existing[:identity_card_number] || "",
+          "passport_number" => traveler["passport_number"] || existing["passport_number"] || existing[:passport_number] || "",
+          "phone" => traveler["phone"] || existing["phone"] || existing[:phone] || ""
         })
       end)
 
+    # Ensure the first traveler always has the profile details if booking for self
+    final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
+      first_traveler = List.first(updated_travelers)
+      updated_first_traveler = Map.merge(first_traveler, %{
+        "full_name" => socket.assigns.current_user.full_name || "",
+        "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+        "passport_number" => socket.assigns.current_user.passport_number || "",
+        "phone" => socket.assigns.current_user.phone_number || "",
+        "date_of_birth" => case socket.assigns.current_user.birthdate do
+          nil -> ""
+          birthdate -> Date.to_string(birthdate)
+        end,
+        "address" => socket.assigns.current_user.address || "",
+        "poskod" => socket.assigns.current_user.poskod || "",
+        "city" => socket.assigns.current_user.city || "",
+        "state" => socket.assigns.current_user.state || "",
+        "citizenship" => socket.assigns.current_user.citizenship || "Malaysia",
+        "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+        "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+        "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+      })
+      [updated_first_traveler] ++ List.delete_at(updated_travelers, 0)
+    else
+      updated_travelers
+    end
+
     # Validate that all required traveler information is filled
     all_travelers_complete =
-      Enum.all?(updated_travelers, fn traveler ->
+      Enum.all?(final_travelers, fn traveler ->
         traveler["full_name"] != "" and
         traveler["identity_card_number"] != "" and
         traveler["phone"] != ""
@@ -949,11 +1085,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     # Update booking flow progress
     {_ok, _progress} =
-      Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: updated_travelers, last_updated: DateTime.utc_now()})
+      Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: final_travelers, last_updated: DateTime.utc_now()})
 
     socket =
       socket
-      |> assign(:travelers, updated_travelers)
+      |> assign(:travelers, final_travelers)
       |> (fn s ->
         if all_travelers_complete do
           put_flash(s, :info, "Traveler information validated successfully!")
@@ -976,15 +1112,38 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     field = params["field"]
     travelers = socket.assigns.travelers
 
-    # Convert field to atom for consistency
-    field_atom = String.to_atom(field)
-
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      # Store only with atom keys for consistency
-      Map.put(traveler, field_atom, value)
+      # Store with string keys for consistency with the form
+      Map.put(traveler, field, value)
     end)
 
-    socket = assign(socket, :travelers, updated_travelers)
+    # Ensure the first traveler always has the profile details if booking for self
+    final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
+      first_traveler = List.first(updated_travelers)
+      updated_first_traveler = Map.merge(first_traveler, %{
+        "full_name" => socket.assigns.current_user.full_name || "",
+        "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+        "passport_number" => socket.assigns.current_user.passport_number || "",
+        "phone" => socket.assigns.current_user.phone_number || "",
+        "date_of_birth" => case socket.assigns.current_user.birthdate do
+          nil -> ""
+          birthdate -> Date.to_string(birthdate)
+        end,
+        "address" => socket.assigns.current_user.address || "",
+        "poskod" => socket.assigns.current_user.poskod || "",
+        "city" => socket.assigns.current_user.city || "",
+        "state" => socket.assigns.current_user.state || "",
+        "citizenship" => socket.assigns.current_user.citizenship || "Malaysia",
+        "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+        "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+        "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+      })
+      [updated_first_traveler] ++ List.delete_at(updated_travelers, 0)
+    else
+      updated_travelers
+    end
+
+    socket = assign(socket, :travelers, final_travelers)
 
     {:noreply, socket}
   end
@@ -1015,23 +1174,44 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: travelers, last_updated: DateTime.utc_now()})
 
       # Clear the form by resetting travelers to empty values while preserving the structure
-      cleared_travelers = Enum.map(travelers, fn _traveler ->
-        %{
-          full_name: "",
-          identity_card_number: "",
-          passport_number: "",
-          phone: "",
-          date_of_birth: "",
-          address: "",
-          poskod: "",
-          city: "",
-          state: "",
-          citizenship: "Malaysia",
-          emergency_contact_name: "",
-          emergency_contact_phone: "",
-          emergency_contact_relationship: "",
-          room_type: "standard"
-        }
+      cleared_travelers = Enum.with_index(travelers)
+      |> Enum.map(fn {_traveler, index} ->
+        # If this is the first traveler and they're booking for themselves, preserve profile info
+        if index == 0 and socket.assigns.is_booking_for_self do
+          %{
+            "full_name" => socket.assigns.current_user.full_name || "",
+            "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+            "passport_number" => "",
+            "phone" => socket.assigns.current_user.phone_number || "",
+            "date_of_birth" => "",
+            "address" => socket.assigns.current_user.address || "",
+            "poskod" => "",
+            "city" => "",
+            "state" => "",
+            "citizenship" => "Malaysia",
+            "emergency_contact_name" => "",
+            "emergency_contact_phone" => "",
+            "emergency_contact_relationship" => "",
+            "room_type" => "standard"
+          }
+        else
+          %{
+            "full_name" => "",
+            "identity_card_number" => "",
+            "passport_number" => "",
+            "phone" => "",
+            "date_of_birth" => "",
+            "address" => "",
+            "poskod" => "",
+            "city" => "",
+            "state" => "",
+            "citizenship" => "Malaysia",
+            "emergency_contact_name" => "",
+            "emergency_contact_phone" => "",
+            "emergency_contact_relationship" => "",
+            "room_type" => "standard"
+          }
+        end
       end)
 
       socket =
@@ -1053,11 +1233,30 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
 
-    # Convert field to atom for consistency
-    field_atom = String.to_atom(field)
-
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      Map.put(traveler, field_atom, "")
+      # If this is the first traveler and they're booking for themselves, preserve profile info when clearing profile fields
+      if index == 0 and socket.assigns.is_booking_for_self and field in ["full_name", "identity_card_number", "passport_number", "phone", "date_of_birth", "address", "poskod", "city", "state", "citizenship", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship"] do
+        case field do
+          "full_name" -> Map.put(traveler, "full_name", socket.assigns.current_user.full_name || "")
+          "identity_card_number" -> Map.put(traveler, "identity_card_number", socket.assigns.current_user.identity_card_number || "")
+          "passport_number" -> Map.put(traveler, "passport_number", socket.assigns.current_user.passport_number || "")
+          "phone" -> Map.put(traveler, "phone", socket.assigns.current_user.phone_number || "")
+          "date_of_birth" -> case socket.assigns.current_user.birthdate do
+            nil -> Map.put(traveler, "date_of_birth", "")
+            birthdate -> Map.put(traveler, "date_of_birth", Date.to_string(birthdate))
+          end
+          "address" -> Map.put(traveler, "address", socket.assigns.current_user.address || "")
+          "poskod" -> Map.put(traveler, "poskod", socket.assigns.current_user.poskod || "")
+          "city" -> Map.put(traveler, "city", socket.assigns.current_user.city || "")
+          "state" -> Map.put(traveler, "state", socket.assigns.current_user.state || "")
+          "citizenship" -> Map.put(traveler, "citizenship", socket.assigns.current_user.citizenship || "Malaysia")
+          "emergency_contact_name" -> Map.put(traveler, "emergency_contact_name", socket.assigns.current_user.emergency_contact_name || "")
+          "emergency_contact_phone" -> Map.put(traveler, "emergency_contact_phone", socket.assigns.current_user.emergency_contact_phone || "")
+          "emergency_contact_relationship" -> Map.put(traveler, "emergency_contact_relationship", socket.assigns.current_user.emergency_contact_relationship || "")
+        end
+      else
+        Map.put(traveler, field, "")
+      end
     end)
 
     socket = assign(socket, :travelers, updated_travelers)
@@ -1071,22 +1270,42 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     travelers = socket.assigns.travelers
 
     updated_travelers = List.update_at(travelers, index, fn _traveler ->
-      %{
-        full_name: "",
-        identity_card_number: "",
-        passport_number: "",
-        phone: "",
-        date_of_birth: "",
-        address: "",
-        poskod: "",
-        city: "",
-        state: "",
-        citizenship: "Malaysia",
-        emergency_contact_name: "",
-        emergency_contact_phone: "",
-        emergency_contact_relationship: "",
-        room_type: "standard"
-      }
+      # If this is the first traveler and they're booking for themselves, preserve profile info
+      if index == 0 and socket.assigns.is_booking_for_self do
+        %{
+          "full_name" => socket.assigns.current_user.full_name || "",
+          "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+          "passport_number" => "",
+          "phone" => socket.assigns.current_user.phone_number || "",
+          "date_of_birth" => "",
+          "address" => socket.assigns.current_user.address || "",
+          "poskod" => "",
+          "city" => "",
+          "state" => "",
+          "citizenship" => "Malaysia",
+          "emergency_contact_name" => "",
+          "emergency_contact_phone" => "",
+          "emergency_contact_relationship" => "",
+          "room_type" => "standard"
+        }
+      else
+        %{
+          "full_name" => "",
+          "identity_card_number" => "",
+          "passport_number" => "",
+          "phone" => "",
+          "date_of_birth" => "",
+          "address" => "",
+          "poskod" => "",
+          "city" => "",
+          "state" => "",
+          "citizenship" => "Malaysia",
+          "emergency_contact_name" => "",
+          "emergency_contact_phone" => "",
+          "emergency_contact_relationship" => "",
+          "room_type" => "standard"
+        }
+      end
     end)
 
     socket = assign(socket, :travelers, updated_travelers)
@@ -1096,23 +1315,44 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
   # Handle clearing all fields for all travelers
   def handle_event("clear_all_fields", _params, socket) do
-    cleared_travelers = Enum.map(socket.assigns.travelers, fn _traveler ->
-      %{
-        full_name: "",
-        identity_card_number: "",
-        passport_number: "",
-        phone: "",
-        date_of_birth: "",
-        address: "",
-        poskod: "",
-        city: "",
-        state: "",
-        citizenship: "Malaysia",
-        emergency_contact_name: "",
-        emergency_contact_phone: "",
-        emergency_contact_relationship: "",
-        room_type: "standard"
-      }
+    cleared_travelers = Enum.with_index(socket.assigns.travelers)
+    |> Enum.map(fn {_traveler, index} ->
+      # If this is the first traveler and they're booking for themselves, preserve profile info
+      if index == 0 and socket.assigns.is_booking_for_self do
+        %{
+          "full_name" => socket.assigns.current_user.full_name || "",
+          "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+          "passport_number" => "",
+          "phone" => socket.assigns.current_user.phone_number || "",
+          "date_of_birth" => "",
+          "address" => socket.assigns.current_user.address || "",
+          "poskod" => "",
+          "city" => "",
+          "state" => "",
+          "citizenship" => "Malaysia",
+          "emergency_contact_name" => "",
+          "emergency_contact_phone" => "",
+          "emergency_contact_relationship" => "",
+          "room_type" => "standard"
+        }
+      else
+        %{
+          "full_name" => "",
+          "identity_card_number" => "",
+          "passport_number" => "",
+          "phone" => "",
+          "date_of_birth" => "",
+          "address" => "",
+          "poskod" => "",
+          "city" => "",
+          "state" => "",
+          "citizenship" => "Malaysia",
+          "emergency_contact_name" => "",
+          "emergency_contact_phone" => "",
+          "emergency_contact_relationship" => "",
+          "room_type" => "standard"
+        }
+      end
     end)
 
     socket =
@@ -1146,50 +1386,31 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     updated_travelers = current_travelers ++ [new_traveler]
     new_number_of_persons = length(updated_travelers)
 
-    # Recalculate amounts
-    package_price = socket.assigns.package.price
-    base_price = package_price
-    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-    schedule_price_per_person = base_price + override_price
-
-    total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
-
-    # Update deposit amount if payment plan is installment
-    deposit_amount = if socket.assigns.payment_plan == "installment" do
-      Decimal.mult(total_amount, Decimal.new("0.2"))
-    else
-      total_amount
-    end
-
-    # Save updated payment information to database
-    {_ok, progress} = Bookings.update_booking_flow_progress(
-      socket.assigns.booking_flow_progress,
-      %{
-        deposit_amount: deposit_amount,
-        last_updated: DateTime.utc_now()
-      }
-    )
-
-    socket =
-      socket
-      |> assign(:travelers, updated_travelers)
-      |> assign(:number_of_persons, new_number_of_persons)
-      |> assign(:total_amount, total_amount)
-      |> assign(:deposit_amount, deposit_amount)
-      |> assign(:booking_flow_progress, progress)
-      |> put_flash(:info, "New traveler added! Please fill in their details.")
-
-    {:noreply, socket}
-  end
-
-  # Handle removing a traveler (when number of persons is decreased)
-  def handle_event("remove_traveler", %{"index" => index_str}, socket) do
-    index = String.to_integer(index_str)
-    travelers = socket.assigns.travelers
-
-    if length(travelers) > 1 do
-      updated_travelers = List.delete_at(travelers, index)
-      new_number_of_persons = length(updated_travelers)
+          # Ensure the first traveler always has the profile details if booking for self
+      final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
+        first_traveler = List.first(updated_travelers)
+        updated_first_traveler = Map.merge(first_traveler, %{
+          "full_name" => socket.assigns.current_user.full_name || "",
+          "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+          "passport_number" => socket.assigns.current_user.passport_number || "",
+          "phone" => socket.assigns.current_user.phone_number || "",
+          "date_of_birth" => case socket.assigns.current_user.birthdate do
+            nil -> ""
+            birthdate -> Date.to_string(birthdate)
+          end,
+          "address" => socket.assigns.current_user.address || "",
+          "poskod" => socket.assigns.current_user.poskod || "",
+          "city" => socket.assigns.current_user.city || "",
+          "state" => socket.assigns.current_user.state || "",
+          "citizenship" => socket.assigns.current_user.citizenship || "Malaysia",
+          "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+          "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+          "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+        })
+        [updated_first_traveler] ++ List.delete_at(updated_travelers, 0)
+      else
+        updated_travelers
+      end
 
       # Recalculate amounts
       package_price = socket.assigns.package.price
@@ -1217,7 +1438,78 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
       socket =
         socket
-        |> assign(:travelers, updated_travelers)
+        |> assign(:travelers, final_travelers)
+        |> assign(:number_of_persons, new_number_of_persons)
+        |> assign(:total_amount, total_amount)
+        |> assign(:deposit_amount, deposit_amount)
+        |> assign(:booking_flow_progress, progress)
+        |> put_flash(:info, "New traveler added! Please fill in their details.")
+
+    {:noreply, socket}
+  end
+
+  # Handle removing a traveler (when number of persons is decreased)
+  def handle_event("remove_traveler", %{"index" => index_str}, socket) do
+    index = String.to_integer(index_str)
+    travelers = socket.assigns.travelers
+
+    if length(travelers) > 1 do
+      updated_travelers = List.delete_at(travelers, index)
+      new_number_of_persons = length(updated_travelers)
+
+      # If the first traveler was removed and we're booking for self, ensure the new first traveler has the profile details
+      final_travelers = if index == 0 and socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
+        first_traveler = List.first(updated_travelers)
+        updated_first_traveler = Map.merge(first_traveler, %{
+          "full_name" => socket.assigns.current_user.full_name || "",
+          "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+          "passport_number" => socket.assigns.current_user.passport_number || "",
+          "phone" => socket.assigns.current_user.phone_number || "",
+          "date_of_birth" => case socket.assigns.current_user.birthdate do
+            nil -> ""
+            birthdate -> Date.to_string(birthdate)
+          end,
+          "address" => socket.assigns.current_user.address || "",
+          "poskod" => socket.assigns.current_user.poskod || "",
+          "city" => socket.assigns.current_user.city || "",
+          "state" => socket.assigns.current_user.state || "",
+          "citizenship" => socket.assigns.current_user.citizenship || "Malaysia",
+          "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+          "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+          "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+        })
+        [updated_first_traveler] ++ List.delete_at(updated_travelers, 0)
+      else
+        updated_travelers
+      end
+
+      # Recalculate amounts
+      package_price = socket.assigns.package.price
+      base_price = package_price
+      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
+      schedule_price_per_person = base_price + override_price
+
+      total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
+
+      # Update deposit amount if payment plan is installment
+      deposit_amount = if socket.assigns.payment_plan == "installment" do
+        Decimal.mult(total_amount, Decimal.new("0.2"))
+      else
+        total_amount
+      end
+
+      # Save updated payment information to database
+      {_ok, progress} = Bookings.update_booking_flow_progress(
+        socket.assigns.booking_flow_progress,
+        %{
+          deposit_amount: deposit_amount,
+          last_updated: DateTime.utc_now()
+        }
+      )
+
+      socket =
+        socket
+        |> assign(:travelers, final_travelers)
         |> assign(:number_of_persons, new_number_of_persons)
         |> assign(:total_amount, total_amount)
         |> assign(:deposit_amount, deposit_amount)
@@ -2087,11 +2379,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                               <div class="relative">
                                 <input
                                   type="date"
+                                  id={"traveler_#{index}_date_of_birth"}
                                   name={"travelers[#{index}][date_of_birth]"}
                                   value={traveler["date_of_birth"] || traveler[:date_of_birth] || ""}
-                                  phx-blur="update_traveler_field"
-                                  phx-value-index={index}
-                                  phx-value-field="date_of_birth"
+                                  phx-hook="DateFieldUpdate"
+                                  data-index={index}
+                                  data-field="date_of_birth"
                                   class={"w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors #{if (traveler["date_of_birth"] || traveler[:date_of_birth] || "") != "", do: "border-green-500 bg-green-50", else: "border-gray-300"}"}
                                   required
                                 />

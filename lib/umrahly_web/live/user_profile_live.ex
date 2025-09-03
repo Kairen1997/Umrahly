@@ -70,7 +70,15 @@ defmodule UmrahlyWeb.UserProfileLive do
       "address" => profile_params["address"],
       "monthly_income" => profile_params["monthly_income"],
       "gender" => profile_params["gender"],
-      "birthdate" => profile_params["birthdate"]
+      "birthdate" => profile_params["birthdate"],
+      "passport_number" => profile_params["passport_number"],
+      "poskod" => profile_params["poskod"],
+      "city" => profile_params["city"],
+      "state" => profile_params["state"],
+      "citizenship" => profile_params["citizenship"],
+      "emergency_contact_name" => profile_params["emergency_contact_name"],
+      "emergency_contact_phone" => profile_params["emergency_contact_phone"],
+      "emergency_contact_relationship" => profile_params["emergency_contact_relationship"]
     }
 
     # Clean up empty strings to nil
@@ -81,6 +89,14 @@ defmodule UmrahlyWeb.UserProfileLive do
     |> Map.update("monthly_income", nil, &if(&1 == "" or is_nil(&1), do: nil, else: &1))
     |> Map.update("gender", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
     |> Map.update("birthdate", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("passport_number", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("poskod", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("city", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("state", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("citizenship", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("emergency_contact_name", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("emergency_contact_phone", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
+    |> Map.update("emergency_contact_relationship", nil, &if(&1 == "" or is_nil(&1), do: nil, else: String.trim(&1)))
 
     # Convert monthly_income to integer if it's a string
     profile_attrs = case profile_attrs["monthly_income"] do
@@ -106,11 +122,14 @@ defmodule UmrahlyWeb.UserProfileLive do
 
     # Check if at least one field has a value (for new profiles)
     has_profile = user.address != nil or user.identity_card_number != nil or user.phone_number != nil or
-                  user.monthly_income != nil or user.birthdate != nil or user.gender != nil
+                  user.monthly_income != nil or user.birthdate != nil or user.gender != nil or
+                  user.passport_number != nil or user.poskod != nil or user.city != nil or
+                  user.state != nil or user.citizenship != nil or user.emergency_contact_name != nil or
+                  user.emergency_contact_phone != nil or user.emergency_contact_relationship != nil
 
     if not has_profile do
       has_values = profile_attrs
-      |> Map.take(["identity_card_number", "phone_number", "address", "monthly_income", "gender", "birthdate"])
+      |> Map.take(["identity_card_number", "phone_number", "address", "monthly_income", "gender", "birthdate", "passport_number", "poskod", "city", "state", "citizenship", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship"])
       |> Map.values()
       |> Enum.any?(&(&1 != nil))
 
@@ -233,9 +252,9 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   def handle_event("validate-identity-contact", %{"profile" => profile_params}, socket) do
     socket = case profile_params do
-      %{"identity_card_number" => id_num, "phone_number" => phone, "address" => addr, "monthly_income" => income, "gender" => gender, "birthdate" => birthdate} ->
+      %{"identity_card_number" => id_num, "phone_number" => phone, "address" => addr, "monthly_income" => income, "gender" => gender, "birthdate" => birthdate, "passport_number" => passport, "poskod" => poskod, "city" => city, "state" => state, "citizenship" => citizenship, "emergency_contact_name" => ec_name, "emergency_contact_phone" => ec_phone, "emergency_contact_relationship" => ec_rel} ->
         cond do
-          id_num == "" and phone == "" and addr == "" and income == "" and gender == "" and birthdate == "" ->
+          id_num == "" and phone == "" and addr == "" and income == "" and gender == "" and birthdate == "" and passport == "" and poskod == "" and city == "" and state == "" and citizenship == "" and ec_name == "" and ec_phone == "" and ec_rel == "" ->
             put_flash(socket, :warning, "Please fill in at least one field")
           true ->
             socket
@@ -479,39 +498,119 @@ defmodule UmrahlyWeb.UserProfileLive do
                       </div>
                     <% end %>
                   </div>
-                  <form id="identity-contact-form" phx-submit="save-identity-contact" phx-change="validate-identity-contact" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number</label>
-                        <input type="text" name="profile[identity_card_number]" value={@profile && @profile.identity_card_number} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Identity Card Number" />
+                  <form id="identity-contact-form" phx-submit="save-identity-contact" phx-change="validate-identity-contact" class="space-y-6">
+
+                    <!-- Personal Information Section -->
+                    <div class="border-b border-gray-200 pb-4">
+                      <h4 class="text-md font-medium text-gray-800 mb-3">Personal Information</h4>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Identity Card Number</label>
+                          <input type="text" name="profile[identity_card_number]" value={@profile && @profile.identity_card_number} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Identity Card Number" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Passport Number</label>
+                          <input type="text" name="profile[passport_number]" value={@profile && @profile.passport_number} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Passport Number" />
+                        </div>
                       </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                        <input type="text" name="profile[phone_number]" value={@profile && @profile.phone_number} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Phone Number" />
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <input type="text" name="profile[phone_number]" value={@profile && @profile.phone_number} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Phone Number" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                          <select name="profile[gender]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                            <option value="">Select Gender</option>
+                            <option value="male" selected={@profile && @profile.gender == "male"}>Male</option>
+                            <option value="female" selected={@profile && @profile.gender == "female"}>Female</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income (RM)</label>
+                          <input type="number" name="profile[monthly_income]" value={@profile && @profile.monthly_income} min="1" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Monthly Income" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Birthdate</label>
+                          <input type="date" name="profile[birthdate]" value={@profile && @profile.birthdate} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Citizenship</label>
+                          <input type="text" name="profile[citizenship]" value={@profile && @profile.citizenship || "Malaysia"} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Citizenship" />
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                      <textarea name="profile[address]" rows="3" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter full address">{@profile && @profile.address}</textarea>
+
+                    <!-- Address Section -->
+                    <div class="border-b border-gray-200 pb-4">
+                      <h4 class="text-md font-medium text-gray-800 mb-3">Address Information</h4>
+                      <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <textarea name="profile[address]" rows="3" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter full address">{@profile && @profile.address}</textarea>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                          <input type="text" name="profile[city]" value={@profile && @profile.city} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter City" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                          <select name="profile[state]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                            <option value="">Select State</option>
+                            <option value="Johor" selected={@profile && @profile.state == "Johor"}>Johor</option>
+                            <option value="Kedah" selected={@profile && @profile.state == "Kedah"}>Kedah</option>
+                            <option value="Kelantan" selected={@profile && @profile.state == "Kelantan"}>Kelantan</option>
+                            <option value="Melaka" selected={@profile && @profile.state == "Melaka"}>Melaka</option>
+                            <option value="Negeri Sembilan" selected={@profile && @profile.state == "Negeri Sembilan"}>Negeri Sembilan</option>
+                            <option value="Pahang" selected={@profile && @profile.state == "Pahang"}>Pahang</option>
+                            <option value="Perak" selected={@profile && @profile.state == "Perak"}>Perak</option>
+                            <option value="Perlis" selected={@profile && @profile.state == "Perlis"}>Perlis</option>
+                            <option value="Pulau Pinang" selected={@profile && @profile.state == "Pulau Pinang"}>Pulau Pinang</option>
+                            <option value="Sabah" selected={@profile && @profile.state == "Sabah"}>Sabah</option>
+                            <option value="Sarawak" selected={@profile && @profile.state == "Sarawak"}>Sarawak</option>
+                            <option value="Selangor" selected={@profile && @profile.state == "Selangor"}>Selangor</option>
+                            <option value="Terengganu" selected={@profile && @profile.state == "Terengganu"}>Terengganu</option>
+                            <option value="Kuala Lumpur" selected={@profile && @profile.state == "Kuala Lumpur"}>Kuala Lumpur</option>
+                            <option value="Labuan" selected={@profile && @profile.state == "Labuan"}>Labuan</option>
+                            <option value="Putrajaya" selected={@profile && @profile.state == "Putrajaya"}>Putrajaya</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                          <input type="text" name="profile[poskod]" value={@profile && @profile.poskod} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Postal Code" />
+                        </div>
+                      </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income</label>
-                        <input type="number" name="profile[monthly_income]" value={@profile && @profile.monthly_income} min="1" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Monthly Income" />
+
+                    <!-- Emergency Contact Section -->
+                    <div class="pb-4">
+                      <h4 class="text-md font-medium text-gray-800 mb-3">Emergency Contact</h4>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Name</label>
+                          <input type="text" name="profile[emergency_contact_name]" value={@profile && @profile.emergency_contact_name} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Emergency Contact Name" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Phone</label>
+                          <input type="text" name="profile[emergency_contact_phone]" value={@profile && @profile.emergency_contact_phone} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Emergency Contact Phone" />
+                        </div>
                       </div>
                       <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-                        <select name="profile[gender]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent">
-                          <option value="">Select Gender</option>
-                          <option value="male" selected={@profile && @profile.gender == "male"}>Male</option>
-                          <option value="female" selected={@profile && @profile.gender == "female"}>Female</option>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Relationship</label>
+                        <select name="profile[emergency_contact_relationship]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                          <option value="">Select Relationship</option>
+                          <option value="spouse" selected={@profile && @profile.emergency_contact_relationship == "spouse"}>Spouse</option>
+                          <option value="parent" selected={@profile && @profile.emergency_contact_relationship == "parent"}>Parent</option>
+                          <option value="child" selected={@profile && @profile.emergency_contact_relationship == "child"}>Child</option>
+                          <option value="sibling" selected={@profile && @profile.emergency_contact_relationship == "sibling"}>Sibling</option>
+                          <option value="friend" selected={@profile && @profile.emergency_contact_relationship == "friend"}>Friend</option>
+                          <option value="other" selected={@profile && @profile.emergency_contact_relationship == "other"}>Other</option>
                         </select>
                       </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Birthdate</label>
-                        <input type="date" name="profile[birthdate]" value={@profile && @profile.birthdate} class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
-                      </div>
                     </div>
+
                     <div class="pt-4">
                       <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors phx-submit-loading:opacity-75 phx-submit-loading:cursor-not-allowed">
                         <span class="phx-submit-loading:hidden">Save Identity & Contact Info</span>

@@ -101,6 +101,29 @@ const DebugClick = {
   }
 };
 
+// Custom hook for date field updates
+const DateFieldUpdate = {
+  mounted() {
+    console.log("DateFieldUpdate hook mounted for date field:", this.el);
+    
+    this.el.addEventListener("change", (e) => {
+      const value = e.target.value;
+      const index = this.el.dataset.index;
+      const field = this.el.dataset.field;
+      
+      console.log("Date field changed:", { value, index, field });
+      
+      // Push the event to LiveView with the proper structure
+      this.pushEvent("update_traveler_field", {
+        value: value,
+        index: index,
+        field: field
+      });
+    });
+  }
+};
+
+
 // Custom hook for payment gateway redirect
 const PaymentGatewayRedirect = {
   mounted() {
@@ -728,7 +751,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     BookingProgress,
     TermsValidation,
     PaymentGatewayRedirect,
-    DownloadReceipt
+    DownloadReceipt,
+    DateFieldUpdate
   }
 })
 

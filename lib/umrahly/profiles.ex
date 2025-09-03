@@ -59,7 +59,15 @@ defmodule Umrahly.Profiles do
       monthly_income: nil,
       birthdate: nil,
       gender: nil,
-      profile_photo: nil
+      profile_photo: nil,
+      passport_number: nil,
+      poskod: nil,
+      city: nil,
+      state: nil,
+      citizenship: nil,
+      emergency_contact_name: nil,
+      emergency_contact_phone: nil,
+      emergency_contact_relationship: nil
     })
     |> Repo.update()
   end

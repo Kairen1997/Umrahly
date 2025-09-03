@@ -20,6 +20,16 @@ defmodule Umrahly.Accounts.User do
     field :gender, :string
     field :profile_photo, :string
 
+    # Additional profile fields
+    field :passport_number, :string
+    field :poskod, :string
+    field :city, :string
+    field :state, :string
+    field :citizenship, :string
+    field :emergency_contact_name, :string
+    field :emergency_contact_phone, :string
+    field :emergency_contact_relationship, :string
+
     timestamps(type: :utc_datetime)
   end
 
@@ -48,7 +58,7 @@ defmodule Umrahly.Accounts.User do
   """
   def registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:full_name, :email, :password, :is_admin, :address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> cast(attrs, [:full_name, :email, :password, :is_admin, :address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo, :passport_number, :poskod, :city, :state, :citizenship, :emergency_contact_name, :emergency_contact_phone, :emergency_contact_relationship])
     |> validate_full_name(opts)
     |> validate_email(opts)
     |> validate_password(opts)
@@ -144,12 +154,14 @@ defmodule Umrahly.Accounts.User do
   """
   def profile_changeset(user, attrs) do
     user
-    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo, :passport_number, :poskod, :city, :state, :citizenship, :emergency_contact_name, :emergency_contact_phone, :emergency_contact_relationship])
     |> validate_identity_card_number()
     |> validate_phone_number()
     |> validate_monthly_income()
     |> validate_gender()
     |> validate_length(:profile_photo, max: 255)
+    |> validate_passport_number()
+    |> validate_emergency_contact_phone()
   end
 
   defp validate_identity_card_number(changeset) do
@@ -165,6 +177,22 @@ defmodule Umrahly.Accounts.User do
       nil -> changeset
       phone when is_binary(phone) and byte_size(phone) > 0 -> changeset
       _ -> add_error(changeset, :phone_number, "must be a valid phone number")
+    end
+  end
+
+  defp validate_passport_number(changeset) do
+    case get_field(changeset, :passport_number) do
+      nil -> changeset
+      passport when is_binary(passport) and byte_size(passport) > 0 -> changeset
+      _ -> add_error(changeset, :passport_number, "must be a valid passport number")
+    end
+  end
+
+  defp validate_emergency_contact_phone(changeset) do
+    case get_field(changeset, :emergency_contact_phone) do
+      nil -> changeset
+      phone when is_binary(phone) and byte_size(phone) > 0 -> changeset
+      _ -> add_error(changeset, :emergency_contact_phone, "must be a valid phone number")
     end
   end
 
@@ -215,7 +243,7 @@ defmodule Umrahly.Accounts.User do
   """
   def update_changeset(user, attrs) do
     user
-    |> cast(attrs, [:full_name, :address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> cast(attrs, [:full_name, :address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo, :passport_number, :poskod, :city, :state, :citizenship, :emergency_contact_name, :emergency_contact_phone, :emergency_contact_relationship])
     |> validate_full_name(validate_email: false)
     |> validate_profile_fields()
   end
@@ -225,7 +253,7 @@ defmodule Umrahly.Accounts.User do
   """
   def profile_update_changeset(user, attrs) do
     user
-    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo])
+    |> cast(attrs, [:address, :identity_card_number, :phone_number, :monthly_income, :birthdate, :gender, :profile_photo, :passport_number, :poskod, :city, :state, :citizenship, :emergency_contact_name, :emergency_contact_phone, :emergency_contact_relationship])
     |> validate_profile_fields()
   end
 

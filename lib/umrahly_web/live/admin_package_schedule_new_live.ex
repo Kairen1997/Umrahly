@@ -39,7 +39,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
 
   def handle_event("validate", %{"package_schedule" => schedule_params}, socket) do
     changeset =
-      %PackageSchedule{}
+      socket.assigns.schedule_changeset
       |> Packages.change_package_schedule(schedule_params)
       |> Map.put(:action, :validate)
 

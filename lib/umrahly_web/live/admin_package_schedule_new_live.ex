@@ -2,8 +2,25 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
   use UmrahlyWeb, :live_view
 
   import UmrahlyWeb.AdminLayout
+  import Phoenix.HTML.Form
   alias Umrahly.Packages
   alias Umrahly.Packages.PackageSchedule
+
+   # Helper function to get field value from changeset
+   defp get_field_value(changeset, field) do
+    # First try to get the value from changes (user input)
+    case Ecto.Changeset.get_change(changeset, field) do
+      nil ->
+        # If no change, try to get from the data (existing value)
+        case Ecto.Changeset.get_field(changeset, field) do
+          nil -> ""
+          value -> value
+        end
+      value ->
+        # If it's a string and empty, return empty string, otherwise return the value
+        if is_binary(value) && value == "", do: "", else: value
+    end
+  end
 
   def mount(params, _session, socket) do
     packages = Packages.list_packages()
@@ -39,7 +56,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
 
   def handle_event("validate", %{"package_schedule" => schedule_params}, socket) do
     changeset =
-      socket.assigns.schedule_changeset
+      %PackageSchedule{}
       |> Packages.change_package_schedule(schedule_params)
       |> Map.put(:action, :validate)
 
@@ -125,7 +142,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 >
                   <option value="">Select a package</option>
                   <%= for package <- @packages do %>
-                    <option value={package.id} selected={@schedule_changeset.data.package_id == package.id}><%= package.name %></option>
+                  <option value={package.id} selected={get_field_value(@schedule_changeset, :package_id) == package.id}><%= package.name %></option>
                   <% end %>
                 </select>
                 <%= if @schedule_changeset.errors[:package_id] do %>
@@ -140,8 +157,8 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   required
                 >
-                  <option value="active" selected={@schedule_changeset.data.status == "active"}>Active</option>
-                  <option value="inactive" selected={@schedule_changeset.data.status == "inactive"}>Inactive</option>
+                  <option value="active" selected={get_field_value(@schedule_changeset, :status) == "active"}>Active</option>
+                  <option value="inactive" selected={get_field_value(@schedule_changeset, :status) == "inactive"}>Inactive</option>
                 </select>
                 <%= if @schedule_changeset.errors[:status] do %>
                   <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:status], 0) %></p>
@@ -153,7 +170,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 <input
                   type="number"
                   name="package_schedule[quota]"
-                  value={@schedule_changeset.data.quota}
+                  value={get_field_value(@schedule_changeset, :quota)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Enter quota"
                   min="1"
@@ -170,7 +187,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 <input
                   type="number"
                   name="package_schedule[price_override]"
-                  value={@schedule_changeset.data.price_override}
+                  value={get_field_value(@schedule_changeset, :price_override)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="Leave empty to use package price"
                   min="1"
@@ -186,7 +203,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 <input
                   type="date"
                   name="package_schedule[departure_date]"
-                  value={@schedule_changeset.data.departure_date}
+                  value={get_field_value(@schedule_changeset, :departure_date)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   required
                 />
@@ -200,7 +217,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 <input
                   type="date"
                   name="package_schedule[return_date]"
-                  value={@schedule_changeset.data.return_date}
+                  value={get_field_value(@schedule_changeset, :return_date)}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   required
                 />
@@ -217,7 +234,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 rows="4"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 placeholder="Any additional notes about this schedule..."
-              ><%= @schedule_changeset.data.notes || "" %></textarea>
+              ><%= get_field_value(@schedule_changeset, :notes) || "" %></textarea>
               <%= if @schedule_changeset.errors[:notes] do %>
                 <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:notes], 0) %></p>
               <% end %>

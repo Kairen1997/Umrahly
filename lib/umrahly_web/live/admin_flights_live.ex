@@ -2,47 +2,13 @@ defmodule UmrahlyWeb.AdminFlightsLive do
   use UmrahlyWeb, :live_view
 
   import UmrahlyWeb.AdminLayout
+  alias Umrahly.Flights
+  alias Umrahly.Flights.Flight
+
 
   def mount(_params, _session, socket) do
-    # Mock data for flights - in a real app, this would come from your database
-    flights = [
-      %{
-        id: 1,
-        flight_number: "MH-001",
-        origin: "Kuala Lumpur (KUL)",
-        destination: "Jeddah (JED)",
-        departure_time: "2024-12-15 02:00",
-        arrival_time: "2024-12-15 08:30",
-        aircraft: "Boeing 777",
-        capacity: 300,
-        booked_seats: 245,
-        status: "Scheduled"
-      },
-      %{
-        id: 2,
-        flight_number: "MH-002",
-        origin: "Jeddah (JED)",
-        destination: "Kuala Lumpur (KUL)",
-        departure_time: "2024-12-22 10:00",
-        arrival_time: "2024-12-22 16:30",
-        aircraft: "Boeing 777",
-        capacity: 300,
-        booked_seats: 198,
-        status: "Scheduled"
-      },
-      %{
-        id: 3,
-        flight_number: "MH-003",
-        origin: "Kuala Lumpur (KUL)",
-        destination: "Medina (MED)",
-        departure_time: "2024-12-16 01:30",
-        arrival_time: "2024-12-16 07:45",
-        aircraft: "Airbus A330",
-        capacity: 250,
-        booked_seats: 180,
-        status: "Scheduled"
-      }
-    ]
+    flights = Flights.list_flights()
+    changeset = Flights.change_flight(%Flight{})
 
     socket =
       socket
@@ -51,9 +17,51 @@ defmodule UmrahlyWeb.AdminFlightsLive do
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
+      |> assign(:show_new_flight_form, false)
+      |> assign(:form, to_form(changeset))
 
     {:ok, socket}
   end
+
+  def handle_event("show_new_flight_form", _, socket) do
+    {:noreply, assign(socket, :show_new_flight_form, true)}
+  end
+
+  def handle_event("hide_new_flight_form", _, socket) do
+    {:noreply, assign(socket, :show_new_flight_form, false)}
+  end
+
+  def handle_event("save_flight", %{"flight" => flight_params}, socket) do
+    flight_params = Map.put(flight_params, "capacity_booked", 0)
+
+    case Flights.create_flight(flight_params) do
+      {:ok, flight} ->
+        {:noreply,
+          socket
+          |> update(:flights, fn flights -> [flight | flights] end)
+          |> assign(:show_new_flight_form, false)
+          |> put_flash(:info, "Flight created successfully")
+        }
+
+      {:error, changeset} ->
+        {:noreply,
+        socket
+        |> assign(:form, to_form(changeset))
+        |> put_flash(:error, "Failed to create flight. Please check the form and try again.")
+        }
+    end
+  end
+
+  def handle_event("validate", %{"flight" => flight_params}, socket) do
+    changeset =
+      %Flight{}
+      |> Flights.change_flight(flight_params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :form, to_form(changeset))}
+  end
+
+
 
   def render(assigns) do
     ~H"""
@@ -62,7 +70,7 @@ defmodule UmrahlyWeb.AdminFlightsLive do
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold text-gray-900">Flights Management</h1>
-            <button class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+            <button type="button" phx-click="show_new_flight_form" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
               Add New Flight
             </button>
           </div>
@@ -92,14 +100,19 @@ defmodule UmrahlyWeb.AdminFlightsLive do
                         <div><%= flight.destination %></div>
                       </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= flight.departure_time %></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= flight.arrival_time %></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <%= Calendar.strftime(flight.departure_time, "%Y-%m-%d %H:%M") %>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <%= Calendar.strftime(flight.arrival_time, "%Y-%m-%d %H:%M") %>
+                    </td>
+
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div class="flex items-center">
-                        <span class="mr-2"><%= flight.booked_seats %>/<%= flight.capacity %></span>
+                        <span class="mr-2"><%= flight.capacity_booked %>/<%= flight.capacity_total %></span>
                         <div class="w-16 bg-gray-200 rounded-full h-2">
-                          <div class="bg-teal-600 h-2 rounded-full" style={"width: #{flight.booked_seats / flight.capacity * 100}%"}>
+                          <div class="bg-teal-600 h-2 rounded-full" style={"width: #{flight.capacity_booked / flight.capacity_total * 100}%"}>
                           </div>
                         </div>
                       </div>
@@ -119,15 +132,74 @@ defmodule UmrahlyWeb.AdminFlightsLive do
                       </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button class="text-blue-600 hover:text-blue-900 mr-3">View</button>
                       <button class="text-teal-600 hover:text-teal-900 mr-3">Edit</button>
-                      <button class="text-blue-600 hover:text-blue-900 mr-3">Manage</button>
-                      <button class="text-red-600 hover:text-red-900">Cancel</button>
+                      <button class="text-red-600 hover:text-red-900">Delete</button>
                     </td>
                   </tr>
                 <% end %>
               </tbody>
             </table>
           </div>
+          <%= if @show_new_flight_form do %>
+            <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+              <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between border-b pb-3 mb-4">
+                  <h2 class="text-xl font-semibold text-gray-800">Add New Flight</h2>
+                  <button type="button" phx-click="hide_new_flight_form"
+                          class="text-gray-500 hover:text-gray-700">
+                    ✕
+                  </button>
+                </div>
+
+                <!-- Form -->
+                <.simple_form for={@form} phx-submit="save_flight" class="space-y-6">
+
+                  <!-- Flight Info -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <.input field={@form[:flight_number]} label="Flight Number" />
+                    <.input field={@form[:aircraft]} label="Aircraft" />
+                  </div>
+
+                  <!-- Route -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <.input field={@form[:origin]} label="Origin" />
+                    <.input field={@form[:destination]} label="Destination" />
+                  </div>
+
+                  <!-- Schedule -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <.input field={@form[:departure_time]} type="datetime-local" label="Departure Time" />
+                    <.input field={@form[:arrival_time]} type="datetime-local" label="Arrival Time" />
+                  </div>
+
+                  <!-- Capacity & Status -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <.input field={@form[:capacity_total]} type="number" label="Total Capacity" />
+                    <.input field={@form[:status]} type="select"
+                            options={["Scheduled", "Boarding", "Delayed", "Cancelled"]}
+                            label="Status" />
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="flex justify-end space-x-3 pt-4 border-t">
+                    <.button type="button" phx-click="hide_new_flight_form"
+                            class="bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg px-4 py-2">
+                      Cancel
+                    </.button>
+                    <.button phx-submit="save_flight" class="bg-teal-600 text-white hover:bg-teal-700 rounded-lg px-4 py-2">
+                      Save Flight
+                    </.button>
+                  </div>
+
+                </.simple_form>
+              </div>
+            </div>
+          <% end %>
+
+
         </div>
       </div>
     </.admin_layout>

@@ -2,7 +2,6 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
   use UmrahlyWeb, :live_view
 
   import UmrahlyWeb.AdminLayout
-  import Phoenix.HTML.Form
   alias Umrahly.Packages
   alias Umrahly.Packages.PackageSchedule
 

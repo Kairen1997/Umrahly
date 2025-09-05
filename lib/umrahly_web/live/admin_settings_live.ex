@@ -44,146 +44,80 @@ defmodule UmrahlyWeb.AdminSettingsLive do
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
-      <div class="max-w-4xl mx-auto">
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
-            <p class="text-gray-600 mt-2">Manage your account security and preferences</p>
-          </div>
+      <!-- Centering and max-width wrapper -->
+      <div class="min-h-screen flex justify-center bg-gray-50 py-12 px-4">
+        <div class="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">Account Settings</h1>
+          <p class="text-sm text-gray-600 mb-6">Manage your account email address and password settings</p>
 
-          <div class="space-y-6">
-            <!-- Password Change Section -->
-            <div class="bg-gray-50 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
-              <form phx-submit="update_password" phx-change="validate_password" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                    <input
-                      type="password"
-                      name="user[current_password]"
-                      required
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Enter current password"
-                    />
-                    <%= if @password_changeset.errors[:current_password] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@password_changeset.errors[:current_password], 0) %></p>
-                    <% end %>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                    <input
-                      type="password"
-                      name="user[password]"
-                      required
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Enter new password"
-                    />
-                    <%= if @password_changeset.errors[:password] do %>
-                      <p class="text-red-500 text-xs mt-1"><%= elem(@password_changeset.errors[:password], 0) %></p>
-                    <% end %>
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                  <input
-                    type="password"
-                    name="user[password_confirmation]"
-                    required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    placeholder="Confirm new password"
-                  />
-                  <%= if @password_changeset.errors[:password_confirmation] do %>
-                    <p class="text-red-500 text-xs mt-1"><%= elem(@password_changeset.errors[:password_confirmation], 0) %></p>
-                  <% end %>
-                </div>
-                <div class="flex justify-end">
-                  <button
-                    type="submit"
-                    class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
-                  >
-                    Update Password
-                  </button>
-                </div>
-              </form>
+          <!-- Email Section -->
+          <form phx-submit="change_email">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={@current_user.email}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
             </div>
 
-            <!-- Account Information Section -->
-            <div class="bg-gray-50 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Account Information</h3>
-              <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
-                    <input
-                      type="text"
-                      value={@current_user.id}
-                      disabled
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
-                    <input
-                      type="text"
-                      value="Administrator"
-                      disabled
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={@current_user.email}
-                      disabled
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Member Since</label>
-                    <input
-                      type="text"
-                      value={@current_user.inserted_at |> Calendar.strftime("%B %d, %Y")}
-                      disabled
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+              <input
+                type="password"
+                name="current_password"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
             </div>
 
-            <!-- Security Tips Section -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-blue-900 mb-4">Security Tips</h3>
-              <div class="space-y-3 text-blue-800">
-                <div class="flex items-start">
-                  <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <p class="text-sm">Use a strong password with at least 8 characters, including uppercase, lowercase, numbers, and symbols.</p>
-                </div>
-                <div class="flex items-start">
-                  <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <p class="text-sm">Never share your password with anyone, including support staff.</p>
-                </div>
-                <div class="flex items-start">
-                  <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <p class="text-sm">Change your password regularly and avoid reusing passwords from other accounts.</p>
-                </div>
-                <div class="flex items-start">
-                  <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <p class="text-sm">Always log out when using shared computers or devices.</p>
-                </div>
-              </div>
+            <div class="mb-6">
+              <button type="submit" class="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700">
+                Change Email
+              </button>
             </div>
-          </div>
+          </form>
+
+          <!-- Password Change Section -->
+          <form phx-submit="update_password" phx-change="validate_password">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">New password</label>
+              <input
+                type="password"
+                name="user[password]"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+              <input
+                type="password"
+                name="user[password_confirmation]"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+              <input
+                type="password"
+                name="user[current_password]"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
+            </div>
+
+            <div class="flex justify-end">
+              <button type="submit" class="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700">
+                Change Password
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </.admin_layout>

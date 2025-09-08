@@ -12,6 +12,7 @@ defmodule Umrahly.Flights.Flight do
     field :aircraft, :string
     field :capacity_total, :integer
     field :capacity_booked, :integer
+    field :return_date, :utc_datetime
 
     timestamps(type: :utc_datetime)
   end
@@ -19,8 +20,8 @@ defmodule Umrahly.Flights.Flight do
   @doc false
   def changeset(flight, attrs) do
     flight
-    |> cast(attrs, [:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status])
-    |> validate_required([:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status])
+    |> cast(attrs, [:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date])
+    |> validate_required([:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date])
     |> unique_constraint(:flight_number)
   end
 end

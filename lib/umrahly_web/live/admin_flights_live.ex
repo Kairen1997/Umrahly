@@ -149,6 +149,7 @@ end
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departure</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arrival</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aircraft</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -173,6 +174,13 @@ end
                     </td>
 
                     <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
+                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <%= if flight.return_date do %>
+                        <%= Calendar.strftime(flight.return_date, "%Y-%m-%d %H:%M") %>
+                      <% else %>
+                        <span class="text-gray-500">N/A</span>
+                      <% end %>
+                    </td>
                     <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       <div class="flex items-center">
                         <span class="mr-2"><%= flight.capacity_booked %>/<%= flight.capacity_total %></span>
@@ -248,6 +256,7 @@ end
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <.input field={@form[:departure_time]} type="datetime-local" label="Departure Time" />
                     <.input field={@form[:arrival_time]} type="datetime-local" label="Arrival Time" />
+                    <.input field={@form[:return_date]} type="datetime-local" label="Return Date" />
                   </div>
 
                   <!-- Capacity & Status -->
@@ -332,6 +341,14 @@ end
                     ]}>
                       <%= @selected_flight.status %>
                     </span>
+                  </div>
+                  <div>
+                    <p class="font-medium">Return Date:</p>
+                    <p><%= if @selected_flight.return_date do %>
+                      <%= Calendar.strftime(@selected_flight.return_date, "%Y-%m-%d %H:%M") %>
+                    <% else %>
+                      <span class="text-gray-500">N/A</span>
+                    <% end %></p>
                   </div>
                 </div>
               </div>

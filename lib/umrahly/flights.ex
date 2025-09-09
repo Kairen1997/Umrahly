@@ -101,4 +101,23 @@ defmodule Umrahly.Flights do
   def change_flight(%Flight{} = flight, attrs \\ %{}) do
     Flight.changeset(flight, attrs)
   end
+
+  @doc """
+  Gets a flight by departure date.
+  Returns the flight that has the specified departure date.
+
+  ## Examples
+
+      iex> get_flight_by_departure_date(~D[2024-01-15])
+      %Flight{}
+
+      iex> get_flight_by_departure_date(~D[2024-01-15])
+      nil
+
+  """
+  def get_flight_by_departure_date(departure_date) do
+    Flight
+    |> where([f], fragment("DATE(?)", f.departure_time) == ^departure_date)
+    |> Repo.one()
+  end
 end

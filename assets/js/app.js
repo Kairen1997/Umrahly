@@ -753,7 +753,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     PaymentGatewayRedirect,
     DownloadReceipt,
     DateFieldUpdate,
-    DateDropdown
+    DateDropdown,
+    DepartureDateChange,
   }
 })
 
@@ -1293,3 +1294,40 @@ const DateDropdown = {
     }
   }
 }
+
+// Custom hook for departure date change
+const DepartureDateChange = {
+  mounted() {
+    console.log("DepartureDateChange hook mounted for select:", this.el);
+    
+    this.el.addEventListener("change", (e) => {
+      const selectedValue = e.target.value;
+      console.log("Departure date changed to:", selectedValue);
+      
+      if (selectedValue) {
+        // Get the form element
+        const form = this.el.closest('form');
+        if (form) {
+          // Create FormData to capture all form fields
+          const formData = new FormData(form);
+          const packageScheduleData = {};
+          
+          // Extract all package_schedule fields
+          for (let [key, value] of formData.entries()) {
+            if (key.startsWith("package_schedule[")) {
+              const fieldName = key.replace("package_schedule[", "").replace("]", "");
+              packageScheduleData[fieldName] = value;
+            }
+          }
+          
+          console.log("Sending all form data:", packageScheduleData);
+          
+          // Push the event to LiveView with all form data
+          this.pushEvent("departure_date_selected", {
+            package_schedule: packageScheduleData
+          });
+        }
+      }
+    });
+  }
+};

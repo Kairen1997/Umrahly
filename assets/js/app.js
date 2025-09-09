@@ -752,7 +752,9 @@ let liveSocket = new LiveSocket("/live", Socket, {
     TermsValidation,
     PaymentGatewayRedirect,
     DownloadReceipt,
-    DateFieldUpdate
+    DateFieldUpdate,
+    DateDropdown,
+    DepartureDateChange,
   }
 })
 
@@ -1250,3 +1252,82 @@ document.addEventListener('phx:page-loading-stop', function() {
   }, 100);
 });
 
+// Custom hook for date dropdown with custom date input
+const DateDropdown = {
+  mounted() {
+    const select = this.el
+    const customInput = document.getElementById(select.id.replace('-select', '-custom'))
+    
+    if (customInput) {
+      select.addEventListener('change', (e) => {
+        if (e.target.value === 'custom') {
+          select.style.display = 'none'
+          customInput.style.display = 'block'
+          customInput.focus()
+        }
+      })
+      
+      customInput.addEventListener('blur', (e) => {
+        if (e.target.value) {
+          // Update the select with the custom value
+          const option = document.createElement('option')
+          option.value = e.target.value
+          option.textContent = new Date(e.target.value).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+          })
+          option.selected = true
+          
+          // Remove custom option and add the new one
+          const customOption = select.querySelector('option[value="custom"]')
+          customOption.remove()
+          select.appendChild(option)
+          select.appendChild(customOption)
+          
+          // Show select, hide input
+          select.style.display = 'block'
+          customInput.style.display = 'none'
+        }
+      })
+    }
+  }
+}
+
+// Custom hook for departure date change
+const DepartureDateChange = {
+  mounted() {
+    console.log("DepartureDateChange hook mounted for select:", this.el);
+    
+    this.el.addEventListener("change", (e) => {
+      const selectedValue = e.target.value;
+      console.log("Departure date changed to:", selectedValue);
+      
+      if (selectedValue) {
+        // Get the form element
+        const form = this.el.closest('form');
+        if (form) {
+          // Create FormData to capture all form fields
+          const formData = new FormData(form);
+          const packageScheduleData = {};
+          
+          // Extract all package_schedule fields
+          for (let [key, value] of formData.entries()) {
+            if (key.startsWith("package_schedule[")) {
+              const fieldName = key.replace("package_schedule[", "").replace("]", "");
+              packageScheduleData[fieldName] = value;
+            }
+          }
+          
+          console.log("Sending all form data:", packageScheduleData);
+          
+          // Push the event to LiveView with all form data
+          this.pushEvent("departure_date_selected", {
+            package_schedule: packageScheduleData
+          });
+        }
+      }
+    });
+  }
+};

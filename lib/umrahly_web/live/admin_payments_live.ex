@@ -454,7 +454,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           </div>
 
           <!-- Summary Stats -->
-          <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-4">
             <div class="bg-blue-50 p-4 rounded-lg">
               <div class="text-sm font-medium text-blue-600">Total Payments</div>
               <div class="text-2xl font-bold text-blue-900"><%= length(@payments) %></div>

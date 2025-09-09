@@ -448,4 +448,77 @@ defmodule Umrahly.Packages do
         {:ok, created_itineraries}
     end
   end
+
+  # In lib/umrahly/packages.ex
+def get_package_flights(package_id) do
+  alias Umrahly.Flights
+
+  Flights.list_flights()
+  |> Enum.filter(&(&1.package_id == package_id))
+end
+
+def get_flight_dates_for_package(package_id) do
+  flights = get_package_flights(package_id)
+
+  case flights do
+    [] -> %{departure_date: nil, return_date: nil}
+    [flight | _] ->
+      %{
+        departure_date: flight.departure_time && Date.from_iso8601!(flight.departure_time |> DateTime.to_date() |> Date.to_iso8601()),
+        return_date: flight.return_date && Date.from_iso8601!(flight.return_date |> DateTime.to_date() |> Date.to_iso8601())
+      }
+  end
+end
+
+@doc """
+Returns unique departure dates from existing flights and package schedules.
+"""
+def get_available_departure_dates do
+  # Get dates from existing flights
+  flight_dates =
+    from(f in Umrahly.Flights.Flight,
+      select: fragment("DATE(?)", f.departure_time),
+      where: not is_nil(f.departure_time)
+    )
+    |> Repo.all()
+
+  # Get dates from existing package schedules
+  schedule_dates =
+    from(ps in PackageSchedule,
+      select: ps.departure_date,
+      where: not is_nil(ps.departure_date)
+    )
+    |> Repo.all()
+
+  # Combine and deduplicate, sort by date
+  (flight_dates ++ schedule_dates)
+  |> Enum.uniq()
+  |> Enum.sort()
+end
+
+@doc """
+Returns unique return dates from existing flights and package schedules.
+"""
+def get_available_return_dates do
+  # Get dates from existing flights
+  flight_dates =
+    from(f in Umrahly.Flights.Flight,
+      select: fragment("DATE(?)", f.return_date),
+      where: not is_nil(f.return_date)
+    )
+    |> Repo.all()
+
+  # Get dates from existing package schedules
+  schedule_dates =
+    from(ps in PackageSchedule,
+      select: ps.return_date,
+      where: not is_nil(ps.return_date)
+    )
+    |> Repo.all()
+
+  # Combine and deduplicate, sort by date
+  (flight_dates ++ schedule_dates)
+  |> Enum.uniq()
+  |> Enum.sort()
+end
 end

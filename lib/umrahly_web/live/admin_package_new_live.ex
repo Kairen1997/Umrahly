@@ -24,6 +24,7 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
     # Create initial changeset
     changeset = Packages.change_package(%Umrahly.Packages.Package{})
 
+
     socket =
       socket
       |> assign(:current_page, "packages")
@@ -119,17 +120,21 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
         {:noreply, socket}
     end
   end
-
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :package_picture, ref)}
+    socket = cancel_upload(socket, :package_picture, ref)
+
+    # Re-assign the existing changeset to preserve form state
+    {:noreply, assign(socket, :package_changeset, socket.assigns.package_changeset)}
   end
 
-  def handle_event("validate", %{"package" => package_params}, socket) do
-    # Create a changeset with the current params to preserve user input during validation
-    changeset = Packages.change_package(%Umrahly.Packages.Package{}, package_params)
 
-    socket = assign(socket, :package_changeset, changeset)
-    {:noreply, socket}
+  def handle_event("validate", %{"package" => package_params}, socket) do
+    changeset =
+      socket.assigns.package_changeset.data
+      |> Packages.change_package(package_params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :package_changeset, changeset)}
   end
 
   def render(assigns) do

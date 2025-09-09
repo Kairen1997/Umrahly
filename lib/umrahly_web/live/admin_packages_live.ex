@@ -25,6 +25,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
+      |> assign(:expanded_descriptions, %{})
 
     {:ok, socket}
   end
@@ -58,6 +59,19 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     {:noreply, socket}
   end
 
+  def handle_event("toggle_description", %{"package_id" => package_id}, socket) do
+    package_id = String.to_integer(package_id)
+    expanded_descriptions = socket.assigns.expanded_descriptions
+
+    new_expanded_state = Map.get(expanded_descriptions, package_id, false)
+    updated_expanded = Map.put(expanded_descriptions, package_id, !new_expanded_state)
+
+    socket =
+      socket
+      |> assign(:expanded_descriptions, updated_expanded)
+
+    {:noreply, socket}
+  end
   def handle_event("delete_package", %{"id" => package_id}, socket) do
     package = Packages.get_package!(package_id)
     {:ok, _} = Packages.delete_package(package)
@@ -78,6 +92,18 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:scroll_target, nil)
 
     {:noreply, socket}
+  end
+
+  defp truncate_description(description, max_length \\ 100) do
+    if String.length(description) > max_length do
+      String.slice(description, 0, max_length) <> "..."
+    else
+      description
+    end
+  end
+
+  defp is_description_long?(description, max_length \\ 100) do
+    String.length(description) > max_length
   end
 
   defp filter_packages(packages, search_query, search_status) do
@@ -412,9 +438,36 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                               <div class="text-sm font-medium text-gray-900 truncate"><%= package.name %></div>
                               <div class="text-xs text-gray-500 truncate">
                                 <%= if package.description && package.description != "" do %>
-                                  <%= package.description %>
+                                  <% is_expanded = Map.get(@expanded_descriptions, package.id, false) %>
+                                  <% is_long = is_description_long?(package.description) %>
+
+                                  <%= if is_long do %>
+                                    <div class="max-w-xs">
+                                      <%= if is_expanded do %>
+                                        <div class="break-wrods"><%= package.description %></div>
+                                        <button
+                                          phx-click="toggle_description"
+                                          phx-value-package_id={package.id}
+                                          class="text-teal-600 hover:text-teal-800 text-xs font medium mt-1"
+                                        >
+                                          View Less
+                                        </button>
+                                      <% else %>
+                                        <div class="break-words"><%= truncate_description(package.description) %></div>
+                                        <button
+                                          phx-click="toggle_description"
+                                          phx-value-package_id={package.id}
+                                          class="text-teal-600 hover:text-teal-800 text-xs font medium mt-1"
+                                        >
+                                          View More
+                                        </button>
+                                      <% end %>
+                                    </div>
+                                  <% else %>
+                                    <div class="break-words"><%= package.description %></div>
+                                  <% end %>
                                 <% else %>
-                                  No description available
+                                  <span class="text-gray-400">No description available</span>
                                 <% end %>
                               </div>
                               <%= if is_recently_updated?(package) do %>

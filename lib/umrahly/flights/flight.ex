@@ -14,14 +14,16 @@ defmodule Umrahly.Flights.Flight do
     field :capacity_booked, :integer
     field :return_date, :utc_datetime
 
+    belongs_to :package, Umrahly.Packages.Package
     timestamps(type: :utc_datetime)
   end
 
   @doc false
   def changeset(flight, attrs) do
     flight
-    |> cast(attrs, [:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date])
-    |> validate_required([:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date])
+    |> cast(attrs, [:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date, :package_id])
+    |> validate_required([:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date, :package_id])
     |> unique_constraint(:flight_number)
+    |> foreign_key_constraint(:package_id)
   end
 end

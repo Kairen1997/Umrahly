@@ -4,7 +4,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
   alias Umrahly.Packages.PackageSchedule
-
+  alias Umrahly.Flights
    # Helper function to get field value from changeset
    defp get_field_value(changeset, field) do
     # First try to get the value from changes (user input)
@@ -13,9 +13,16 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
         # If no change, try to get from the data (existing value)
         case Ecto.Changeset.get_field(changeset, field) do
           nil -> ""
-          value -> value
+          value ->
+            # Convert Date struct to string if needed
+          if is_struct(value, Date) do
+            Date.to_iso8601(value)
+          else
+             value
+          end
         end
       value ->
+
         # If it's a string and empty, return empty string, otherwise return the value
         if is_binary(value) && value == "", do: "", else: value
     end
@@ -23,15 +30,27 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
 
   def mount(params, _session, socket) do
     packages = Packages.list_packages()
+    flights = Flights.list_flights()
+    available_departure_dates = Packages.get_available_departure_dates()
+    available_return_dates = Packages.get_available_return_dates()
 
+
+    departure_date = case params["package_schedule"]["departure_date"] do
+      %Date{} = d -> Date.to_iso8601(d)
+      other -> other
+    end
+    return_date = case params["package_schedule"]["return_date"] do
+      %Date{} = d -> Date.to_iso8601(d)
+      other -> other
+    end
     # Extract query parameters for pre-filling the form
     initial_attrs = %{
       package_id: params["package_schedule"]["package_id"],
       status: params["package_schedule"]["status"] || "active",
       quota: params["package_schedule"]["quota"],
       price_override: params["package_schedule"]["price_override"],
-      departure_date: params["package_schedule"]["departure_date"],
-      return_date: params["package_schedule"]["return_date"],
+      departure_date: departure_date,
+      return_date: return_date,
       notes: params["package_schedule"]["notes"]
     }
 
@@ -43,6 +62,9 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
     socket =
       socket
       |> assign(:packages, packages)
+      |> assign(:flights, flights)
+      |> assign(:available_departure_dates, available_departure_dates)
+      |> assign(:available_return_dates, available_return_dates)
       |> assign(:schedule_changeset, changeset)
       |> assign(:current_page, "package_schedules")
       |> assign(:has_profile, true)
@@ -78,6 +100,18 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
 
         {:noreply, socket}
     end
+  end
+
+  def handle_event("refresh_dates", _, socket) do
+    available_departure_dates = Packages.get_available_departure_dates()
+    available_return_dates = Packages.get_available_return_dates()
+
+    {:noreply,
+      socket
+      |> assign(:available_departure_dates, available_departure_dates)
+      |> assign(:available_return_dates, available_return_dates)
+      |> put_flash(:info, "Available dates refreshed!")
+    }
   end
 
   defp render_error_messages(assigns) do
@@ -129,6 +163,20 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
             </div>
           </div>
 
+          <!-- Add this above the form -->
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Schedule Details</h2>
+            <button
+              type="button"
+              phx-click="refresh_dates"
+              class="text-sm text-teal-600 hover:text-teal-800 flex items-center"
+            >
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Refresh Available Dates
+            </button>
+          </div>
           <!-- Add Schedule Form -->
           <form phx-submit="save_schedule" phx-change="validate" class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -196,36 +244,58 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                   <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:price_override], 0) %></p>
                 <% end %>
               </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Departure Date *</label>
-                <input
-                  type="date"
-                  name="package_schedule[departure_date]"
-                  value={get_field_value(@schedule_changeset, :departure_date)}
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  required
-                />
-                <%= if @schedule_changeset.errors[:departure_date] do %>
-                  <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:departure_date], 0) %></p>
+            </div>
+            <!-- Enhanced departure date dropdown with custom option -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Departure Date *</label>
+             <select
+                name="package_schedule[departure_date]"
+                id="departure-date-select"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select departure date</option>
+                <%= for date <- @available_departure_dates do %>
+                  <option
+                    value={Date.to_iso8601(date)}
+                    selected={get_field_value(@schedule_changeset, :departure_date) == Date.to_iso8601(date)}
+                  >
+                    <%= Calendar.strftime(date, "%B %d, %Y (%A)") %>
+                  </option>
                 <% end %>
-              </div>
+              </select>
 
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Return Date *</label>
-                <input
-                  type="date"
-                  name="package_schedule[return_date]"
-                  value={get_field_value(@schedule_changeset, :return_date)}
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  required
-                />
-                <%= if @schedule_changeset.errors[:return_date] do %>
-                  <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:return_date], 0) %></p>
-                <% end %>
-              </div>
+
+              <%= if @schedule_changeset.errors[:departure_date] do %>
+                <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:departure_date], 0) %></p>
+              <% end %>
             </div>
 
+            <!-- Enhanced return date dropdown with custom option -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Return Date *</label>
+              <select
+                name="package_schedule[return_date]"
+                id="return-date-select"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select return date</option>
+                <%= for date <- @available_return_dates do %>
+                  <option
+                    value={Date.to_iso8601(date)}
+                    selected={get_field_value(@schedule_changeset, :return_date) == Date.to_iso8601(date)}
+                  >
+                    <%= Calendar.strftime(date, "%B %d, %Y (%A)") %>
+                  </option>
+                <% end %>
+              </select>
+
+
+              <%= if @schedule_changeset.errors[:return_date] do %>
+                <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:return_date], 0) %></p>
+              <% end %>
+            </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
               <textarea

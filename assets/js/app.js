@@ -752,7 +752,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     TermsValidation,
     PaymentGatewayRedirect,
     DownloadReceipt,
-    DateFieldUpdate
+    DateFieldUpdate,
+    DateDropdown
   }
 })
 
@@ -1250,3 +1251,45 @@ document.addEventListener('phx:page-loading-stop', function() {
   }, 100);
 });
 
+// Custom hook for date dropdown with custom date input
+const DateDropdown = {
+  mounted() {
+    const select = this.el
+    const customInput = document.getElementById(select.id.replace('-select', '-custom'))
+    
+    if (customInput) {
+      select.addEventListener('change', (e) => {
+        if (e.target.value === 'custom') {
+          select.style.display = 'none'
+          customInput.style.display = 'block'
+          customInput.focus()
+        }
+      })
+      
+      customInput.addEventListener('blur', (e) => {
+        if (e.target.value) {
+          // Update the select with the custom value
+          const option = document.createElement('option')
+          option.value = e.target.value
+          option.textContent = new Date(e.target.value).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+          })
+          option.selected = true
+          
+          // Remove custom option and add the new one
+          const customOption = select.querySelector('option[value="custom"]')
+          customOption.remove()
+          select.appendChild(option)
+          select.appendChild(customOption)
+          
+          // Show select, hide input
+          select.style.display = 'block'
+          customInput.style.display = 'none'
+        }
+      })
+    }
+  }
+}

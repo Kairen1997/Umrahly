@@ -22,9 +22,13 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
           end
         end
       value ->
-
+         # Handle the case where we have a change value
+      if is_struct(value, Date) do
+        Date.to_iso8601(value)
+      else
         # If it's a string and empty, return empty string, otherwise return the value
         if is_binary(value) && value == "", do: "", else: value
+      end
     end
   end
 

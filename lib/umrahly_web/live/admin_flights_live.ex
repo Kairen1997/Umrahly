@@ -43,6 +43,7 @@ defmodule UmrahlyWeb.AdminFlightsLive do
           socket
           |> update(:flights, fn flights -> [flight | flights] end)
           |> assign(:show_new_flight_form, false)
+          |> assign(:editing_flight_id, nil)
           |> put_flash(:info, "Flight created successfully")
         }
 
@@ -53,7 +54,7 @@ defmodule UmrahlyWeb.AdminFlightsLive do
         |> put_flash(:error, "Failed to create flight. Please check the form and try again.")
         }
     end
-    id ->
+  id ->
       flight = Flights.get_flight!(id)
 
       case Flights.update_flight(flight, flight_params) do
@@ -72,9 +73,9 @@ defmodule UmrahlyWeb.AdminFlightsLive do
             socket
             |> assign(:form, to_form(changeset))
             |> put_flash(:error, "Failed to update flight.")}
-      end
+    end
   end
-  end
+end
 
   def handle_event("validate", %{"flight" => flight_params}, socket) do
     changeset =
@@ -273,7 +274,7 @@ end
                             class="bg-teal-100 text-teal-700 hover:bg-teal-200 rounded-lg px-4 py-2">
                       Cancel
                     </.button>
-                    <.button phx-submit="save_flight" class="bg-teal-600 text-white hover:bg-teal-700 rounded-lg px-4 py-2">
+                    <.button type="submit" class="bg-teal-600 text-white hover:bg-teal-700 rounded-lg px-4 py-2">
                       Save Flight
                     </.button>
                   </div>

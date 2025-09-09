@@ -22,7 +22,7 @@ defmodule Umrahly.Flights.Flight do
   def changeset(flight, attrs) do
     flight
     |> cast(attrs, [:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date, :package_id])
-    |> validate_required([:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date, :package_id])
+    |> validate_required([:flight_number, :origin, :destination, :departure_time, :arrival_time, :aircraft, :capacity_total, :capacity_booked, :status, :return_date])
     |> unique_constraint(:flight_number)
     |> foreign_key_constraint(:package_id)
   end

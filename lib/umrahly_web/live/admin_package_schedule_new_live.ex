@@ -332,7 +332,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:departure_date], 0) %></p>
               <% end %>
             </div>
-   <!-- Enhanced return date field - now read-only but still submits data -->
+            <!-- Enhanced return date field - now read-only but still submits data -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Return Date *

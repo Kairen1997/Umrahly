@@ -183,7 +183,7 @@ defp calculate_duration_days(flight_params) do
 
         Map.put(flight_params, "duration_days", duration_days)
       else
-        error ->
+        _error ->
 
           flight_params
       end

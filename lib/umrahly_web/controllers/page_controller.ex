@@ -4,9 +4,15 @@ defmodule UmrahlyWeb.PageController do
   alias Umrahly.Profiles
 
   def home(conn, _params) do
+    # Fetch active packages for the landing page
+    packages = Umrahly.Packages.list_active_packages_with_schedules()
+
+    # Limit to 3 packages for the landing page (or however many you want)
+    featured_packages = packages |> Enum.take(3)
+
     # The home page is often custom made,
     # so skip the default app layout.
-    render(conn, :home, layout: false)
+    render(conn, :home, layout: false, packages: featured_packages)
   end
 
   def test_flash(conn, _params) do

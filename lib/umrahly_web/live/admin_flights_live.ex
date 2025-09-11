@@ -180,11 +180,11 @@ defp calculate_duration_days(flight_params) do
       with {:ok, departure_date} <- Date.from_iso8601(departure_date_str),
            {:ok, return_date_only} <- Date.from_iso8601(return_date_str) do
         duration_days = Date.diff(return_date_only, departure_date)
-        IO.inspect(duration_days, label: "Calculated duration")
+
         Map.put(flight_params, "duration_days", duration_days)
       else
         error ->
-          IO.inspect(error, label: "Date parsing error")
+
           flight_params
       end
     _ ->

@@ -57,69 +57,31 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
   def mount(%{"package_id" => package_id, "schedule_id" => schedule_id} = params, _session, socket) do
-    # Get package and schedule details
     user_id = socket.assigns.current_user.id
     package = Packages.get_package!(package_id)
     schedule = Packages.get_package_schedule!(schedule_id)
-
-    # Helper function to check if price override should be shown
     has_price_override = schedule.price_override && Decimal.gt?(schedule.price_override, Decimal.new(0))
-
-    # Check if this is a resume request
     is_resume = Map.get(params, "resume") == "true"
-
-    #find or create booking flow progress
     progress = Bookings.get_or_create_booking_flow_progress(user_id, package_id, schedule_id)
-
-    # Debug logging for progress data
-    IO.puts("MOUNT: is_resume = #{is_resume}")
-    IO.puts("MOUNT: progress.id = #{progress.id}")
-    IO.puts("MOUNT: progress.current_step = #{progress.current_step}")
-    IO.puts("MOUNT: progress.number_of_persons = #{progress.number_of_persons}")
-    IO.puts("MOUNT: progress.travelers_data = #{inspect(progress.travelers_data)}")
-    IO.puts("MOUNT: progress.travelers_data type = #{if progress.travelers_data, do: "#{is_map(progress.travelers_data)}", else: "nil"}")
-    IO.puts("MOUNT: progress.travelers_data length = #{if progress.travelers_data, do: length(progress.travelers_data), else: 0}")
-
-    # Verify the schedule belongs to the package
     if schedule.package_id != String.to_integer(package_id) do
       {:noreply,
        socket
        |> put_flash(:error, "Invalid package schedule selected")
        |> push_navigate(to: ~p"/packages/#{package_id}")}
     else
-      # Calculate total amount based on number of persons and schedule price
       base_price = package.price
       override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
       schedule_price_per_person = base_price + override_price
-
-      # We'll calculate total_amount after we know the actual number of persons
-
-      # Create initial booking changeset
       changeset = Bookings.change_booking(%Booking{})
-
-      # Initialize travelers based on number_of_persons and existing data
       travelers = cond do
-        # If resuming and we have existing travelers data, use it
         is_resume && progress.travelers_data && length(progress.travelers_data) > 0 ->
-          # Debug logging
-          IO.puts("RESUME: Loading existing travelers data")
-          IO.puts("RESUME: travelers_data: #{inspect(progress.travelers_data)}")
-          IO.puts("RESUME: number_of_persons: #{progress.number_of_persons}")
-
-          # Use all existing travelers and update number_of_persons to match
           all_travelers = progress.travelers_data
-          IO.puts("RESUME: Using all existing travelers: #{inspect(all_travelers)}")
           all_travelers
-        # If not resuming but we have existing travelers data, use it
         progress.travelers_data && length(progress.travelers_data) > 0 ->
-          IO.puts("NOT_RESUME: Using existing travelers data: #{inspect(progress.travelers_data)}")
           progress.travelers_data
-        # If booking for self, pre-fill first traveler
         progress.is_booking_for_self ->
-          # Create travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn index ->
             if index == 1 do
-              # First traveler - pre-fill with user details if booking for self
               %{
                 "full_name" => socket.assigns.current_user.full_name || "",
                 "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
@@ -140,7 +102,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 "room_type" => "standard"
               }
             else
-              # Additional travelers - empty fields
               %{
                 "full_name" => "",
                 "identity_card_number" => "",
@@ -160,8 +121,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             end
           end)
         true ->
-          IO.puts("DEFAULT: Creating empty travelers list")
-          # Create empty travelers list based on number_of_persons
           Enum.map(1..progress.number_of_persons, fn _ ->
             %{
               "full_name" => "",
@@ -182,22 +141,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           end)
         end
 
-      # Update number_of_persons to match the actual number of travelers
       actual_number_of_persons = length(travelers)
-      IO.puts("FINAL travelers: #{inspect(travelers)}")
-      IO.puts("FINAL travelers count: #{actual_number_of_persons}")
-      IO.puts("UPDATED number_of_persons from #{progress.number_of_persons} to #{actual_number_of_persons}")
 
-
-
-      # Now calculate total amount based on actual number of persons
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(actual_number_of_persons))
-      IO.puts("CALCULATED total_amount: #{total_amount} for #{actual_number_of_persons} persons")
 
-              # Check if we have saved payment progress
               saved_payment_progress = has_payment_progress?(progress)
-
-              # Use saved deposit amount if available, otherwise use total amount
               deposit_amount = if progress.deposit_amount do
                 progress.deposit_amount
               else
@@ -228,6 +176,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:payment_proof_file, nil)
         |> assign(:payment_proof_notes, "")
         |> assign(:show_payment_proof_form, false)
+        |> assign(:current_booking_id, nil)  # Initialize as nil
         |> assign(:saved_package_progress, nil)
         |> assign(:saved_travelers_progress, nil)
         |> assign(:saved_payment_progress, saved_payment_progress)
@@ -238,19 +187,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  # All handle_event functions grouped together
   def handle_event("validate_booking", %{"booking" => booking_params}, socket) do
-    # Update local assigns for real-time validation
     number_of_persons = String.to_integer(booking_params["number_of_persons"] || "1")
     payment_plan = booking_params["payment_plan"] || "full_payment"
 
-    # Handle travelers data and sync with number of persons
     travelers = case booking_params["travelers"] do
       nil ->
-        # If no travelers data in form, use existing travelers from socket
         socket.assigns.travelers
       travelers_params ->
-        # If number of persons increased, add new travelers
         current_count = length(travelers_params)
         if number_of_persons > current_count do
           additional_travelers = Enum.map((current_count + 1)..number_of_persons, fn _ ->
@@ -292,7 +236,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
           all_travelers = mapped_travelers ++ additional_travelers
 
-                  # Ensure the first traveler always has the address if booking for self
         final_travelers = if socket.assigns.is_booking_for_self and length(all_travelers) > 0 do
           first_traveler = List.first(all_travelers)
           updated_first_traveler = Map.put(first_traveler, "address", socket.assigns.current_user.address || "")
@@ -303,7 +246,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
           final_travelers
         else
-          # If number of persons decreased, truncate the list
           taken_travelers = Enum.take(Enum.map(travelers_params, fn traveler ->
             %{
               "full_name" => traveler["full_name"] || "",
@@ -323,7 +265,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             }
           end), number_of_persons)
 
-          # Ensure the first traveler always has the profile details if booking for self
           final_travelers = if socket.assigns.is_booking_for_self and length(taken_travelers) > 0 do
             first_traveler = List.first(taken_travelers)
             updated_first_traveler = Map.merge(first_traveler, %{
@@ -353,7 +294,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         end
     end
 
-    # Calculate amounts
     package_price = socket.assigns.package.price
     base_price = package_price
     override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
@@ -365,7 +305,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       "full_payment" -> total_amount
       "installment" ->
         deposit_input = booking_params["deposit_amount"] || "0"
-        # Try to parse the deposit amount, default to 20% of total if parsing fails (same as package details)
         try do
           Decimal.new(deposit_input)
         rescue
@@ -373,7 +312,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         end
     end
 
-    # Create changeset for validation
+
     attrs = %{
       total_amount: total_amount,
       deposit_amount: deposit_amount,
@@ -392,7 +331,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       |> Bookings.change_booking(attrs)
       |> Map.put(:action, :validate)
 
-    # Save payment information to database when validating
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -422,13 +360,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
   def handle_event("toggle_booking_for_self", _params, socket) do
     current_is_booking_for_self = socket.assigns.is_booking_for_self
-
-    # Toggle the value
     new_is_booking_for_self = !current_is_booking_for_self
-
-    # Update travelers based on the toggle
     travelers = if new_is_booking_for_self do
-      # Booking for self - pre-fill with user details
       [%{
         "full_name" => socket.assigns.current_user.full_name || "",
         "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
@@ -449,7 +382,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         "room_type" => "standard"
       }]
     else
-      # Booking for someone else - empty fields
       [%{
         "full_name" => "",
         "identity_card_number" => "",
@@ -467,10 +399,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         "room_type" => "standard"
       }]
     end
-
-    # If we're toggling to booking for self, also update the travelers list to match the current number of persons
     final_travelers = if new_is_booking_for_self and socket.assigns.number_of_persons > 1 do
-      # Keep the first traveler with user details, add empty travelers for the rest
       first_traveler = List.first(travelers)
       additional_travelers = Enum.map(2..socket.assigns.number_of_persons, fn _ ->
         %{
@@ -494,8 +423,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     else
       travelers
     end
-
-    # Save updated travelers and payment information to database
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -518,10 +445,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_number = socket.assigns.number_of_persons
     new_number = min(current_number + 1, 10)
 
-    # Preserve existing travelers data and add new ones
     existing_travelers = socket.assigns.travelers
     travelers = if new_number > current_number do
-      # Add new travelers while preserving existing data
       additional_travelers = Enum.map((current_number + 1)..new_number, fn _index ->
         %{
           "full_name" => "",
@@ -541,10 +466,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         }
       end)
 
-      # Merge existing travelers with new ones
       new_travelers = existing_travelers ++ additional_travelers
 
-      # Ensure the first traveler always has the address if booking for self
       final_travelers = if socket.assigns.is_booking_for_self and length(new_travelers) > 0 do
         first_traveler = List.first(new_travelers)
         updated_first_traveler = Map.merge(first_traveler, %{
@@ -577,7 +500,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       existing_travelers
     end
 
-    # Calculate new amounts
     package_price = socket.assigns.package.price
     base_price = package_price
     override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
@@ -585,7 +507,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
 
-    # Update deposit amount if payment plan is installment
     deposit_amount = if socket.assigns.payment_plan == "installment" do
       Decimal.mult(total_amount, Decimal.new("0.2"))
     else
@@ -606,13 +527,10 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_number = socket.assigns.number_of_persons
     new_number = max(current_number - 1, 1)
 
-    # Preserve existing travelers data when decreasing
     existing_travelers = socket.assigns.travelers
     travelers = if new_number < current_number do
-      # Take only the first N travelers, preserving their data
       taken_travelers = Enum.take(existing_travelers, new_number)
 
-      # Ensure the first traveler always has the address if booking for self
       final_travelers = if socket.assigns.is_booking_for_self and length(taken_travelers) > 0 do
         first_traveler = List.first(taken_travelers)
         updated_first_traveler = Map.merge(first_traveler, %{
@@ -643,7 +561,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       existing_travelers
     end
 
-    # Calculate new amounts
     package_price = socket.assigns.package.price
     base_price = package_price
     override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
@@ -651,7 +568,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
 
-    # Update deposit amount if payment plan is installment
     deposit_amount = if socket.assigns.payment_plan == "installment" do
       Decimal.mult(total_amount, Decimal.new("0.2"))
     else
@@ -672,11 +588,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     deposit_amount = case payment_plan do
       "full_payment" -> socket.assigns.total_amount
       "installment" ->
-        # Default to 20% of total for installment (same as package details)
         Decimal.mult(socket.assigns.total_amount, Decimal.new("0.2"))
     end
 
-    # Save payment plan to database
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -685,7 +599,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       }
     )
 
-    # Update the booking flow progress in socket
     socket = assign(socket, :booking_flow_progress, progress)
 
     socket =
@@ -697,17 +610,15 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   end
 
   def handle_event("update_payment_method", params, socket) do
-    # Handle the case where payment_method might be in a nested structure
+
     payment_method = case params do
       %{"payment_method" => pm} -> pm
       %{"booking" => %{"payment_method" => pm}} -> pm
       _ -> socket.assigns.payment_method
     end
 
-    # Update the payment method immediately for responsive UI
     socket = assign(socket, :payment_method, payment_method)
 
-    # Save payment method to database
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -716,10 +627,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       }
     )
 
-    # Update the booking flow progress in socket
     socket = assign(socket, :booking_flow_progress, progress)
 
-    # Add flash message to confirm the change
     socket = put_flash(socket, :info, "Payment method changed to #{String.replace(payment_method, "_", " ") |> String.capitalize()} and saved")
 
     {:noreply, socket}
@@ -728,7 +637,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   def handle_event("update_notes", %{"booking" => %{"notes" => notes}}, socket) do
     socket = assign(socket, :notes, notes)
 
-    # Save notes to database
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -737,105 +645,75 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       }
     )
 
-    # Update the booking flow progress in socket
     socket = assign(socket, :booking_flow_progress, progress)
 
     {:noreply, socket}
   end
 
-    def handle_event("submit_payment_proof", params, socket) do
-    # Debug logging
-    IO.puts("SUBMIT_PAYMENT_PROOF: params = #{inspect(params)}")
-    IO.puts("SUBMIT_PAYMENT_PROOF: current_booking_id = #{inspect(socket.assigns[:current_booking_id])}")
-    IO.puts("SUBMIT_PAYMENT_PROOF: uploads = #{inspect(socket.assigns.uploads.payment_proof.entries)}")
-
-    # Extract notes from params
+  def handle_event("submit_payment_proof", params, socket) do
     notes = Map.get(params, "payment_proof_notes", "")
 
-    # Check if we have a current booking ID
     case socket.assigns[:current_booking_id] do
       nil ->
-        IO.puts("SUBMIT_PAYMENT_PROOF: No current_booking_id found")
         socket = put_flash(socket, :error, "No booking found. Please create a booking first.")
         {:noreply, socket}
 
       booking_id ->
-        IO.puts("SUBMIT_PAYMENT_PROOF: Processing booking_id = #{booking_id}")
-        # Get the booking from the database
         try do
           booking = Bookings.get_booking!(booking_id)
-          IO.puts("SUBMIT_PAYMENT_PROOF: Found booking = #{inspect(booking)}")
 
-          # Check if payment proof has already been submitted
           if booking.payment_proof_status == "submitted" do
-            IO.puts("SUBMIT_PAYMENT_PROOF: Payment proof already submitted")
             socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
             {:noreply, socket}
           else
-            # Check if there are uploaded files - also check for any file input in params
-            has_uploaded_files = !Enum.empty?(socket.assigns.uploads.payment_proof.entries)
-            has_file_in_params = Map.has_key?(params, "payment_proof_file") && params["payment_proof_file"] != ""
+            has_uploaded_files = length(socket.assigns.uploads.payment_proof.entries) > 0
 
-            if !has_uploaded_files && !has_file_in_params do
-              IO.puts("SUBMIT_PAYMENT_PROOF: No files uploaded")
+            if !has_uploaded_files do
               socket = put_flash(socket, :error, "Please select a file to upload.")
               {:noreply, socket}
             else
-              # Handle file upload - either through upload system or params
-              filename = nil
+              uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
+                timestamp = DateTime.utc_now() |> DateTime.to_unix()
+                extension = Path.extname(entry.client_name)
+                filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
 
-              if has_uploaded_files do
-                IO.puts("SUBMIT_PAYMENT_PROOF: Processing #{length(socket.assigns.uploads.payment_proof.entries)} uploaded files")
-                # Consume the uploaded files
-                uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn %{path: path}, entry ->
-                  # Create a unique filename to avoid conflicts
-                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
-                  extension = Path.extname(entry.client_name)
-                  filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
+                upload_path = ensure_upload_directory()
+                file_path = Path.join(upload_path, filename)
 
-                  # Ensure upload directory exists and save the file
-                  upload_path = ensure_upload_directory()
-                  file_path = Path.join(upload_path, filename)
 
-                  IO.puts("SUBMIT_PAYMENT_PROOF: Saving file to #{file_path}")
-                  # Copy the uploaded file to the destination
-                  case File.cp(path, file_path) do
-                    :ok ->
-                      IO.puts("SUBMIT_PAYMENT_PROOF: File saved successfully as #{filename}")
-                      {:ok, filename}
-                    {:error, reason} ->
-                      IO.puts("SUBMIT_PAYMENT_PROOF: Failed to save file: #{inspect(reason)}")
-                      {:error, "Failed to save file: #{inspect(reason)}"}
-                  end
-                end)
+                case File.cp(entry.path, file_path) do
+                  :ok ->
 
-                # Get the first successful upload
-                successful_uploads = Enum.filter(uploaded_files, fn
-                  {:ok, _filename} -> true
-                  {:error, _reason} -> false
-                end)
-
-                if !Enum.empty?(successful_uploads) do
-                  {:ok, filename} = List.first(successful_uploads)
-                  IO.puts("SUBMIT_PAYMENT_PROOF: Using uploaded filename = #{filename}")
+                    {:ok, filename}
+                  {:error, reason} ->
+                    {:error, "Failed to save file: #{inspect(reason)}"}
                 end
-              else if has_file_in_params do
-                # Handle file from params (fallback for when upload system doesn't work)
-                filename = params["payment_proof_file"]
-                IO.puts("SUBMIT_PAYMENT_PROOF: Using filename from params = #{filename}")
+              end)
+
+
+              successful_uploads = Enum.filter(uploaded_files, fn
+                {:ok, _filename} -> true
+                {:error, _reason} -> false
+              end)
+
+              filename = if !Enum.empty?(successful_uploads) do
+                {:ok, extracted_filename} = List.first(successful_uploads)
+
+                extracted_filename
+              else
+                nil
               end
 
               if filename do
-                # Prepare payment proof attributes
+
                 attrs = %{
                   "payment_proof_file" => filename,
                   "payment_proof_notes" => notes || ""
                 }
-                IO.puts("SUBMIT_PAYMENT_PROOF: Submitting with attrs = #{inspect(attrs)}")
+
 
                 case Bookings.submit_payment_proof(booking, attrs) do
-                  {:ok, updated_booking} ->
-                    IO.puts("SUBMIT_PAYMENT_PROOF: Successfully updated booking = #{inspect(updated_booking)}")
+                  {:ok, _updated_booking} ->
                     socket =
                       socket
                       |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
@@ -845,13 +723,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
                     {:noreply, socket}
 
-                  {:error, %Ecto.Changeset{} = changeset} ->
-                    IO.puts("SUBMIT_PAYMENT_PROOF: Changeset error = #{inspect(changeset.errors)}")
+                  {:error, %Ecto.Changeset{} = _changeset} ->
+
                     socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
                     {:noreply, socket}
 
-                  {:error, error} ->
-                    IO.puts("SUBMIT_PAYMENT_PROOF: Unexpected error = #{inspect(error)}")
+                  {:error, _error} ->
+
                     socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
                     {:noreply, socket}
                 end
@@ -861,21 +739,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               end
             end
           end
+        rescue
+          Ecto.QueryError ->
+
+            socket = put_flash(socket, :error, "Invalid booking ID.")
+            {:noreply, socket}
+          Ecto.NoResultsError ->
+
+            socket = put_flash(socket, :error, "Booking not found.")
+            {:noreply, socket}
+          _error ->
+
+            socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
+            {:noreply, socket}
         end
-      rescue
-        Ecto.QueryError ->
-          IO.puts("SUBMIT_PAYMENT_PROOF: Ecto.QueryError")
-          socket = put_flash(socket, :error, "Invalid booking ID.")
-          {:noreply, socket}
-        Ecto.NoResultsError ->
-          IO.puts("SUBMIT_PAYMENT_PROOF: Ecto.NoResultsError")
-          socket = put_flash(socket, :error, "Booking not found.")
-          {:noreply, socket}
-        error ->
-          IO.puts("SUBMIT_PAYMENT_PROOF: Unexpected error = #{inspect(error)}")
-          socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
-          {:noreply, socket}
-      end
     end
   end
 
@@ -889,6 +766,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, cancel_upload(socket, :payment_proof, ref)}
   end
 
+  def handle_event("validate", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("upload_payment_proof", _params, socket) do
+    {:noreply, socket}
+  end
 
 
   def handle_event("save_progress_async", %{"value" => %{"step" => _step_str}}, socket) do
@@ -932,7 +816,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       deposit_amount = Decimal.new(deposit_amount_str)
       socket = assign(socket, :deposit_amount, deposit_amount)
 
-      # Save deposit amount to database
+
       {_ok, progress} = Bookings.update_booking_flow_progress(
         socket.assigns.booking_flow_progress,
         %{
@@ -941,7 +825,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         }
       )
 
-      # Update the booking flow progress in socket
+
       socket = assign(socket, :booking_flow_progress, progress)
 
       {:noreply, socket}
@@ -951,9 +835,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-    # Save all payment information at once
+
   def handle_event("save_payment_info", _params, socket) do
-    # Save all current payment information to database
+
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -965,7 +849,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       }
     )
 
-    # Update the booking flow progress in socket
+
     socket = assign(socket, :booking_flow_progress, progress)
 
     socket = put_flash(socket, :info, "Payment information saved successfully! ✅")
@@ -973,9 +857,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Clear all payment information
+
   def handle_event("clear_payment_info", _params, socket) do
-    # Clear all payment information from database
+
     {_ok, progress} = Bookings.update_booking_flow_progress(
       socket.assigns.booking_flow_progress,
       %{
@@ -987,10 +871,10 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       }
     )
 
-    # Update the booking flow progress in socket
+
     socket = assign(socket, :booking_flow_progress, progress)
 
-    # Reset local assigns
+
     socket =
       socket
       |> assign(:payment_method, "")
@@ -1008,11 +892,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     travelers = socket.assigns.travelers
 
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      # Store with string keys for consistency with the form
+
       Map.put(traveler, field, value)
     end)
 
-    # Ensure the first traveler always has the address if booking for self
+
     final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
       first_traveler = List.first(updated_travelers)
       updated_first_traveler = Map.merge(first_traveler, %{
@@ -1031,12 +915,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-      # Handle form submission for travelers step (kept for backward compatibility)
+
   def handle_event("validate_travelers", %{"booking" => booking_params}, socket) do
-    # Extract travelers data from the form
+
     travelers_params = booking_params["travelers"] || []
 
-    # Update travelers with form data
+
     updated_travelers =
       Enum.with_index(travelers_params)
       |> Enum.map(fn {traveler, idx} ->
@@ -1049,7 +933,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         })
       end)
 
-    # Ensure the first traveler always has the profile details if booking for self
+
     final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
       first_traveler = List.first(updated_travelers)
       updated_first_traveler = Map.merge(first_traveler, %{
@@ -1075,7 +959,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       updated_travelers
     end
 
-    # Validate that all required traveler information is filled
     all_travelers_complete =
       Enum.all?(final_travelers, fn traveler ->
         traveler["full_name"] != "" and
@@ -1083,7 +966,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         traveler["phone"] != ""
       end)
 
-    # Update booking flow progress
     {_ok, _progress} =
       Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: final_travelers, last_updated: DateTime.utc_now()})
 
@@ -1101,23 +983,19 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Fallback handler for validate_travelers
   def handle_event("validate_travelers", _params, socket) do
     {:noreply, socket}
   end
 
-  # Handle individual traveler field updates
   def handle_event("update_traveler_field", %{"value" => value} = params, socket) do
     index = String.to_integer(params["index"])
     field = params["field"]
     travelers = socket.assigns.travelers
 
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      # Store with string keys for consistency with the form
       Map.put(traveler, field, value)
     end)
 
-    # Ensure the first traveler always has the profile details if booking for self
     final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
       first_traveler = List.first(updated_travelers)
       updated_first_traveler = Map.merge(first_traveler, %{
@@ -1148,12 +1026,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Handle saving travelers data
   def handle_event("save_travelers", _params, socket) do
-    # Use the current travelers data from socket assigns
     travelers = socket.assigns.travelers
 
-    # Validate that all required traveler information is filled
     all_travelers_complete =
       Enum.all?(travelers, fn traveler ->
         (traveler["full_name"] || traveler[:full_name] || "") != "" and
@@ -1169,14 +1044,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       end)
 
     if all_travelers_complete do
-      # Update booking flow progress
       {_ok, _progress} =
         Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: travelers, last_updated: DateTime.utc_now()})
 
-      # Clear the form by resetting travelers to empty values while preserving the structure
       cleared_travelers = Enum.with_index(travelers)
       |> Enum.map(fn {_traveler, index} ->
-        # If this is the first traveler and they're booking for themselves, preserve profile info
         if index == 0 and socket.assigns.is_booking_for_self do
           %{
             "full_name" => socket.assigns.current_user.full_name || "",
@@ -1228,13 +1100,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
 
-  # Handle clearing individual traveler fields
   def handle_event("clear_traveler_field", %{"index" => index_str, "field" => field}, socket) do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
 
     updated_travelers = List.update_at(travelers, index, fn traveler ->
-      # If this is the first traveler and they're booking for themselves, preserve profile info when clearing profile fields
       if index == 0 and socket.assigns.is_booking_for_self and field in ["full_name", "identity_card_number", "passport_number", "phone", "date_of_birth", "address", "poskod", "city", "state", "citizenship", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship"] do
         case field do
           "full_name" -> Map.put(traveler, "full_name", socket.assigns.current_user.full_name || "")
@@ -1264,13 +1134,11 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Handle clearing all fields for a specific traveler
   def handle_event("clear_all_traveler_fields", %{"index" => index_str}, socket) do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
 
     updated_travelers = List.update_at(travelers, index, fn _traveler ->
-      # If this is the first traveler and they're booking for themselves, preserve profile info
       if index == 0 and socket.assigns.is_booking_for_self do
         %{
           "full_name" => socket.assigns.current_user.full_name || "",
@@ -1313,11 +1181,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Handle clearing all fields for all travelers
   def handle_event("clear_all_fields", _params, socket) do
     cleared_travelers = Enum.with_index(socket.assigns.travelers)
     |> Enum.map(fn {_traveler, index} ->
-      # If this is the first traveler and they're booking for themselves, preserve profile info
       if index == 0 and socket.assigns.is_booking_for_self do
         %{
           "full_name" => socket.assigns.current_user.full_name || "",
@@ -1363,7 +1229,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Handle adding a new traveler
+
   def handle_event("add_traveler", _params, socket) do
     current_travelers = socket.assigns.travelers
     new_traveler = %{
@@ -1386,7 +1252,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     updated_travelers = current_travelers ++ [new_traveler]
     new_number_of_persons = length(updated_travelers)
 
-          # Ensure the first traveler always has the profile details if booking for self
       final_travelers = if socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
         first_traveler = List.first(updated_travelers)
         updated_first_traveler = Map.merge(first_traveler, %{
@@ -1412,7 +1277,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         updated_travelers
       end
 
-      # Recalculate amounts
       package_price = socket.assigns.package.price
       base_price = package_price
       override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
@@ -1420,14 +1284,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
 
-      # Update deposit amount if payment plan is installment
       deposit_amount = if socket.assigns.payment_plan == "installment" do
         Decimal.mult(total_amount, Decimal.new("0.2"))
       else
         total_amount
       end
 
-      # Save updated payment information to database
       {_ok, progress} = Bookings.update_booking_flow_progress(
         socket.assigns.booking_flow_progress,
         %{
@@ -1448,7 +1310,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  # Handle removing a traveler (when number of persons is decreased)
   def handle_event("remove_traveler", %{"index" => index_str}, socket) do
     index = String.to_integer(index_str)
     travelers = socket.assigns.travelers
@@ -1457,7 +1318,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       updated_travelers = List.delete_at(travelers, index)
       new_number_of_persons = length(updated_travelers)
 
-      # If the first traveler was removed and we're booking for self, ensure the new first traveler has the profile details
       final_travelers = if index == 0 and socket.assigns.is_booking_for_self and length(updated_travelers) > 0 do
         first_traveler = List.first(updated_travelers)
         updated_first_traveler = Map.merge(first_traveler, %{
@@ -1483,7 +1343,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         updated_travelers
       end
 
-      # Recalculate amounts
       package_price = socket.assigns.package.price
       base_price = package_price
       override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
@@ -1491,14 +1350,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
 
-      # Update deposit amount if payment plan is installment
       deposit_amount = if socket.assigns.payment_plan == "installment" do
         Decimal.mult(total_amount, Decimal.new("0.2"))
       else
         total_amount
       end
 
-      # Save updated payment information to database
       {_ok, progress} = Bookings.update_booking_flow_progress(
         socket.assigns.booking_flow_progress,
         %{
@@ -1527,11 +1384,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     current_step = socket.assigns.current_step
     max_steps = socket.assigns.max_steps
 
-    # If we're at the final step (step 5), don't allow any step changes
     if current_step == max_steps do
       {:noreply, socket}
     else
-      # Validate step bounds - be more defensive
       cond do
         current_step < 1 ->
           socket = assign(socket, :current_step, 1)
@@ -1540,7 +1395,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           socket = assign(socket, :current_step, max_steps)
           {:noreply, socket}
         current_step == 2 ->
-          # Validate travelers before allowing progression to step 3
           travelers = socket.assigns.travelers
           all_travelers_complete = Enum.all?(travelers, fn traveler ->
             (traveler["full_name"] || traveler[:full_name] || "") != "" and
@@ -1557,7 +1411,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
           if all_travelers_complete do
             new_step = current_step + 1
-            # Persist to DB
             {_ok, progress} = Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{current_step: new_step})
 
             socket = assign(socket, :current_step, new_step)
@@ -1570,10 +1423,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         current_step < max_steps ->
           new_step = current_step + 1
 
-          # Persist to DB
           {_ok, progress} = Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{current_step: new_step})
 
-          # Advance the step
           socket = assign(socket, :current_step, new_step)
           socket = assign(socket, :booking_flow_progress, progress)
 
@@ -1617,10 +1468,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   end
 
   def handle_event("create_booking", _params, socket) do
-    # Validate that all required traveler information is filled
     travelers = socket.assigns.travelers
 
-        # Check if all travelers have required fields filled
     all_travelers_complete = Enum.all?(travelers, fn traveler ->
       (traveler["full_name"] || traveler[:full_name] || "") != "" and
       (traveler["identity_card_number"] || traveler[:identity_card_number] || "") != "" and
@@ -1634,7 +1483,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       (traveler["emergency_contact_phone"] || traveler[:emergency_contact_phone] || "") != ""
     end)
 
-    # Check if payment method is selected
     cond do
       socket.assigns.payment_method == "" or is_nil(socket.assigns.payment_method) ->
         socket =
@@ -1668,15 +1516,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         try do
           case Bookings.create_booking(attrs) do
             {:ok, booking} ->
-              # Check if payment method requires immediate payment gateway redirect
               payment_method = socket.assigns.payment_method
               requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
 
               socket = if requires_online_payment do
-                # For online payment methods, redirect to payment gateway
                 payment_url = generate_payment_gateway_url(booking, socket.assigns)
 
-                # Set the payment gateway URL - the JavaScript hook will handle the redirect
                 socket
                   |> put_flash(:info, "Booking created successfully! Redirecting to payment gateway...")
                   |> assign(:current_step, 5)
@@ -1684,7 +1529,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   |> assign(:requires_online_payment, true)
                   |> assign(:current_booking_id, booking.id)
               else
-                # For offline payment methods, show success message
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
                   |> assign(:current_step, 5)
@@ -1692,7 +1536,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   |> assign(:current_booking_id, booking.id)
               end
 
-              # Return the socket with step 5
               {:noreply, socket}
 
             {:error, %Ecto.Changeset{} = changeset} ->
@@ -1721,7 +1564,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-  # Handle async messages
   def handle_info({:save_progress_async, _step}, socket) do
     {:noreply, socket}
   end
@@ -1730,53 +1572,35 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
 
 
-  # Generate payment gateway URL (placeholder - replace with actual payment gateway integration)
   defp generate_payment_gateway_url(booking, assigns) do
-    # Get payment gateway configuration
     config = Application.get_env(:umrahly, :payment_gateway)
 
-    # Determine which payment gateway to use based on payment method
     payment_method = assigns.payment_method
 
     case payment_method do
       "credit_card" ->
-        # Use Stripe for credit card payments
         generate_stripe_payment_url(booking, assigns, config[:stripe])
 
       "online_banking" ->
-        # Use PayPal for online banking
         generate_paypal_payment_url(booking, assigns, config[:paypal])
 
       "e_wallet" ->
-        # Use e-wallet payment gateway
         generate_ewallet_payment_url(booking, assigns, config[:ewallet])
 
       _ ->
-        # Fallback to generic payment gateway
         generate_generic_payment_url(booking, assigns, config[:generic])
     end
   end
 
-  # Generate Stripe payment URL
   defp generate_stripe_payment_url(booking, _assigns, _stripe_config) do
-    # This is a placeholder - replace with actual Stripe integration
-    # In a real implementation, you would:
-    # 1. Create a Stripe Checkout Session
-    # 2. Return the session URL
-
-    # For demo purposes, we'll create a more realistic Stripe-like URL
-    # In production, replace this with actual Stripe Checkout Session creation
     base_url = "https://checkout.stripe.com"
 
-    # Create a demo session ID (in real implementation, this would come from Stripe API)
-    # Safely handle the booking ID to prevent String.slice errors
     booking_id_str = case booking do
       %{id: id} when is_integer(id) -> Integer.to_string(id)
       %{id: id} when is_binary(id) -> id
       _ -> "demo"
     end
 
-    # Take last 8 characters safely
     id_suffix = if String.length(booking_id_str) >= 8 do
       String.slice(booking_id_str, -8..-1)
     else
@@ -1785,27 +1609,18 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     session_id = "cs_test_#{id_suffix}_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
 
-    # Return a realistic Stripe checkout URL
     "#{base_url}/pay/#{session_id}"
   end
 
-  # Generate PayPal payment URL
   defp generate_paypal_payment_url(booking, _assigns, paypal_config) do
-    # This is a placeholder - replace with actual PayPal integration
-    # In production, replace this with actual PayPal payment creation
-
-    # For demo purposes, we'll create a realistic PayPal-like URL
     base_url = if paypal_config && paypal_config[:mode] == "live", do: "https://www.paypal.com", else: "https://www.sandbox.paypal.com"
 
-    # Create a demo payment ID (in real implementation, this would come from PayPal API)
-    # Safely handle the booking ID to prevent String.slice errors
     booking_id_str = case booking do
       %{id: id} when is_integer(id) -> Integer.to_string(id)
       %{id: id} when is_binary(id) -> id
       _ -> "demo"
     end
 
-    # Take last 8 characters safely
     id_suffix = if String.length(booking_id_str) >= 8 do
       String.slice(booking_id_str, -8..-1)
     else
@@ -1814,28 +1629,18 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     payment_id = "PAY-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
 
-    # Return a realistic PayPal payment URL
     "#{base_url}/checkoutnow?token=#{payment_id}"
   end
 
-    # Generate e-wallet payment URL
   defp generate_ewallet_payment_url(booking, _assigns, _ewallet_config) do
-    # This is a placeholder - replace with actual e-wallet integration
-    # In production, replace this with actual e-wallet payment creation
-
-    # For demo purposes, we'll create a realistic e-wallet payment URL
-    # This could be Boost, Touch 'n Go, or other Malaysian e-wallets
     base_url = "https://demo-ewallet-gateway.com"
 
-    # Create a demo payment ID (in real implementation, this would come from the e-wallet API)
-    # Safely handle the booking ID to prevent String.slice errors
     booking_id_str = case booking do
       %{id: id} when is_integer(id) -> Integer.to_string(id)
       %{id: id} when is_binary(id) -> id
       _ -> "demo"
     end
 
-    # Take last 8 characters safely
     id_suffix = if String.length(booking_id_str) >= 8 do
       String.slice(booking_id_str, -8..-1)
     else
@@ -1844,26 +1649,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     payment_id = "EW-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
 
-    # Return a realistic e-wallet payment URL
     "#{base_url}/pay/#{payment_id}"
   end
 
-  # Generate generic payment gateway URL
   defp generate_generic_payment_url(booking, _assigns, generic_config) do
-    # This is a placeholder - replace with actual payment gateway integration
-
-    # For demo purposes, we'll create a realistic payment gateway URL
     base_url = generic_config && generic_config[:base_url] || "https://demo-payment-gateway.com"
 
-    # Create a demo transaction ID (in real implementation, this would come from the payment gateway API)
-    # Safely handle the booking ID to prevent String.slice errors
+
     booking_id_str = case booking do
       %{id: id} when is_integer(id) -> Integer.to_string(id)
       %{id: id} when is_binary(id) -> id
       _ -> "demo"
     end
 
-    # Take last 8 characters safely
+
     id_suffix = if String.length(booking_id_str) >= 8 do
       String.slice(booking_id_str, -8..-1)
     else
@@ -1872,24 +1671,21 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     transaction_id = "TXN-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
 
-    # Return a realistic payment gateway URL
+
     "#{base_url}/payment/#{transaction_id}"
   end
 
-  # Helper function to convert upload errors to readable strings
   defp error_to_string(:too_large), do: "File is too large"
   defp error_to_string(:too_many_files), do: "Too many files"
   defp error_to_string(:not_accepted), do: "File type not accepted"
   defp error_to_string(_), do: "Invalid file"
 
-  # Helper function to ensure upload directory exists
   defp ensure_upload_directory do
     upload_path = Path.join(["priv", "static", "uploads", "payment_proof"])
     File.mkdir_p!(upload_path)
     upload_path
   end
 
-  # Helper function to check if payment progress exists
   defp has_payment_progress?(progress) do
     progress.payment_method || progress.payment_plan || progress.notes || progress.deposit_amount
   end

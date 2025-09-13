@@ -102,8 +102,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       |> Enum.flat_map(&expand_traveler_data/1)
       |> Enum.map(&format_payment_data/1)
     rescue
-      e ->
-        IO.inspect(e, label: "Error fetching payments data")
+      _ ->
         []
     end
   end
@@ -163,8 +162,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       end)
       |> Enum.map(&format_payment_data/1)
     rescue
-      e ->
-        IO.inspect(e, label: "Error searching payments")
+      _ ->
         []
     end
   end

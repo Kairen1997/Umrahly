@@ -243,7 +243,7 @@ defmodule Umrahly.Bookings do
           package_id: package_id,
           package_schedule_id: schedule_id,
           current_step: 1,
-          max_steps: 5,
+          max_steps: 4,
           number_of_persons: 1,
           is_booking_for_self: true,
           payment_method: "bank_transfer",
@@ -259,6 +259,18 @@ defmodule Umrahly.Bookings do
       progress ->
         progress
     end
+  end
+
+  @doc """
+  Gets the latest booking for a given user and package schedule.
+  Used by Active Bookings to show latest payment-proof status.
+  """
+  def get_latest_booking_for_user_schedule(user_id, package_schedule_id) do
+    Booking
+    |> where([b], b.user_id == ^user_id and b.package_schedule_id == ^package_schedule_id)
+    |> order_by([b], desc: b.inserted_at)
+    |> limit(1)
+    |> Repo.one()
   end
 
 end

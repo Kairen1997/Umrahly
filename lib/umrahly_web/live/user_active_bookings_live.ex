@@ -10,9 +10,20 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
     # Get all active booking flows for the current user
     active_bookings = Bookings.get_booking_flow_progress_by_user_id(socket.assigns.current_user.id)
 
+    # Enrich with latest booking to show payment-proof status
+    enriched = Enum.map(active_bookings, fn progress ->
+      latest_booking =
+        Bookings.get_latest_booking_for_user_schedule(
+          socket.assigns.current_user.id,
+          progress.package_schedule_id
+        )
+
+      Map.put(progress, :_latest_booking, latest_booking)
+    end)
+
     socket =
       socket
-      |> assign(:active_bookings, active_bookings)
+      |> assign(:active_bookings, enriched)
       |> assign(:page_title, "Active Bookings")
 
     {:ok, socket}
@@ -26,6 +37,31 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
       booking_flow ->
         # Redirect to the booking flow with the saved progress
         {:noreply, push_navigate(socket, to: ~p"/book/#{booking_flow.package_id}/#{booking_flow.package_schedule_id}?resume=true")}
+    end
+  end
+
+  def handle_event("upload_or_resubmit_proof", %{"progress_id" => id}, socket) do
+    case Enum.find(socket.assigns.active_bookings, &(&1.id == String.to_integer(id))) do
+      nil -> {:noreply, put_flash(socket, :error, "Booking flow not found")}
+      booking_flow ->
+        {:noreply, push_navigate(socket, to: ~p"/book/#{booking_flow.package_id}/#{booking_flow.package_schedule_id}?resume=true&jump_to=success")}
+    end
+  end
+
+  def handle_event("view_proof", %{"progress_id" => id}, socket) do
+    case Enum.find(socket.assigns.active_bookings, &(&1.id == String.to_integer(id))) do
+      nil -> {:noreply, put_flash(socket, :error, "Booking flow not found")}
+      booking_flow ->
+        case booking_flow._latest_booking do
+          nil -> {:noreply, put_flash(socket, :error, "No proof uploaded yet")}
+          booking ->
+            if booking.payment_proof_file do
+              url = "/uploads/payment_proof/" <> booking.payment_proof_file
+              {:noreply, push_event(socket, "js:open-url", %{url: url})}
+            else
+              {:noreply, put_flash(socket, :error, "No proof file found")}
+            end
+        end
     end
   end
 
@@ -115,6 +151,19 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         ]}>
                           <%= String.upcase(String.replace(booking.status, "_", " ")) %>
                         </span>
+                        <%= if booking._latest_booking && booking._latest_booking.payment_proof_status do %>
+                          <span class={[
+                            "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
+                            case booking._latest_booking.payment_proof_status do
+                              "approved" -> "bg-green-100 text-green-800"
+                              "submitted" -> "bg-yellow-100 text-yellow-800"
+                              "rejected" -> "bg-red-100 text-red-800"
+                              _ -> "bg-gray-100 text-gray-800"
+                            end
+                          ]}>
+                            PROOF: <%= String.upcase(booking._latest_booking.payment_proof_status) %>
+                          </span>
+                        <% end %>
                       </div>
 
                       <!-- Package and Schedule Details -->
@@ -201,6 +250,44 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       >
                         Resume Booking
                       </button>
+                      <%= if booking._latest_booking && booking._latest_booking.payment_proof_status in ["submitted", "approved", "rejected"] do %>
+                        <%= if booking._latest_booking.payment_proof_status == "rejected" do %>
+                          <button
+                            phx-click="upload_or_resubmit_proof"
+                            phx-value-progress_id={booking.id}
+                            class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm"
+                          >
+                            Resubmit Proof
+                          </button>
+                          <%= if booking._latest_booking.payment_proof_file do %>
+                            <a
+                              href={"/uploads/payment_proof/" <> booking._latest_booking.payment_proof_file}
+                              target="_blank"
+                              class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm text-center"
+                            >
+                              View Proof
+                            </a>
+                          <% end %>
+                        <% else %>
+                          <%= if booking._latest_booking.payment_proof_file do %>
+                            <a
+                              href={"/uploads/payment_proof/" <> booking._latest_booking.payment_proof_file}
+                              target="_blank"
+                              class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm text-center"
+                            >
+                              View Proof
+                            </a>
+                          <% end %>
+                        <% end %>
+                      <% else %>
+                        <button
+                          phx-click="upload_or_resubmit_proof"
+                          phx-value-progress_id={booking.id}
+                          class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
+                        >
+                          Upload Proof
+                        </button>
+                      <% end %>
                       <button
                         phx-click="cancel_booking"
                         phx-value-id={booking.id}

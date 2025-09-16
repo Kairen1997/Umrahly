@@ -183,6 +183,12 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:booking_flow_progress, progress)
         |> allow_upload(:payment_proof, accept: ~w(.pdf .jpg .jpeg .png .doc .docx), max_entries: 1, max_file_size: 5_000_000)
 
+      # Optionally jump straight to success (payment proof) when requested
+      socket = case Map.get(params, "jump_to") do
+        "success" -> assign(socket, :current_step, 5)
+        _ -> socket
+      end
+
       {:ok, socket}
     end
   end
@@ -609,29 +615,41 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
-  def handle_event("update_payment_method", params, socket) do
+  def handle_event("upload_payment_proof", _params, socket) do
+    # Only process if there are files to upload
+    if length(socket.assigns.uploads.payment_proof.entries) > 0 do
+      # Process the uploaded files immediately when this event is triggered
+      filenames =
+        consume_uploaded_entries(socket, :payment_proof, fn %{path: path}, entry ->
+          timestamp = DateTime.utc_now() |> DateTime.to_unix()
+          extension = Path.extname(entry.client_name)
+          filename = "payment_proof_#{socket.assigns[:current_booking_id]}_#{timestamp}#{extension}"
 
-    payment_method = case params do
-      %{"payment_method" => pm} -> pm
-      %{"booking" => %{"payment_method" => pm}} -> pm
-      _ -> socket.assigns.payment_method
+          upload_path = ensure_upload_directory()
+          file_path = Path.join(upload_path, filename)
+
+          case File.cp(path, file_path) do
+            :ok -> {:ok, filename}
+            {:error, reason} -> {:postpone, {:error, "Failed to save file: #{inspect(reason)}"}}
+          end
+        end)
+
+      # Update socket with upload results
+      socket =
+        case filenames do
+          [filename | _] when is_binary(filename) ->
+            socket
+            |> put_flash(:info, "File uploaded successfully")
+            |> assign(:payment_proof_file, filename)
+          _ ->
+            put_flash(socket, :error, "Failed to upload file. Please try again.")
+        end
+
+      {:noreply, socket}
+    else
+      # No files to process, just return the socket unchanged
+      {:noreply, socket}
     end
-
-    socket = assign(socket, :payment_method, payment_method)
-
-    {_ok, progress} = Bookings.update_booking_flow_progress(
-      socket.assigns.booking_flow_progress,
-      %{
-        payment_method: payment_method,
-        last_updated: DateTime.utc_now()
-      }
-    )
-
-    socket = assign(socket, :booking_flow_progress, progress)
-
-    socket = put_flash(socket, :info, "Payment method changed to #{String.replace(payment_method, "_", " ") |> String.capitalize()} and saved")
-
-    {:noreply, socket}
   end
 
   def handle_event("update_notes", %{"booking" => %{"notes" => notes}}, socket) do
@@ -647,6 +665,10 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
 
     socket = assign(socket, :booking_flow_progress, progress)
 
+    {:noreply, socket}
+  end
+
+  def handle_event("validate_payment_proof", _params, socket) do
     {:noreply, socket}
   end
 
@@ -666,90 +688,82 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
             socket = put_flash(socket, :error, "Payment proof has already been submitted for this booking.")
             {:noreply, socket}
           else
-            has_uploaded_files = length(socket.assigns.uploads.payment_proof.entries) > 0
+            # First, check if there are pending uploads to process
+            socket = if length(socket.assigns.uploads.payment_proof.entries) > 0 and is_nil(socket.assigns.payment_proof_file) do
+              # Process the uploaded files immediately
+              filenames =
+                consume_uploaded_entries(socket, :payment_proof, fn %{path: path}, entry ->
+                  timestamp = DateTime.utc_now() |> DateTime.to_unix()
+                  extension = Path.extname(entry.client_name)
+                  filename = "payment_proof_#{socket.assigns[:current_booking_id]}_#{timestamp}#{extension}"
 
-            if !has_uploaded_files do
-              socket = put_flash(socket, :error, "Please select a file to upload.")
-              {:noreply, socket}
+                  upload_path = ensure_upload_directory()
+                  file_path = Path.join(upload_path, filename)
+
+                  case File.cp(path, file_path) do
+                    :ok -> {:ok, filename}
+                    {:error, reason} -> {:postpone, {:error, "Failed to save file: #{inspect(reason)}"}}
+                  end
+                end)
+
+              # Update socket with upload results
+              case filenames do
+                [filename | _] when is_binary(filename) ->
+                  assign(socket, :payment_proof_file, filename)
+                _ ->
+                socket
+              end
             else
-              uploaded_files = consume_uploaded_entries(socket, :payment_proof, fn entry, _socket ->
-                timestamp = DateTime.utc_now() |> DateTime.to_unix()
-                extension = Path.extname(entry.client_name)
-                filename = "payment_proof_#{booking_id}_#{timestamp}#{extension}"
+              socket
+            end
 
-                upload_path = ensure_upload_directory()
-                file_path = Path.join(upload_path, filename)
+            # Now check if we have a file to submit
+            if socket.assigns.payment_proof_file do
+              attrs = %{
+                "payment_proof_file" => socket.assigns.payment_proof_file,
+                "payment_proof_notes" => notes || ""
+              }
 
+              case Bookings.submit_payment_proof(booking, attrs) do
+                {:ok, _updated_booking} ->
+                  # Reflect submission in booking flow progress for Active Bookings page
+                  {_ok, updated_progress} = Bookings.update_booking_flow_progress(
+                    socket.assigns.booking_flow_progress,
+                    %{
+                      last_updated: DateTime.utc_now()
+                    }
+                  )
 
-                case File.cp(entry.path, file_path) do
-                  :ok ->
+                  socket =
+                    socket
+                    |> put_flash(:info, "Payment proof submitted successfully! File: #{socket.assigns.payment_proof_file}. Admin will review and approve your payment.")
+                    |> assign(:show_payment_proof_form, false)
+                    |> assign(:payment_proof_notes, notes || "")
+                    |> assign(:booking_flow_progress, updated_progress)
 
-                    {:ok, filename}
-                  {:error, reason} ->
-                    {:error, "Failed to save file: #{inspect(reason)}"}
-                end
-              end)
+                  {:noreply, socket}
 
+                {:error, %Ecto.Changeset{} = _changeset} ->
+                  socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
+                  {:noreply, socket}
 
-              successful_uploads = Enum.filter(uploaded_files, fn
-                {:ok, _filename} -> true
-                {:error, _reason} -> false
-              end)
-
-              filename = if !Enum.empty?(successful_uploads) do
-                {:ok, extracted_filename} = List.first(successful_uploads)
-
-                extracted_filename
-              else
-                nil
+                {:error, _error} ->
+                  socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
+                  {:noreply, socket}
               end
-
-              if filename do
-
-                attrs = %{
-                  "payment_proof_file" => filename,
-                  "payment_proof_notes" => notes || ""
-                }
-
-
-                case Bookings.submit_payment_proof(booking, attrs) do
-                  {:ok, _updated_booking} ->
-                    socket =
-                      socket
-                      |> put_flash(:info, "Payment proof submitted successfully! File: #{filename}. Admin will review and approve your payment.")
-                      |> assign(:show_payment_proof_form, false)
-                      |> assign(:payment_proof_notes, notes || "")
-                      |> assign(:payment_proof_file, filename)
-
-                    {:noreply, socket}
-
-                  {:error, %Ecto.Changeset{} = _changeset} ->
-
-                    socket = put_flash(socket, :error, "Failed to submit payment proof. Please check the form for errors.")
-                    {:noreply, socket}
-
-                  {:error, _error} ->
-
-                    socket = put_flash(socket, :error, "An unexpected error occurred while submitting payment proof.")
-                    {:noreply, socket}
-                end
-              else
-                socket = put_flash(socket, :error, "Failed to process uploaded file.")
-                {:noreply, socket}
-              end
+            else
+              socket = put_flash(socket, :error, "Please upload a file first.")
+              {:noreply, socket}
             end
           end
         rescue
           Ecto.QueryError ->
-
             socket = put_flash(socket, :error, "Invalid booking ID.")
             {:noreply, socket}
           Ecto.NoResultsError ->
-
             socket = put_flash(socket, :error, "Booking not found.")
             {:noreply, socket}
           _error ->
-
             socket = put_flash(socket, :error, "An unexpected error occurred while processing the request.")
             {:noreply, socket}
         end
@@ -767,10 +781,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
   end
 
   def handle_event("validate", _params, socket) do
-    {:noreply, socket}
-  end
-
-  def handle_event("upload_payment_proof", _params, socket) do
     {:noreply, socket}
   end
 
@@ -1519,6 +1529,21 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               payment_method = socket.assigns.payment_method
               requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
 
+              # Update the booking flow progress so Active Bookings reflects completion
+              {_ok, progress_after_booking} = Bookings.update_booking_flow_progress(
+                socket.assigns.booking_flow_progress,
+                %{
+                  # Keep within validation limits in booking_flow_progress schema
+                  current_step: 4,
+                  max_steps: 4,
+                  status: "completed",
+                  # Only update safe fields to avoid inclusion validation failures
+                  deposit_amount: socket.assigns.deposit_amount,
+                  total_amount: socket.assigns.total_amount,
+                  last_updated: DateTime.utc_now()
+                }
+              )
+
               socket = if requires_online_payment do
                 payment_url = generate_payment_gateway_url(booking, socket.assigns)
 
@@ -1528,12 +1553,14 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   |> assign(:payment_gateway_url, payment_url)
                   |> assign(:requires_online_payment, true)
                   |> assign(:current_booking_id, booking.id)
+                  |> assign(:booking_flow_progress, progress_after_booking)
               else
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
                   |> assign(:current_step, 5)
                   |> assign(:requires_online_payment, false)
                   |> assign(:current_booking_id, booking.id)
+                  |> assign(:booking_flow_progress, progress_after_booking)
               end
 
               {:noreply, socket}
@@ -3213,12 +3240,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   <div class="flex items-center justify-between mb-3">
                     <h3 class="text-lg font-medium text-blue-900">Submit Payment Proof</h3>
                     <button
-                      type="button"
-                      phx-click="toggle_payment_proof_form"
-                      class="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      <%= if @show_payment_proof_form, do: "Hide Form", else: "Show Form" %>
-                    </button>
+                  type="button"
+                  phx-click="toggle_payment_proof_form"
+                  phx-prevent-default
+                  class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  <%= if @show_payment_proof_form, do: "Hide Form", else: "Show Form" %>
+                </button>
                   </div>
 
                   <p class="text-sm text-blue-700 mb-3">
@@ -3226,13 +3254,16 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   </p>
 
                   <%= if @show_payment_proof_form do %>
-                    <form phx-submit="submit_payment_proof" class="space-y-4 text-left" id="payment-proof-form">
-                      <div>
+                    <form phx-submit="submit_payment_proof" phx-change="validate_payment_proof" class="space-y-4 text-left" id="payment-proof-form">
+                     <div>
                         <label class="block text-sm font-medium text-blue-900 mb-2">
                           Payment Proof File <span class="text-red-500">*</span>
                         </label>
                         <div class="w-full border border-blue-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500">
-                          <.live_file_input upload={@uploads.payment_proof} class="w-full border-0 focus:outline-none" />
+                        <.live_file_input
+                          upload={@uploads.payment_proof}
+                          class="w-full border-0 focus:outline-none"
+                        />
                         </div>
                         <p class="text-xs text-blue-600 mt-1">
                           Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 5MB)
@@ -3252,8 +3283,21 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                             <% end %>
                           </div>
                         <% end %>
-                      </div>
+                        <!-- Show upload progress -->
+                        <%= for entry <- @uploads.payment_proof.entries do %>
+                          <div class="mt-2">
+                            <div class="text-xs text-blue-600">
+                              <%= if entry.done?, do: "Uploaded: #{entry.client_name}", else: "Uploading: #{entry.client_name}" %>
+                            </div>
+                            <%= if !entry.done? do %>
+                              <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style={"width: #{entry.progress}%"}></div>
+                              </div>
+                            <% end %>
+                          </div>
+                        <% end %>
 
+                      </div>
                       <div>
                         <label class="block text-sm font-medium text-blue-900 mb-2">
                           Additional Notes

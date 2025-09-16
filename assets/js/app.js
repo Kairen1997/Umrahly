@@ -23,15 +23,6 @@ import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import "./flash_config"
 
-// Custom hook for file uploads
-const FileUploadHook = {
-  mounted() {
-    console.log("FileUploadHook mounted", this.el);
-    this.el.addEventListener("change", (e) => {
-      console.log("File selected:", e.target.files[0]);
-    });
-  }
-};
 
 // Custom hook for form validation
 const FormValidationHook = {
@@ -739,7 +730,6 @@ let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {
-    FileUploadHook,
     // FormValidationHook, // Temporarily disabled to fix form issues
     FormDebug,
     AutoDismissFlash,
@@ -765,8 +755,17 @@ document.addEventListener('phx:update', (event) => {
   console.log("LiveView update event:", event);
 });
 
+
 document.addEventListener('phx:error', (event) => {
   console.error("LiveView error event:", event);
+});
+
+// Listen for open-url events from LiveView
+document.addEventListener('phx:open-url', (event) => {
+  console.log("Received open-url event:", event.detail);
+  if (event.detail && event.detail.url) {
+    window.open(event.detail.url, '_blank');
+  }
 });
 
 

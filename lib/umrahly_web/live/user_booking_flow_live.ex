@@ -615,6 +615,20 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     {:noreply, socket}
   end
 
+  def handle_event("update_payment_method", %{"booking" => %{"payment_method" => payment_method}}, socket) do
+    {_ok, progress} = Bookings.update_booking_flow_progress(
+      socket.assigns.booking_flow_progress,
+      %{
+        payment_method: payment_method,
+        last_updated: DateTime.utc_now()
+      }
+    )
+
+    socket = assign(socket, :booking_flow_progress, progress)
+
+    {:noreply, assign(socket, :payment_method, payment_method)}
+  end
+
   def handle_event("upload_payment_proof", _params, socket) do
     # Only process if there are files to upload
     if length(socket.assigns.uploads.payment_proof.entries) > 0 do

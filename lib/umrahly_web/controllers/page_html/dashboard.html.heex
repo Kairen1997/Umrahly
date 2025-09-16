@@ -193,17 +193,19 @@
     <!-- Stats Section -->
     <div class="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Your Stats</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="text-center">
-          <div class="text-2xl font-bold text-blue-600">0</div>
+          <div class="text-2xl font-bold text-blue-600"><%= if @user_stats, do: @user_stats.active_bookings, else: 0 %></div>
           <div class="text-sm text-gray-500">Active Bookings</div>
         </div>
         <div class="text-center">
-          <div class="text-2xl font-bold text-green-600">1</div>
-          <div class="text-sm text-gray-500">Completed Profiles</div>
-        </div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-purple-600">0</div>
+          <div class="text-2xl font-bold text-purple-600">
+            <% total_paid = if @user_stats, do: @user_stats.total_paid, else: 0 %>
+            <%= case total_paid do
+              %Decimal{} -> Decimal.to_string(total_paid)
+              _ -> to_string(total_paid)
+            end %>
+          </div>
           <div class="text-sm text-gray-500">Total Payments</div>
         </div>
       </div>

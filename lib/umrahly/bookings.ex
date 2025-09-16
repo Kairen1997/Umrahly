@@ -298,4 +298,30 @@ defmodule Umrahly.Bookings do
     |> Repo.one()
   end
 
+  @doc """
+  Counts active bookings for a specific user.
+  Here, "active" means confirmed bookings only.
+  """
+  def count_active_bookings_for_user(user_id) do
+    Booking
+    |> where([b], b.user_id == ^user_id and b.status == "confirmed")
+    |> select([b], count(b.id))
+    |> Repo.one()
+  end
+
+  @doc """
+  Sums paid amounts for a user's bookings.
+  Currently uses `deposit_amount` as the paid amount field.
+  Returns 0 if there are no bookings or no paid amounts.
+  """
+  def sum_paid_amount_for_user(user_id) do
+    sum =
+      Booking
+      |> where([b], b.user_id == ^user_id)
+      |> select([b], coalesce(sum(b.deposit_amount), 0))
+      |> Repo.one()
+
+    sum
+  end
+
 end

@@ -46,12 +46,26 @@ defmodule UmrahlyWeb.PageController do
     # Recent user activities
     recent_activities = if current_user, do: Umrahly.ActivityLogs.recent_user_activities(current_user.id, 10), else: []
 
+    # Compute user stats
+    user_stats = if current_user do
+      %{
+        active_bookings: Umrahly.Bookings.count_active_bookings_for_user(current_user.id),
+        total_paid: Umrahly.Bookings.sum_paid_amount_for_user(current_user.id)
+      }
+    else
+      %{
+        active_bookings: 0,
+        total_paid: 0
+      }
+    end
+
     render(conn, :dashboard,
       current_user: current_user,
       has_profile: has_profile,
       is_admin: is_admin,
       latest_booking: latest_booking,
-      recent_activities: recent_activities
+      recent_activities: recent_activities,
+      user_stats: user_stats
     )
   end
 

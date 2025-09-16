@@ -68,7 +68,7 @@
                 (paid || 0) / total * 100
               end
           end %>
-        <% percent = if percent < 0, do: 0, else: if percent > 100, do: 100, else: percent %>
+        <% percent = if percent < 0, do: 0, else: (if percent > 100, do: 100, else: percent) %>
         <% next_due_date =
           cond do
             @latest_booking.payment_plan == "installment" and @latest_booking.booking_date ->
@@ -142,21 +142,17 @@
       <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
         <div class="space-y-4">
-          <div class="flex items-center space-x-3">
-            <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
-            <span class="text-sm text-gray-600">Profile updated successfully</span>
-            <span class="text-xs text-gray-400 ml-auto">2 hours ago</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span class="text-sm text-gray-600">Account verified</span>
-            <span class="text-xs text-gray-400 ml-auto">1 day ago</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-2 h-2 bg-purple-400 rounded-full"></div>
-            <span class="text-sm text-gray-600">Welcome to Umrahly</span>
-            <span class="text-xs text-gray-400 ml-auto">3 days ago</span>
-          </div>
+          <%= if @recent_activities && length(@recent_activities) > 0 do %>
+            <%= for activity <- @recent_activities do %>
+              <div class="flex items-center space-x-3">
+                <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <span class="text-sm text-gray-600"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></span>
+                <span class="text-xs text-gray-400 ml-auto"><%= Calendar.strftime(activity.inserted_at, "%d %b %Y %H:%M") %></span>
+              </div>
+            <% end %>
+          <% else %>
+            <div class="text-sm text-gray-500">No recent activity yet.</div>
+          <% end %>
         </div>
       </div>
 

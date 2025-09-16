@@ -755,6 +755,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                     |> assign(:payment_proof_notes, notes || "")
                     |> assign(:booking_flow_progress, updated_progress)
 
+                  _ = Umrahly.ActivityLogs.log_user_action(socket.assigns.current_user.id, "Payment Proof Submitted", socket.assigns.payment_proof_file, %{booking_id: booking.id})
+
                   {:noreply, socket}
 
                 {:error, %Ecto.Changeset{} = _changeset} ->
@@ -1557,6 +1559,8 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   last_updated: DateTime.utc_now()
                 }
               )
+
+              _ = Umrahly.ActivityLogs.log_user_action(socket.assigns.current_user.id, "Booking Created", booking.package_name, %{booking_id: booking.id, total_amount: booking.total_amount})
 
               socket = if requires_online_payment do
                 payment_url = generate_payment_gateway_url(booking, socket.assigns)

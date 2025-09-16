@@ -37,6 +37,10 @@ defmodule UmrahlyWeb.UserAuth do
     |> put_session(:user_token, token)
     |> put_session(:live_socket_id, "users_sessions:#{Base.url_encode64(token)}")
     |> maybe_write_remember_me_cookie(token, params)
+    |> then(fn conn ->
+      _ = Umrahly.ActivityLogs.log_user_action(user.id, "User Logged In", nil, %{ip: to_string(:inet_parse.ntoa(conn.remote_ip || {0,0,0,0}))})
+      conn
+    end)
     |> redirect(to: redirect_path)
   end
 

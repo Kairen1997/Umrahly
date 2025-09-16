@@ -40,10 +40,14 @@ defmodule UmrahlyWeb.PageController do
       {false, false}
     end
 
+    # Latest active booking with payments for dashboard widgets
+    latest_booking = if current_user, do: Umrahly.Bookings.get_latest_active_booking_with_payments(current_user.id), else: nil
+
     render(conn, :dashboard,
       current_user: current_user,
       has_profile: has_profile,
-      is_admin: is_admin
+      is_admin: is_admin,
+      latest_booking: latest_booking
     )
   end
 

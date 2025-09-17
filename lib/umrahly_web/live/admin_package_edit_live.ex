@@ -16,6 +16,12 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
+      |> allow_upload(:package_picture,
+        accept: ~w(.jpg .jpeg .png .gif .bmp .webp),
+        max_entries: 1,
+        max_file_size: 5_000_000,
+        auto_upload: true
+      )
 
     {:ok, socket}
   end
@@ -32,32 +38,64 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
   end
 
     def handle_event("save_package", %{"package" => package_params}, socket) do
-    # Convert numeric fields from strings to integers
+    # Process picture upload if provided
+    picture_path = case consume_uploaded_entries(socket, :package_picture, fn %{path: temp_path}, entry ->
+      uploads_dir = Path.join(File.cwd!(), "priv/static/images")
+      File.mkdir_p!(uploads_dir)
+
+      extension = Path.extname(entry.client_name)
+      filename = "package_#{System.system_time()}#{extension}"
+      dest_path = Path.join(uploads_dir, filename)
+
+      case File.cp(temp_path, dest_path) do
+        :ok ->
+          {:ok, "/images/#{filename}"}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end) do
+      [path | _] -> path
+      [] -> nil
+    end
+
+    # Add picture path to package params if uploaded; otherwise preserve existing value if present
+    package_params =
+      cond do
+        picture_path -> Map.put(package_params, "picture", picture_path)
+        Map.get(package_params, "picture", "") == "" -> Map.delete(package_params, "picture")
+        true -> package_params
+      end
+
+    # Normalize and convert fields
     package_params = package_params
       |> Map.update("price", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
       |> Map.update("duration_days", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
       |> Map.update("duration_nights", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
+      |> Map.update("picture", nil, &if(is_binary(&1) && &1 == "", do: nil, else: &1))
+      |> Map.reject(fn {_k, v} -> is_binary(v) && v == "" end)
 
     # Updating existing package
     case Packages.update_package(socket.assigns.package, package_params) do
-      {:ok, _updated_package} ->
+      {:ok, updated_package} ->
+        success_msg = if picture_path, do: "Package updated and image saved.", else: "Package updated successfully!"
         {:noreply,
-         socket
-         |> put_flash(:info, "Package updated successfully!")
-         |> redirect(to: ~p"/admin/packages")}
+                  socket
+           |> assign(:package, updated_package)
+           |> put_flash(:info, success_msg)
+           |> push_navigate(to: ~p"/admin/packages")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
          socket
          |> assign(:package_changeset, changeset)
-         |> put_flash(:error, "Failed to update package. Please check the form for errors.")}
+         |> put_flash(:error, "Failed to update package: #{inspect(changeset.errors)}")}
     end
   end
 
   def render(assigns) do
     ~H"""
-    <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
-      <div class="max-w-4xl mx-auto">
+    <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin} flash={@flash}>
+      <div class="max-w-6xl mx-auto">
         <div class="bg-white rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-6">
           <h1 class="text-2xl font-bold text-gray-900">Edit Package</h1>
@@ -77,6 +115,7 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
             phx-submit="save_package"
             class="space-y-6"
           >
+            <input type="hidden" name="package[picture]" value={@package.picture || ""} />
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Package Name</label>
@@ -186,6 +225,52 @@ defmodule UmrahlyWeb.AdminPackageEditLive do
                   <option value="Shared Transport" selected={@package_changeset.changes[:transport_type] == "Shared Transport" || @package_changeset.data.transport_type == "Shared Transport"}>Shared Transport</option>
                   <option value="Not Included" selected={@package_changeset.changes[:transport_type] == "Not Included" || @package_changeset.data.transport_type == "Not Included"}>Not Included</option>
                 </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Package Picture</label>
+
+                <div class="w-full border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-teal-500" phx-drop-target={@uploads.package_picture.ref}>
+                  <.live_file_input upload={@uploads.package_picture} class="w-full border-0 focus:outline-none" />
+                  <p class="text-xs text-gray-500 mt-1">Accepted formats: JPG, JPEG, PNG, GIF, WEBP, BMP (Max 5MB)</p>
+                </div>
+
+                <div class="mt-2">
+                  <%= for entry <- @uploads.package_picture.entries do %>
+                    <div class="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
+                      <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-700"><%= entry.client_name %></span>
+                        <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-600 hover:text-red-800">Remove</button>
+                      </div>
+                      <%= for err <- upload_errors(@uploads.package_picture, entry) do %>
+                        <div class="text-red-500 text-xs mt-1"><%= Phoenix.Naming.humanize(err) %></div>
+                      <% end %>
+                      <div class="mt-2">
+                        <div class="text-xs text-gray-600">
+                          <%= if entry.done?, do: "Uploaded: #{entry.client_name}", else: "Uploading: #{entry.client_name}" %>
+                        </div>
+                        <%= if !entry.done? do %>
+                          <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-teal-600 h-2 rounded-full transition-all duration-300" style={"width: #{entry.progress}%"}></div>
+                          </div>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+
+                  <%= for err <- upload_errors(@uploads.package_picture) do %>
+                    <p class="text-red-600 text-sm mt-2"><%= Phoenix.Naming.humanize(err) %></p>
+                  <% end %>
+                </div>
+
+                <%= if @package.picture do %>
+                  <div class="mt-3">
+                    <p class="text-xs text-gray-500 mb-1">Current image:</p>
+                    <img src={@package.picture} alt="Current package image" class="h-32 w-auto rounded border" />
+                  </div>
+                <% end %>
               </div>
             </div>
 

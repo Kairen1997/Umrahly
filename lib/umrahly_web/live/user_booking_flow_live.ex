@@ -1073,49 +1073,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       {_ok, _progress} =
         Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: travelers, last_updated: DateTime.utc_now()})
 
-      cleared_travelers = Enum.with_index(travelers)
-      |> Enum.map(fn {_traveler, index} ->
-        if index == 0 and socket.assigns.is_booking_for_self do
-          %{
-            "full_name" => socket.assigns.current_user.full_name || "",
-            "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
-            "passport_number" => "",
-            "phone" => socket.assigns.current_user.phone_number || "",
-            "date_of_birth" => "",
-            "address" => socket.assigns.current_user.address || "",
-            "poskod" => "",
-            "city" => "",
-            "state" => "",
-            "citizenship" => "Malaysia",
-            "emergency_contact_name" => "",
-            "emergency_contact_phone" => "",
-            "emergency_contact_relationship" => "",
-            "room_type" => "standard"
-          }
-        else
-          %{
-            "full_name" => "",
-            "identity_card_number" => "",
-            "passport_number" => "",
-            "phone" => "",
-            "date_of_birth" => "",
-            "address" => "",
-            "poskod" => "",
-            "city" => "",
-            "state" => "",
-            "citizenship" => "Malaysia",
-            "emergency_contact_name" => "",
-            "emergency_contact_phone" => "",
-            "emergency_contact_relationship" => "",
-            "room_type" => "standard"
-          }
-        end
-      end)
-
       socket =
         socket
-        |> assign(:travelers, cleared_travelers)
-        |> put_flash(:info, "Traveler information saved successfully! ✅ Form has been automatically cleared and is ready for the next entry.")
+        |> put_flash(:info, "Traveler information saved successfully! ✅ Your data has been preserved and you can continue editing if needed.")
 
       {:noreply, socket}
     else

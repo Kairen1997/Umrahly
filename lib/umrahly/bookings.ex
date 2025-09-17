@@ -438,6 +438,28 @@ defmodule Umrahly.Bookings do
   end
 
   @doc """
+  Returns the total payments received across all bookings that are confirmed or completed.
+  Uses `deposit_amount` as the received payment value.
+  Returns a Decimal (0 if none).
+  """
+  def sum_total_payments_received do
+    Booking
+    |> where([b], b.status in ["confirmed", "completed"])
+    |> select([b], coalesce(sum(b.deposit_amount), 0))
+    |> Repo.one()
+  end
+
+  @doc """
+  Counts bookings with payment proofs submitted and pending approval.
+  """
+  def count_pending_payment_proof_approvals do
+    Booking
+    |> where([b], b.payment_proof_status == "submitted")
+    |> select([b], count(b.id))
+    |> Repo.one()
+  end
+
+  @doc """
   Deletes all booking flow progress entries that are marked as "abandoned".
 
   Returns {count, nil} where count is the number of rows removed.

@@ -3,6 +3,8 @@ defmodule UmrahlyWeb.AdminDashboardLive do
 
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Packages
+  alias Umrahly.Bookings
+  alias Umrahly.ActivityLogs
 
   def mount(_params, _session, socket) do
     current_user = socket.assigns.current_user
@@ -18,34 +20,18 @@ defmodule UmrahlyWeb.AdminDashboardLive do
     # Get real data for admin dashboard
     package_stats = Packages.get_enhanced_package_statistics()
     recent_package_activities = Packages.get_recent_package_activities(3)
+    total_bookings_count = Bookings.count_bookings_with_details()
+    total_payments_decimal = Bookings.sum_total_payments_received()
+    pending_verifications_count = Bookings.count_pending_payment_proof_approvals()
 
     admin_stats = %{
-      total_bookings: 124, # TODO: Replace with real bookings count when bookings module is implemented
-      total_payments: "RM 300,000", # TODO: Replace with real payments data when payments module is implemented
+      total_bookings: total_bookings_count, # Using real bookings count
+      total_payments: format_rm(total_payments_decimal), # Using real payments sum
       packages_available: package_stats.active_packages,
-      pending_verification: 3 # TODO: Replace with real verification count when user verification is implemented
+      pending_verification: pending_verifications_count # Using real pending verification count
     }
 
-    recent_activities = [
-      %{
-        title: "Payment",
-        activity_message: "John submitted a payment (RM1,000)",
-        timestamp: "Today at 9:40 AM",
-        action: "View / Approve"
-      },
-      %{
-        title: "Booking",
-        activity_message: "Sarah booked Standard Package",
-        timestamp: "6 Aug, 8:15 PM",
-        action: "View / Confirm"
-      },
-      %{
-        title: "Profile Update",
-        activity_message: "Ahmed updated contact information",
-        timestamp: "6 Aug, 6:30 PM",
-        action: "View"
-      }
-    ]
+    recent_activities = ActivityLogs.recent_activities(10)
 
     socket =
       socket
@@ -60,6 +46,36 @@ defmodule UmrahlyWeb.AdminDashboardLive do
       |> assign(:show_packages_details, false)
 
     {:ok, socket}
+  end
+
+  defp format_rm(nil), do: "RM 0.00"
+  defp format_rm(decimal) do
+    value = case decimal do
+      %Decimal{} -> decimal
+      n when is_integer(n) or is_float(n) -> Decimal.new(n)
+      _ -> Decimal.new(0)
+    end
+
+    rounded = Decimal.round(value, 2)
+    str = Decimal.to_string(rounded, :normal)
+    sign = if String.starts_with?(str, "-"), do: "-", else: ""
+    num = if sign == "-", do: String.trim_leading(str, "-"), else: str
+    parts = String.split(num, ".")
+    int_part = Enum.at(parts, 0)
+    frac_part =
+      case Enum.at(parts, 1) do
+        nil -> "00"
+        f when byte_size(f) == 0 -> "00"
+        f when byte_size(f) == 1 -> f <> "0"
+        f when byte_size(f) >= 2 -> String.slice(f, 0, 2)
+      end
+
+    formatted_int = format_thousands(int_part)
+    "RM " <> sign <> formatted_int <> "." <> frac_part
+  end
+
+  defp format_thousands(int_part) when is_binary(int_part) do
+    Regex.replace(~r/\B(?=(\d{3})+(?!\d))/, int_part, ",")
   end
 
   def handle_event("toggle_packages_details", _params, socket) do
@@ -338,33 +354,20 @@ defmodule UmrahlyWeb.AdminDashboardLive do
               <table class="min-w-full">
                 <thead>
                   <tr class="border-b border-gray-200">
-                    <th class="text-left py-3 px-4 font-medium text-gray-700">Element</th>
-                    <th class="text-left py-3 px-4 font-medium text-gray-700">Activity</th>
+                    <th class="text-left py-3 px-4 font-medium text-gray-700">User</th>
+                    <th class="text-left py-3 px-4 font-medium text-gray-700">Action</th>
+                    <th class="text-left py-3 px-4 font-medium text-gray-700">Details</th>
+                    <th class="text-left py-3 px-4 font-medium text-gray-700">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody>
                   <%= for activity <- @recent_activities do %>
                     <tr class="border-b border-gray-100">
-                      <td class="py-3 px-4 text-sm text-gray-600">Title</td>
                       <td class="py-3 px-4 text-sm text-gray-900"><%= activity.title %></td>
-                    </tr>
-                    <tr class="border-b border-gray-100">
-                      <td class="py-3 px-4 text-sm text-gray-600">Activity Message</td>
+                      <td class="py-3 px-4 text-sm text-gray-900"><%= activity.action %></td>
                       <td class="py-3 px-4 text-sm text-gray-900"><%= activity.activity_message %></td>
-                    </tr>
-                    <tr class="border-b border-gray-100">
-                      <td class="py-3 px-4 text-sm text-gray-600">Timestamp</td>
                       <td class="py-3 px-4 text-sm text-gray-900"><%= activity.timestamp %></td>
                     </tr>
-                    <tr class="border-b border-gray-100">
-                      <td class="py-3 px-4 text-sm text-gray-600">Action</td>
-                      <td class="py-3 px-4 text-sm text-gray-900">
-                        <span class="text-blue-600 hover:text-blue-800 cursor-pointer">
-                          <%= activity.action %>
-                        </span>
-                      </td>
-                    </tr>
-                    <tr class="h-4"></tr>
                   <% end %>
                 </tbody>
               </table>

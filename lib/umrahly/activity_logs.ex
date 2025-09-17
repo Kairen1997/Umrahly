@@ -24,4 +24,42 @@ defmodule Umrahly.ActivityLogs do
     |> limit(^limit)
     |> Repo.all()
   end
+
+  @doc """
+  Fetch recent activities across all users, formatted for admin dashboard.
+  """
+  @spec recent_activities(pos_integer()) :: [map()]
+  def recent_activities(limit \\ 10) do
+    ActivityLog
+    |> order_by([a], desc: a.inserted_at)
+    |> limit(^limit)
+    |> preload(:user)
+    |> Repo.all()
+    |> Enum.map(fn activity ->
+      user = Map.get(activity, :user)
+      user_name =
+        cond do
+          match?(%{full_name: name} when is_binary(name), user) and String.trim(user.full_name) != "" -> user.full_name
+          match?(%{email: email} when is_binary(email), user) -> user.email
+          true -> "User #{activity.user_id}"
+        end
+
+      formatted_time =
+        case activity.inserted_at do
+          %NaiveDateTime{} = ndt ->
+            ndt |> DateTime.from_naive!("Etc/UTC") |> Calendar.strftime("%B %d, %Y at %I:%M %p")
+          %DateTime{} = dt ->
+            Calendar.strftime(dt, "%B %d, %Y at %I:%M %p")
+          _ ->
+            ""
+        end
+
+      %{
+        title: user_name,
+        activity_message: activity.details || activity.action,
+        timestamp: formatted_time,
+        action: activity.action
+      }
+    end)
+  end
 end

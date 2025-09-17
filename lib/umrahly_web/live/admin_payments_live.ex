@@ -155,10 +155,10 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
 
     filtered_query =
       case status_filter do
-        "all" -> base_query |> where([bfp, u, p], bfp.status != "abandoned")
+        "all" -> base_query
         "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
         "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
+        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
         _ -> base_query
       end
 
@@ -271,10 +271,10 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
 
     filtered_query =
       case status_filter do
-        "all" -> base_query |> where([bfp, u, p], bfp.status != "abandoned")
+        "all" -> base_query
         "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
         "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
+        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
         _ -> base_query
       end
 
@@ -374,6 +374,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   defp normalize_status("confirmed"), do: "completed"
   defp normalize_status("pending"), do: "in_progress"
   defp normalize_status("cancelled"), do: "canceled"
+  defp normalize_status("abandoned"), do: "canceled"
   defp normalize_status(status), do: status
 
   defp format_amount(nil), do: "RM 0"

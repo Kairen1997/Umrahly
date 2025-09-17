@@ -4,30 +4,33 @@ defmodule UmrahlyWeb.UserLoginLive do
   def render(assigns) do
     ~H"""
     <div class="flex justify-center items-center min-h-screen bg-[#F9FAF5]">
-      <div class="max-w-md w-full bg-[#EAD4AB] rounded-lg p-8 shadow-lg">
-        <h2 class="text-center text-xl font-semibold mb-6">Login to your account</h2>
-        <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-6">
+      <div class="bg-[#EAD4AB] p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div class="flex justify-center mb-6 space-x-8 text-sm font-medium">
+          <.link navigate={~p"/users/register"} class="text-gray-500 hover:text-[#00897B]">Register</.link>
+          <span class="text-[#00897B] cursor-pointer border-b-2 border-[#00897B] pb-1">Login</span>
+        </div>
+        <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-4">
           <div>
-            <label for="email" class="block mb-1 text-sm font-medium text-gray-900">Email</label>
+            <label for="email" class="block mb-1 text-sm font-medium text-gray-800">Email</label>
             <.input
               field={@form[:email]}
               id="email"
               type="email"
               placeholder="Enter your email"
               required
-              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
+              class="w-full rounded-md border border-gray-300 bg-[#FFF3D6] text-gray-900 placeholder-gray-600 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00897B]"
             />
           </div>
 
           <div>
-            <label for="password" class="block mb-1 text-sm font-medium text-gray-900">Password</label>
+            <label for="password" class="block mb-1 text-sm font-medium text-gray-800">Password</label>
             <.input
               field={@form[:password]}
               id="password"
               type="password"
               placeholder="Enter your password"
               required
-              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
+              class="w-full rounded-md border border-gray-300 bg-[#FFF3D6] text-gray-900 placeholder-gray-600 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00897B]"
             />
           </div>
 
@@ -40,7 +43,7 @@ defmodule UmrahlyWeb.UserLoginLive do
 
         <p class="mt-4 text-center text-sm text-gray-700">
           Don't have an account?
-          <.link navigate={~p"/users/register"} class="text-teal-700 hover:underline">Register</.link>
+          <.link navigate={~p"/users/register"} class="text-[#00897B] hover:underline">Register</.link>
         </p>
       </div>
     </div>

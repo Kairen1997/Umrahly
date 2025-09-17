@@ -7,14 +7,16 @@ defmodule Umrahly.ActivityLogs do
   alias Umrahly.Repo
   alias Umrahly.ActivityLogs.ActivityLog
 
-  @spec log_user_action(integer(), String.t(), String.t() | nil, map() | nil) :: {:ok, ActivityLog.t()} | {:error, Ecto.Changeset.t()}
+  @type activity_log :: %ActivityLog{}
+
+  @spec log_user_action(integer(), String.t(), String.t() | nil, map() | nil) :: {:ok, activity_log()} | {:error, Ecto.Changeset.t()}
   def log_user_action(user_id, action, details \\ nil, metadata \\ %{}) do
     %ActivityLog{}
     |> ActivityLog.changeset(%{user_id: user_id, action: action, details: details, metadata: metadata || %{}})
     |> Repo.insert()
   end
 
-  @spec recent_user_activities(integer(), pos_integer()) :: [ActivityLog.t()]
+  @spec recent_user_activities(integer(), pos_integer()) :: [activity_log()]
   def recent_user_activities(user_id, limit \\ 10) do
     ActivityLog
     |> where([a], a.user_id == ^user_id)

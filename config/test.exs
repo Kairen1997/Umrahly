@@ -10,7 +10,7 @@ config :pbkdf2_elixir, :rounds, 1
 # Run `mix help test` for more information.
 config :umrahly, Umrahly.Repo,
   username: "postgres",
-  password: "postgres",
+  password: "Kairen@89100",
   hostname: "localhost",
   database: "umrahly_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,

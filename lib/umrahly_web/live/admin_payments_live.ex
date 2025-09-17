@@ -63,111 +63,212 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     end
   end
 
+  # --- Data loading (bookings + in-progress flows) ---
   defp get_payments_data(status_filter \\ "all") do
     try do
-      base_query =
-        BookingFlowProgress
-        |> join(:inner, [bfp], u in User, on: bfp.user_id == u.id)
-        |> join(:inner, [bfp, u], p in Package, on: bfp.package_id == p.id)
+      bookings = get_payments_from_bookings(status_filter)
+      progresses = get_payments_from_progress(status_filter)
 
-      filtered_query =
-        case status_filter do
-          "all" -> base_query
-          "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
-          "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-          "abandoned" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
-          "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
-          _ -> base_query
-        end
-
-      filtered_query
-      |> select([bfp, u, p], %{
-        id: bfp.id,
-        user_name: u.full_name,
-        user_email: u.email,
-        package_name: p.name,
-        total_amount: bfp.total_amount,
-        payment_method: bfp.payment_method,
-        payment_plan: bfp.payment_plan,
-        status: bfp.status,
-        number_of_persons: bfp.number_of_persons,
-        current_step: bfp.current_step,
-        max_steps: bfp.max_steps,
-        inserted_at: bfp.inserted_at,
-        updated_at: bfp.updated_at,
-        travelers_data: bfp.travelers_data
-      })
-      |> order_by([bfp, u, p], [desc: bfp.inserted_at])
-      |> Repo.all()
+      (bookings ++ progresses)
+      |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
       |> Enum.flat_map(&expand_traveler_data/1)
       |> Enum.map(&format_payment_data/1)
-    rescue
-      _ ->
-        []
+    rescue e ->
+      require Logger
+      Logger.error(Exception.format(:error, e, __STACKTRACE__))
+      []
     end
+  end
+
+  defp get_payments_from_bookings(status_filter) do
+    # Pull real, confirmed booking/payment data
+    alias Umrahly.Bookings.Booking
+    alias Umrahly.Packages.PackageSchedule
+
+    base_query =
+      Booking
+      |> join(:inner, [b], u in User, on: b.user_id == u.id)
+      |> join(:inner, [b, u], ps in PackageSchedule, on: b.package_schedule_id == ps.id)
+      |> join(:inner, [b, u, ps], p in Package, on: ps.package_id == p.id)
+
+    filtered_query =
+      case status_filter do
+        "all" -> base_query |> where([b, u, ps, p], b.status != "cancelled")
+        # Map UI statuses to booking statuses where sensible
+        "completed" -> base_query |> where([b, u, ps, p], b.status == "completed" or b.status == "confirmed")
+        "in_progress" -> base_query |> where([b, u, ps, p], b.status == "pending")
+        "canceled" -> base_query |> where([b, u, ps, p], b.status == "cancelled")
+        _ -> base_query
+      end
+
+    filtered_query
+    |> select([b, u, ps, p], %{
+      id: b.id,
+      user_name: u.full_name,
+      user_email: u.email,
+      package_name: p.name,
+      total_amount: b.total_amount,
+      payment_method: b.payment_method,
+      payment_plan: b.payment_plan,
+      status: b.status,
+      number_of_persons: b.number_of_persons,
+      current_step: 4,
+      max_steps: 4,
+      inserted_at: b.inserted_at,
+      updated_at: b.updated_at,
+      travelers_data: nil
+    })
+    |> Repo.all()
+  end
+
+  defp get_payments_from_progress(status_filter) do
+    base_query =
+      BookingFlowProgress
+      |> join(:inner, [bfp], u in User, on: bfp.user_id == u.id)
+      |> join(:inner, [bfp, u], p in Package, on: bfp.package_id == p.id)
+
+    filtered_query =
+      case status_filter do
+        "all" -> base_query |> where([bfp, u, p], bfp.status != "abandoned")
+        "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
+        "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
+        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
+        _ -> base_query
+      end
+
+    filtered_query
+    |> select([bfp, u, p], %{
+      id: bfp.id,
+      user_name: u.full_name,
+      user_email: u.email,
+      package_name: p.name,
+      total_amount: bfp.total_amount,
+      payment_method: bfp.payment_method,
+      payment_plan: bfp.payment_plan,
+      status: bfp.status,
+      number_of_persons: bfp.number_of_persons,
+      current_step: bfp.current_step,
+      max_steps: bfp.max_steps,
+      inserted_at: bfp.inserted_at,
+      updated_at: bfp.updated_at,
+      travelers_data: bfp.travelers_data
+    })
+    |> order_by([bfp, u, p], [desc: bfp.inserted_at])
+    |> Repo.all()
   end
 
   defp search_payments(search_term, status_filter) when byte_size(search_term) > 0 do
     try do
       search_pattern = "%#{search_term}%"
 
-      base_query =
-        BookingFlowProgress
-        |> join(:inner, [bfp], u in User, on: bfp.user_id == u.id)
-        |> join(:inner, [bfp, u], p in Package, on: bfp.package_id == p.id)
-        |> where([bfp, u, p],
+      # Search confirmed/real bookings
+      alias Umrahly.Bookings.Booking
+      alias Umrahly.Packages.PackageSchedule
+
+      bookings_query =
+        Booking
+        |> join(:inner, [b], u in User, on: b.user_id == u.id)
+        |> join(:inner, [b, u], ps in PackageSchedule, on: b.package_schedule_id == ps.id)
+        |> join(:inner, [b, u, ps], p in Package, on: ps.package_id == p.id)
+        |> where([b, u, ps, p],
           ilike(u.full_name, ^search_pattern) or
           ilike(u.email, ^search_pattern) or
           ilike(p.name, ^search_pattern)
         )
 
-      filtered_query =
+      bookings_query =
         case status_filter do
-          "all" -> base_query
-          "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
-          "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-          "abandoned" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
-          "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
-          _ -> base_query
+          "all" -> bookings_query |> where([b, u, ps, p], b.status != "cancelled")
+          "completed" -> bookings_query |> where([b, u, ps, p], b.status in ["completed", "confirmed"])
+          "in_progress" -> bookings_query |> where([b, u, ps, p], b.status == "pending")
+          "abandoned" -> bookings_query |> where([b, u, ps, p], b.status == "cancelled")
+          "canceled" -> bookings_query |> where([b, u, ps, p], b.status == "cancelled")
+          _ -> bookings_query
         end
 
-      filtered_query
-      |> select([bfp, u, p], %{
-        id: bfp.id,
-        user_name: u.full_name,
-        user_email: u.email,
-        package_name: p.name,
-        total_amount: bfp.total_amount,
-        payment_method: bfp.payment_method,
-        payment_plan: bfp.payment_plan,
-        status: bfp.status,
-        number_of_persons: bfp.number_of_persons,
-        current_step: bfp.current_step,
-        max_steps: bfp.max_steps,
-        inserted_at: bfp.inserted_at,
-        updated_at: bfp.updated_at,
-        travelers_data: bfp.travelers_data
-      })
-      |> order_by([bfp, u, p], [desc: bfp.inserted_at])
-      |> Repo.all()
+      bookings_results =
+        bookings_query
+        |> select([b, u, ps, p], %{
+          id: b.id,
+          user_name: u.full_name,
+          user_email: u.email,
+          package_name: p.name,
+          total_amount: b.total_amount,
+          payment_method: b.payment_method,
+          payment_plan: b.payment_plan,
+          status: b.status,
+          number_of_persons: b.number_of_persons,
+          current_step: 4,
+          max_steps: 4,
+          inserted_at: b.inserted_at,
+          updated_at: b.updated_at,
+          travelers_data: nil
+        })
+        |> Repo.all()
+
+      progress_results =
+        get_payments_from_progress_for_search(search_pattern, status_filter)
+
+      (bookings_results ++ progress_results)
       |> Enum.flat_map(&expand_traveler_data/1)
       |> Enum.filter(fn payment ->
-        search_pattern = String.downcase(search_term)
+        search_lc = String.downcase(search_term)
 
-        String.contains?(String.downcase(payment.user_name || ""), search_pattern) or
-        String.contains?(String.downcase(payment.user_email || ""), search_pattern) or
-        String.contains?(String.downcase(payment.package_name || ""), search_pattern) or
-        String.contains?(String.downcase(payment.traveler_name || ""), search_pattern) or
-        String.contains?(String.downcase(payment.traveler_identity || ""), search_pattern)
+        String.contains?(String.downcase(payment.user_name || ""), search_lc) or
+        String.contains?(String.downcase(payment.user_email || ""), search_lc) or
+        String.contains?(String.downcase(payment.package_name || ""), search_lc) or
+        String.contains?(String.downcase(payment.traveler_name || ""), search_lc) or
+        String.contains?(String.downcase(payment.traveler_identity || ""), search_lc)
       end)
       |> Enum.map(&format_payment_data/1)
-    rescue
-      _ ->
-        []
+    rescue e ->
+      require Logger
+      Logger.error(Exception.format(:error, e, __STACKTRACE__))
+      []
     end
   end
 
   defp search_payments(_search_term, status_filter), do: get_payments_data(status_filter)
+
+  defp get_payments_from_progress_for_search(search_pattern, status_filter) do
+    base_query =
+      BookingFlowProgress
+      |> join(:inner, [bfp], u in User, on: bfp.user_id == u.id)
+      |> join(:inner, [bfp, u], p in Package, on: bfp.package_id == p.id)
+      |> where([bfp, u, p],
+        ilike(u.full_name, ^search_pattern) or
+        ilike(u.email, ^search_pattern) or
+        ilike(p.name, ^search_pattern)
+      )
+
+    filtered_query =
+      case status_filter do
+        "all" -> base_query |> where([bfp, u, p], bfp.status != "abandoned")
+        "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
+        "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
+        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "canceled")
+        _ -> base_query
+      end
+
+    filtered_query
+    |> select([bfp, u, p], %{
+      id: bfp.id,
+      user_name: u.full_name,
+      user_email: u.email,
+      package_name: p.name,
+      total_amount: bfp.total_amount,
+      payment_method: bfp.payment_method,
+      payment_plan: bfp.payment_plan,
+      status: bfp.status,
+      number_of_persons: bfp.number_of_persons,
+      current_step: bfp.current_step,
+      max_steps: bfp.max_steps,
+      inserted_at: bfp.inserted_at,
+      updated_at: bfp.updated_at,
+      travelers_data: bfp.travelers_data
+    })
+    |> Repo.all()
+  end
 
   # Expand traveler data to show individual travelers
   defp expand_traveler_data(booking) do
@@ -219,7 +320,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       raw_amount: payment.total_amount,
       payment_method: payment.payment_method || "Not specified",
       payment_plan: payment.payment_plan || "Not specified",
-      status: payment.status || "unknown",
+      status: normalize_status(payment.status),
       transaction_id: "TXN-#{String.pad_leading("#{payment.id}", 6, "0")}",
       payment_date: format_date(payment.inserted_at),
       booking_reference: "BK-#{String.pad_leading("#{payment.id}", 6, "0")}",
@@ -238,6 +339,12 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       traveler_citizenship: payment.traveler_citizenship || "No citizenship"
     }
   end
+
+  defp normalize_status(nil), do: "unknown"
+  defp normalize_status("confirmed"), do: "completed"
+  defp normalize_status("pending"), do: "in_progress"
+  defp normalize_status("cancelled"), do: "canceled"
+  defp normalize_status(status), do: status
 
   defp format_amount(nil), do: "RM 0"
   defp format_amount(%Decimal{} = amount) do
@@ -322,15 +429,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                 ]}>
                 In Progress
               </button>
-              <button
-                phx-click="filter_by_status"
-                phx-value-status="abandoned"
-                class={[
-                  "px-4 py-2 rounded-lg transition-colors",
-                  if(@filter_status == "abandoned", do: "bg-red-600 text-white", else: "bg-gray-200 text-gray-700 hover:bg-gray-300")
-                ]}>
-                Abandoned
-              </button>
+
               <button
                 phx-click="filter_by_status"
                 phx-value-status="canceled"
@@ -405,7 +504,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                           case payment.status do
                             "completed" -> "bg-green-100 text-green-800"
                             "in_progress" -> "bg-blue-100 text-blue-800"
-                            "abandoned" -> "bg-red-100 text-red-800"
+                            # removed abandoned
                             "canceled" -> "bg-red-100 text-red-800"
                             _ -> "bg-gray-100 text-gray-800"
                           end
@@ -469,12 +568,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                 <%= @payments |> Enum.filter(& &1.status == "in_progress") |> length() %>
               </div>
             </div>
-            <div class="bg-red-50 p-4 rounded-lg">
-              <div class="text-sm font-medium text-red-600">Abandoned</div>
-              <div class="text-2xl font-bold text-red-900">
-                <%= @payments |> Enum.filter(& &1.status == "abandoned") |> length() %>
-              </div>
-            </div>
+
             <div class="bg-red-50 p-4 rounded-lg">
               <div class="text-sm font-medium text-red-600">Canceled</div>
               <div class="text-2xl font-bold text-red-900">

@@ -316,90 +316,235 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
 
                 <!-- Traveler Details Section -->
                 <div class="p-6 bg-gray-50">
-                  <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    Traveler Details (<%= booking.number_of_persons %> person<%= if booking.number_of_persons > 1, do: "s", else: "" %>)
-                  </h4>
+                  <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-medium text-gray-900 flex items-center">
+                      <svg class="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                      </svg>
+                      Traveler Details (<%=
+                        traveler_count = if booking.travelers_data && length(booking.travelers_data) > 0 do
+                          length(booking.travelers_data)
+                        else
+                          if booking.is_booking_for_self, do: 1, else: 0
+                        end
+                        traveler_count %> person<%= if traveler_count > 1, do: "s", else: "" %>)
+                    </h4>
+
+                    <!-- Booking Type Indicator -->
+                    <div class="flex items-center space-x-2">
+                      <%= if booking.is_booking_for_self do %>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                          </svg>
+                          Booking for Self
+                        </span>
+                      <% else %>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                          </svg>
+                          Booking for Others
+                        </span>
+                      <% end %>
+                    </div>
+                  </div>
 
                   <%= if booking.travelers_data && length(booking.travelers_data) > 0 do %>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <%= for {traveler, index} <- Enum.with_index(booking.travelers_data) do %>
-                        <div class="bg-white rounded-lg border border-gray-200 p-4">
-                          <div class="flex items-center justify-between mb-3">
-                            <h5 class="font-medium text-gray-900">
-                              Traveler <%= index + 1 %>
-                              <%= if index == 0 && booking.is_booking_for_self do %>
-                                <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded ml-2">Primary</span>
-                              <% end %>
-                            </h5>
-                          </div>
-
-                          <div class="space-y-2 text-sm">
-                            <div>
-                              <span class="font-medium text-gray-700">Name:</span>
-                              <div class="text-gray-900"><%= traveler["full_name"] || "Not provided" %></div>
-                            </div>
-                            <div>
-                              <span class="font-medium text-gray-700">ID:</span>
-                              <div class="text-gray-900">
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <thead class="bg-gray-50">
+                          <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              Traveler
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              Full Name
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              ID Number
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              Phone
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              Birth Date
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              Address
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              Emergency Contact
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                          <%= for {traveler, index} <- Enum.with_index(booking.travelers_data) do %>
+                            <tr class="hover:bg-gray-50">
+                              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <div class="flex items-center">
+                                  <span>Traveler <%= index + 1 %></span>
+                                  <%= if index == 0 && booking.is_booking_for_self do %>
+                                    <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      Primary
+                                    </span>
+                                  <% end %>
+                                </div>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= traveler["full_name"] || "Not provided" %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
                                 <%= if traveler["identity_card_number"] && traveler["identity_card_number"] != "" do %>
                                   <%= traveler["identity_card_number"] %>
                                 <% else %>
                                   <%= traveler["passport_number"] || "Not provided" %>
                                 <% end %>
-                              </div>
-                            </div>
-                            <div>
-                              <span class="font-medium text-gray-700">Phone:</span>
-                              <div class="text-gray-900"><%= traveler["phone"] || "Not provided" %></div>
-                            </div>
-                            <%= if traveler["date_of_birth"] && traveler["date_of_birth"] != "" do %>
-                              <div>
-                                <span class="font-medium text-gray-700">Birth Date:</span>
-                                <div class="text-gray-900"><%= traveler["date_of_birth"] %></div>
-                              </div>
-                            <% end %>
-                            <%= if traveler["address"] && traveler["address"] != "" do %>
-                              <div>
-                                <span class="font-medium text-gray-700">Address:</span>
-                                <div class="text-gray-900">
-                                  <%= traveler["address"] %>
-                                  <%= if traveler["poskod"] && traveler["poskod"] != "" do %>
-                                    <br><%= traveler["poskod"] %>
-                                  <% end %>
-                                  <%= if traveler["city"] && traveler["city"] != "" do %>
-                                    <br><%= traveler["city"] %><%= if traveler["state"] && traveler["state"] != "", do: ", #{traveler["state"]}", else: "" %>
-                                  <% end %>
-                                </div>
-                              </div>
-                            <% end %>
-                            <%= if traveler["emergency_contact_name"] && traveler["emergency_contact_name"] != "" do %>
-                              <div>
-                                <span class="font-medium text-gray-700">Emergency Contact:</span>
-                                <div class="text-gray-900">
-                                  <%= traveler["emergency_contact_name"] %>
-                                  <%= if traveler["emergency_contact_phone"] && traveler["emergency_contact_phone"] != "" do %>
-                                    <br><%= traveler["emergency_contact_phone"] %>
-                                  <% end %>
-                                </div>
-                              </div>
-                            <% end %>
-                          </div>
-                        </div>
-                      <% end %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= traveler["phone"] || "Not provided" %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= traveler["date_of_birth"] || "Not provided" %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= if traveler["address"] && traveler["address"] != "" do %>
+                                  <div class="max-w-xs">
+                                    <div><%= traveler["address"] %></div>
+                                    <%= if traveler["poskod"] && traveler["poskod"] != "" do %>
+                                      <div class="text-gray-500"><%= traveler["poskod"] %></div>
+                                    <% end %>
+                                    <%= if traveler["city"] && traveler["city"] != "" do %>
+                                      <div class="text-gray-500">
+                                        <%= traveler["city"] %><%= if traveler["state"] && traveler["state"] != "", do: ", #{traveler["state"]}", else: "" %>
+                                      </div>
+                                    <% end %>
+                                  </div>
+                                <% else %>
+                                  Not provided
+                                <% end %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= if traveler["emergency_contact_name"] && traveler["emergency_contact_name"] != "" do %>
+                                  <div class="max-w-xs">
+                                    <div><%= traveler["emergency_contact_name"] %></div>
+                                    <%= if traveler["emergency_contact_phone"] && traveler["emergency_contact_phone"] != "" do %>
+                                      <div class="text-gray-500"><%= traveler["emergency_contact_phone"] %></div>
+                                    <% end %>
+                                  </div>
+                                <% else %>
+                                  Not provided
+                                <% end %>
+                              </td>
+                            </tr>
+                          <% end %>
+                        </tbody>
+                      </table>
                     </div>
                   <% else %>
-                    <div class="text-center py-8">
-                      <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
+                    <%= if booking.is_booking_for_self do %>
+                      <!-- Show user's own information when booking for self but no travelers_data -->
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                          <thead class="bg-gray-50">
+                            <tr>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                Traveler
+                              </th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                Full Name
+                              </th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                ID Number
+                              </th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                Phone
+                              </th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                Birth Date
+                              </th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                Address
+                              </th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                Emergency Contact
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody class="bg-white divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <div class="flex items-center">
+                                  <span>Traveler 1</span>
+                                  <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Primary
+                                  </span>
+                                </div>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= @current_user.full_name || "Not provided" %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= if @current_user.identity_card_number && @current_user.identity_card_number != "" do %>
+                                  <%= @current_user.identity_card_number %>
+                                <% else %>
+                                  <%= @current_user.passport_number || "Not provided" %>
+                                <% end %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= @current_user.phone_number || "Not provided" %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= if @current_user.birthdate do %>
+                                  <%= Date.to_string(@current_user.birthdate) %>
+                                <% else %>
+                                  Not provided
+                                <% end %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= if @current_user.address && @current_user.address != "" do %>
+                                  <div class="max-w-xs">
+                                    <div><%= @current_user.address %></div>
+                                    <%= if @current_user.poskod && @current_user.poskod != "" do %>
+                                      <div class="text-gray-500"><%= @current_user.poskod %></div>
+                                    <% end %>
+                                    <%= if @current_user.city && @current_user.city != "" do %>
+                                      <div class="text-gray-500">
+                                        <%= @current_user.city %><%= if @current_user.state && @current_user.state != "", do: ", #{@current_user.state}", else: "" %>
+                                      </div>
+                                    <% end %>
+                                  </div>
+                                <% else %>
+                                  Not provided
+                                <% end %>
+                              </td>
+                              <td class="px-6 py-4 text-sm text-gray-900">
+                                <%= if @current_user.emergency_contact_name && @current_user.emergency_contact_name != "" do %>
+                                  <div class="max-w-xs">
+                                    <div><%= @current_user.emergency_contact_name %></div>
+                                    <%= if @current_user.emergency_contact_phone && @current_user.emergency_contact_phone != "" do %>
+                                      <div class="text-gray-500"><%= @current_user.emergency_contact_phone %></div>
+                                    <% end %>
+                                  </div>
+                                <% else %>
+                                  Not provided
+                                <% end %>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
-                      <h5 class="text-lg font-medium text-gray-900 mb-2">No Traveler Information Yet</h5>
-                      <p class="text-gray-600">Traveler details will be collected in the next step of your booking process.</p>
-                    </div>
+                    <% else %>
+                      <div class="text-center py-8">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                          </svg>
+                        </div>
+                        <h5 class="text-lg font-medium text-gray-900 mb-2">No Traveler Information Yet</h5>
+                        <p class="text-gray-600">Traveler details will be collected in the next step of your booking process.</p>
+                      </div>
+                    <% end %>
                   <% end %>
                 </div>
               </div>

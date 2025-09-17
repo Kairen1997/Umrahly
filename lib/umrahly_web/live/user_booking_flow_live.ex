@@ -1070,8 +1070,13 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       end)
 
     if all_travelers_complete do
+      actual_number_of_persons = length(travelers)
       {_ok, _progress} =
-        Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{travelers_data: travelers, last_updated: DateTime.utc_now()})
+        Bookings.update_booking_flow_progress(socket.assigns.booking_flow_progress, %{
+          travelers_data: travelers,
+          number_of_persons: actual_number_of_persons,
+          last_updated: DateTime.utc_now()
+        })
 
       socket =
         socket
@@ -2981,68 +2986,212 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
               <!-- Travelers Details -->
               <div class="border rounded-lg p-4">
                 <h3 class="font-medium text-gray-900 mb-3">Travelers Details</h3>
-                <div class="space-y-3">
+
+                <!-- Table for larger screens -->
+                <div class="hidden lg:block overflow-x-auto">
+                  <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead class="bg-gray-50">
+                      <tr class="text-xs font-medium text-gray-700 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Traveler</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Full Name</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Identity Card</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Passport</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Phone</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Date of Birth</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Address</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Poskod</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">City</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">State</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Citizenship</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Emergency Contact</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Emergency Phone</th>
+                        <th class="px-3 py-3 text-left border-r border-gray-200">Emergency Relationship</th>
+                        <th class="px-3 py-3 text-left">Room Type</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
                   <%= for {traveler, index} <- Enum.with_index(@travelers) do %>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                      <h4 class="font-medium text-gray-800 mb-2">
+                        <tr class="hover:bg-gray-50">
+                          <td class="px-3 py-4 text-sm font-medium text-gray-900 border-r border-gray-200">
+                            <div class="flex items-center">
+                              <%= if @number_of_persons == 1 and @is_booking_for_self do %>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">You</span>
+                              <% else %>
+                                <%= if @number_of_persons == 1 do %>
+                                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Traveler</span>
+                                <% else %>
+                                  <%= if index == 0 do %>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Lead (<%= index + 1 %>)</span>
+                                  <% else %>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"><%= index + 1 %></span>
+                                  <% end %>
+                                <% end %>
+                              <% end %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200 max-w-xs">
+                            <div>
+                              <%= traveler[:full_name] || traveler["full_name"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="font-mono text-xs">
+                              <%= traveler[:identity_card_number] || traveler["identity_card_number"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="font-mono text-xs">
+                              <%= if (traveler[:passport_number] || traveler["passport_number"] || "") != "" do %>
+                                <%= traveler[:passport_number] || traveler["passport_number"] || "" %>
+                              <% else %>
+                                <span class="text-gray-400 italic">Not provided</span>
+                              <% end %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="font-mono text-xs">
+                              <%= traveler[:phone] || traveler["phone"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="text-xs">
+                              <%= traveler[:date_of_birth] || traveler["date_of_birth"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200 max-w-xs">
+                            <div>
+                              <%= traveler[:address] || traveler["address"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="text-xs">
+                              <%= traveler[:poskod] || traveler["poskod"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="text-xs">
+                              <%= traveler[:city] || traveler["city"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="text-xs">
+                              <%= traveler[:state] || traveler["state"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="text-xs">
+                              <%= traveler[:citizenship] || traveler["citizenship"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200 max-w-xs">
+                            <div>
+                              <%= traveler[:emergency_contact_name] || traveler["emergency_contact_name"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="font-mono text-xs">
+                              <%= traveler[:emergency_contact_phone] || traveler["emergency_contact_phone"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900 border-r border-gray-200">
+                            <div class="text-xs">
+                              <%= traveler[:emergency_contact_relationship] || traveler["emergency_contact_relationship"] || "" %>
+                            </div>
+                          </td>
+                          <td class="px-3 py-4 text-sm text-gray-900">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                              <%= traveler[:room_type] || traveler["room_type"] || "" %>
+                            </span>
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Cards for mobile/tablet screens -->
+                <div class="lg:hidden space-y-4">
+                  <%= for {traveler, index} <- Enum.with_index(@travelers) do %>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-medium text-gray-800">
                         <%= if(@number_of_persons == 1 and @is_booking_for_self, do: "Your Details", else: if(@number_of_persons == 1, do: "Traveler Details", else: if(index == 0, do: "Traveler #{index + 1} (Person In Charge)", else: "Traveler #{index + 1}"))) %>
                       </h4>
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <%= if @number_of_persons == 1 and @is_booking_for_self do %>
+                          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">You</span>
+                        <% else %>
+                          <%= if index == 0 and @number_of_persons > 1 do %>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Lead</span>
+                          <% end %>
+                        <% end %>
+                        </div>
+
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div>
-                          <span class="text-gray-600">Full Name:</span>
-                          <span class="font-medium ml-2"><%= traveler[:full_name] || traveler["full_name"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Full Name:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:full_name] || traveler["full_name"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Identity Card:</span>
-                          <span class="font-medium ml-2"><%= traveler[:identity_card_number] || traveler["identity_card_number"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Identity Card:</span>
+                          <div class="mt-1 text-gray-900 font-mono text-xs"><%= traveler[:identity_card_number] || traveler["identity_card_number"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Passport Number:</span>
-                          <span class="font-medium ml-2"><%= traveler[:passport_number] || traveler["passport_number"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Passport:</span>
+                          <div class="mt-1 text-gray-900 font-mono text-xs">
+                            <%= if (traveler[:passport_number] || traveler["passport_number"] || "") != "" do %>
+                              <%= traveler[:passport_number] || traveler["passport_number"] || "" %>
+                            <% else %>
+                              <span class="text-gray-400 italic">Not provided</span>
+                            <% end %>
+                          </div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Phone:</span>
-                          <span class="font-medium ml-2"><%= traveler[:phone] || traveler["phone"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Phone:</span>
+                          <div class="mt-1 text-gray-900 font-mono text-xs"><%= traveler[:phone] || traveler["phone"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Date of Birth:</span>
-                          <span class="font-medium ml-2"><%= traveler[:date_of_birth] || traveler["date_of_birth"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Date of Birth:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:date_of_birth] || traveler["date_of_birth"] || "" %></div>
+                        </div>
+                        <div class="sm:col-span-2">
+                          <span class="text-gray-600 font-medium">Address:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:address] || traveler["address"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Address:</span>
-                          <span class="font-medium ml-2"><%= traveler[:address] || traveler["address"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Poskod:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:poskod] || traveler["poskod"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Poskod:</span>
-                          <span class="font-medium ml-2"><%= traveler[:poskod] || traveler["poskod"] || "" %></span>
+                          <span class="text-gray-600 font-medium">City:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:city] || traveler["city"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">City:</span>
-                          <span class="font-medium ml-2"><%= traveler[:city] || traveler["city"] || "" %></span>
+                          <span class="text-gray-600 font-medium">State:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:state] || traveler["state"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">State:</span>
-                          <span class="font-medium ml-2"><%= traveler[:state] || traveler["state"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Citizenship:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:citizenship] || traveler["citizenship"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Citizenship:</span>
-                          <span class="font-medium ml-2"><%= traveler[:citizenship] || traveler["citizenship"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Emergency Contact:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:emergency_contact_name] || traveler["emergency_contact_name"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Emergency Contact:</span>
-                          <span class="font-medium ml-2"><%= traveler[:emergency_contact_name] || traveler["emergency_contact_name"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Emergency Phone:</span>
+                          <div class="mt-1 text-gray-900 font-mono text-xs"><%= traveler[:emergency_contact_phone] || traveler["emergency_contact_phone"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Emergency Phone:</span>
-                          <span class="font-medium ml-2"><%= traveler[:emergency_contact_phone] || traveler["emergency_contact_phone"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Emergency Relationship:</span>
+                          <div class="mt-1 text-gray-900"><%= traveler[:emergency_contact_relationship] || traveler["emergency_contact_relationship"] || "" %></div>
                         </div>
                         <div>
-                          <span class="text-gray-600">Emergency Relationship:</span>
-                          <span class="font-medium ml-2"><%= traveler[:emergency_contact_relationship] || traveler["emergency_contact_relationship"] || "" %></span>
-                        </div>
-                        <div>
-                          <span class="text-gray-600">Room Type:</span>
-                          <span class="font-medium ml-2"><%= traveler[:room_type] || traveler["room_type"] || "" %></span>
+                          <span class="text-gray-600 font-medium">Room Type:</span>
+                          <div class="mt-1">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                              <%= traveler[:room_type] || traveler["room_type"] || "" %>
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -53,27 +53,106 @@
       </div>
     </div>
 
+    <!-- Payment Overview -->
+    <div class="mt-8">
+      <%= if @latest_booking do %>
+        <% total = @latest_booking.total_amount || 0 %>
+        <% paid = @latest_booking.paid_amount || 0 %>
+        <% percent =
+          case total do
+            0 -> 0
+            _ ->
+              if is_struct(total, Decimal) do
+                Decimal.to_float(paid || 0) / Decimal.to_float(total) * 100
+              else
+                (paid || 0) / total * 100
+              end
+          end %>
+        <% percent = if percent < 0, do: 0, else: (if percent > 100, do: 100, else: percent) %>
+        <% next_due_date =
+          cond do
+            @latest_booking.payment_plan == "installment" and @latest_booking.booking_date ->
+              Date.add(@latest_booking.booking_date, 30)
+            true -> nil
+          end %>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Booking Status -->
+          <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Booking Status</div>
+            <div class="mt-1 text-sm"><%= String.capitalize(@latest_booking.status) %></div>
+          </div>
+          <!-- Selected Package -->
+          <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Selected Package</div>
+            <div class="mt-1 text-sm"><%= @latest_booking.package_name %></div>
+          </div>
+          <!-- Next Installment -->
+          <a href="/payments/installment" class="block focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-lg">
+            <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4 hover:shadow transition-shadow">
+              <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Next Installment</div>
+              <div class="mt-1 text-sm">
+                <%= if next_due_date do %>
+                  <%= Calendar.strftime(next_due_date, "%d %B %Y") %>
+                <% else %>
+                  —
+                <% end %>
+              </div>
+              <div class="mt-2 text-xs text-blue-700">View details</div>
+            </div>
+          </a>
+          <!-- Total Paid -->
+          <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Total Paid</div>
+            <div class="mt-1 text-sm">
+              RM <%= paid %> / RM <%= total %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Progress -->
+        <div class="mt-4">
+          <div class="text-sm text-gray-700">Payment Progress</div>
+          <div class="text-xs text-gray-500">RM <%= paid %> of RM <%= total %> Paid</div>
+          <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+            <div class="bg-blue-600 h-2 rounded-full" style={"width: #{percent}%"}></div>
+          </div>
+          <div class="mt-2 text-xs text-blue-600">
+            <span class="font-medium">Next Payment</span>
+            <span class="text-gray-500">due:</span>
+            <span>
+              <%= if next_due_date do %>
+                <%= Calendar.strftime(next_due_date, "%d %B %Y") %>
+              <% else %>
+                —
+              <% end %>
+            </span>
+          </div>
+        </div>
+      <% else %>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+          No active booking found. Start by selecting a package and creating a booking.
+        </div>
+      <% end %>
+    </div>
+
     <!-- Main Content Area -->
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
       <!-- Recent Activity -->
       <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
         <div class="space-y-4">
-          <div class="flex items-center space-x-3">
-            <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
-            <span class="text-sm text-gray-600">Profile updated successfully</span>
-            <span class="text-xs text-gray-400 ml-auto">2 hours ago</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span class="text-sm text-gray-600">Account verified</span>
-            <span class="text-xs text-gray-400 ml-auto">1 day ago</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-2 h-2 bg-purple-400 rounded-full"></div>
-            <span class="text-sm text-gray-600">Welcome to Umrahly</span>
-            <span class="text-xs text-gray-400 ml-auto">3 days ago</span>
-          </div>
+          <%= if @recent_activities && length(@recent_activities) > 0 do %>
+            <%= for activity <- @recent_activities do %>
+              <div class="flex items-center space-x-3">
+                <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <span class="text-sm text-gray-600"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></span>
+                <span class="text-xs text-gray-400 ml-auto"><%= Calendar.strftime(activity.inserted_at, "%d %b %Y %H:%M") %></span>
+              </div>
+            <% end %>
+          <% else %>
+            <div class="text-sm text-gray-500">No recent activity yet.</div>
+          <% end %>
         </div>
       </div>
 
@@ -114,17 +193,19 @@
     <!-- Stats Section -->
     <div class="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Your Stats</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="text-center">
-          <div class="text-2xl font-bold text-blue-600">0</div>
+          <div class="text-2xl font-bold text-blue-600"><%= if @user_stats, do: @user_stats.active_bookings, else: 0 %></div>
           <div class="text-sm text-gray-500">Active Bookings</div>
         </div>
         <div class="text-center">
-          <div class="text-2xl font-bold text-green-600">1</div>
-          <div class="text-sm text-gray-500">Completed Profiles</div>
-        </div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-purple-600">0</div>
+          <div class="text-2xl font-bold text-purple-600">
+            <% total_paid = if @user_stats, do: @user_stats.total_paid, else: 0 %>
+            <%= case total_paid do
+              %Decimal{} -> Decimal.to_string(total_paid)
+              _ -> to_string(total_paid)
+            end %>
+          </div>
           <div class="text-sm text-gray-500">Total Payments</div>
         </div>
       </div>

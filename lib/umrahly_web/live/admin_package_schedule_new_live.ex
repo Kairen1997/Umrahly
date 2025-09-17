@@ -94,6 +94,10 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
     else
       schedule_params
     end
+
+    # Calculate duration if both dates are present
+    updated_params = calculate_duration_days(updated_params)
+
     changeset =
       %PackageSchedule{}
       |> Packages.change_package_schedule(updated_params)
@@ -110,6 +114,10 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
     else
       schedule_params
     end
+
+    # Calculate duration before saving
+    updated_params = calculate_duration_days(updated_params)
+
     case Packages.create_package_schedule(updated_params) do
       {:ok, _schedule} ->
         socket =
@@ -175,6 +183,23 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
         |> assign(:selected_return_date, nil)
     end
   end
+
+  defp calculate_duration_days(schedule_params) do
+    case {schedule_params["departure_date"], schedule_params["return_date"]} do
+      {departure_date, return_date} when not is_nil(departure_date) and not is_nil(return_date) and departure_date != "" and return_date != "" ->
+        with {:ok, departure_date} <- Date.from_iso8601(departure_date),
+             {:ok, return_date_only} <- Date.from_iso8601(return_date) do
+          duration_days = Date.diff(return_date_only, departure_date)
+          Map.put(schedule_params, "duration_days", duration_days)
+        else
+          _error ->
+            schedule_params
+        end
+      _ ->
+        schedule_params
+    end
+  end
+
   defp render_error_messages(assigns) do
     if assigns.schedule_changeset.errors != [] do
       ~H"""
@@ -360,6 +385,27 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
               <%= if @schedule_changeset.errors[:return_date] do %>
                 <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:return_date], 0) %></p>
               <% end %>
+            </div>
+
+            <!-- Duration Display -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Duration
+                <span class="text-sm text-gray-500 font-normal">(Auto-calculated)</span>
+              </label>
+              <div class="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-900">
+                <%= if @schedule_changeset.changes[:duration_days] && @schedule_changeset.changes[:duration_days] != "" do %>
+                  <%= @schedule_changeset.changes[:duration_days] %> days
+                <% else %>
+                  <span class="text-gray-500">Select departure and return dates</span>
+                <% end %>
+              </div>
+              <p class="mt-1 text-sm text-gray-500">
+                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                This field is automatically calculated based on the selected departure and return dates.
+              </p>
             </div>
 
             <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">

@@ -261,4 +261,67 @@ defmodule Umrahly.Bookings do
     end
   end
 
+  @doc """
+  Gets the latest booking for a given user and package schedule.
+  Used by Active Bookings to show latest payment-proof status.
+  """
+  def get_latest_booking_for_user_schedule(user_id, package_schedule_id) do
+    Booking
+    |> where([b], b.user_id == ^user_id and b.package_schedule_id == ^package_schedule_id)
+    |> order_by([b], desc: b.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets the latest active booking (pending/confirmed) for a user with payment info.
+  Returns a map with: id, booking_reference, package_name, status, total_amount, paid_amount, payment_method, payment_plan, booking_date.
+  """
+  def get_latest_active_booking_with_payments(user_id) do
+    Booking
+    |> join(:inner, [b], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+    |> join(:inner, [b, ps], p in Umrahly.Packages.Package, on: ps.package_id == p.id)
+    |> where([b, ps, p], b.user_id == ^user_id and b.status in ["pending", "confirmed"])
+    |> order_by([b], desc: b.inserted_at)
+    |> limit(1)
+    |> select([b, ps, p], %{
+      id: b.id,
+      booking_reference: fragment("'BK' || ?", b.id),
+      package_name: p.name,
+      status: b.status,
+      total_amount: b.total_amount,
+      paid_amount: b.deposit_amount,
+      payment_method: b.payment_method,
+      payment_plan: b.payment_plan,
+      booking_date: b.booking_date
+    })
+    |> Repo.one()
+  end
+
+  @doc """
+  Counts active bookings for a specific user.
+  Here, "active" means confirmed bookings only.
+  """
+  def count_active_bookings_for_user(user_id) do
+    Booking
+    |> where([b], b.user_id == ^user_id and b.status == "confirmed")
+    |> select([b], count(b.id))
+    |> Repo.one()
+  end
+
+  @doc """
+  Sums paid amounts for a user's bookings.
+  Currently uses `deposit_amount` as the paid amount field.
+  Returns 0 if there are no bookings or no paid amounts.
+  """
+  def sum_paid_amount_for_user(user_id) do
+    sum =
+      Booking
+      |> where([b], b.user_id == ^user_id)
+      |> select([b], coalesce(sum(b.deposit_amount), 0))
+      |> Repo.one()
+
+    sum
+  end
+
 end

@@ -247,6 +247,15 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
     end
   end
 
+  defp calculate_schedule_duration(schedule) do
+    case {schedule.departure_date, schedule.return_date} do
+      {departure_date, return_date} when not is_nil(departure_date) and not is_nil(return_date) ->
+        Date.diff(return_date, departure_date)
+      _ ->
+        nil
+    end
+  end
+
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
@@ -389,8 +398,22 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                     max="100"
                     required
                   />
+                   <%= if duration = calculate_schedule_duration(@schedule_changeset.data) do %>
+                    <span class="text-sm text-gray-600">(Calculated: <%= duration %> days)</span>
+                  <% end %>
                 </div>
-
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                  <input
+                    type="number"
+                    name="package_schedule[duration_days]"
+                    value={@schedule_changeset.data.duration_days}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="Enter duration"
+                    min="1"
+                    required
+                  />
+                </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Price Override (RM)</label>
                   <input
@@ -482,6 +505,9 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                   Return Date
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  Duration
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
                   Accommodation
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
@@ -493,12 +519,13 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
                   Remarks
                 </th>
+
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <%= if length(@filtered_schedules) == 0 do %>
                 <tr>
-                  <td colspan="11" class="px-6 py-12 text-center">
+                  <td colspan="12" class="px-6 py-12 text-center">
                     <div class="text-gray-500">
                       <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
@@ -562,6 +589,15 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm text-gray-900"><%= schedule.return_date %></div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-900">
+                        <%= if duration = calculate_schedule_duration(schedule) do %>
+                          <%= duration %> days
+                        <% else %>
+                          <span class="text-gray-400">-</span>
+                        <% end %>
+                      </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm text-gray-900">

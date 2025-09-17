@@ -9,6 +9,7 @@ defmodule Umrahly.Packages.PackageSchedule do
     field :status, :string, default: "active"
     field :price_override, :decimal
     field :notes, :string
+    field :duration_days, :integer, virtual: true
 
     belongs_to :package, Umrahly.Packages.Package
 
@@ -18,7 +19,7 @@ defmodule Umrahly.Packages.PackageSchedule do
   @doc false
   def changeset(package_schedule, attrs) do
     package_schedule
-    |> cast(attrs, [:departure_date, :return_date, :quota, :status, :price_override, :notes, :package_id])
+    |> cast(attrs, [:departure_date, :return_date, :quota, :status, :price_override, :notes, :package_id, :duration_days])
     |> validate_required([:departure_date, :return_date, :quota, :status, :package_id])
     |> validate_inclusion(:status, ["active", "inactive", "cancelled", "completed"])
     |> validate_inclusion(:quota, 1..100)

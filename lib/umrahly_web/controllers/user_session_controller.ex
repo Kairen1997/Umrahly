@@ -41,9 +41,18 @@ defmodule UmrahlyWeb.UserSessionController do
   end
 
   def delete(conn, _params) do
+    user = conn.assigns[:current_user]
+
+    conn =
+      conn
+      |> put_flash(:info, "Logged out successfully.")
+      |> UserAuth.log_out_user()
+
+    if user do
+      _ = Umrahly.ActivityLogs.log_user_action(user.id, "User Logged Out", nil, %{})
+    end
+
     conn
-    |> put_flash(:info, "Logged out successfully.")
-    |> UserAuth.log_out_user()
     |> redirect(to: ~p"/")
   end
 end

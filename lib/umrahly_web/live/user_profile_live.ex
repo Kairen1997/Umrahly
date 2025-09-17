@@ -47,6 +47,8 @@ defmodule UmrahlyWeb.UserProfileLive do
     with {:ok, updated_user} <- Accounts.update_user(user, user_attrs),
          {:ok, updated_profile} <- Profiles.upsert_profile(profile, profile_attrs) do
 
+      _ = Umrahly.ActivityLogs.log_user_action(user.id, "Profile Updated", nil, %{section: "basic"})
+
       {:noreply,
        socket
        |> assign(user: updated_user, profile: updated_profile, last_updated: DateTime.utc_now())
@@ -156,6 +158,8 @@ defmodule UmrahlyWeb.UserProfileLive do
     # Update user
     case Accounts.update_user(user, user_attrs) do
       {:ok, updated_user} ->
+        _ = Umrahly.ActivityLogs.log_user_action(user.id, "Personal Info Updated", nil, %{})
+
         {:noreply,
          socket
          |> assign(user: updated_user, last_updated: DateTime.utc_now())
@@ -176,6 +180,8 @@ defmodule UmrahlyWeb.UserProfileLive do
 
     case Accounts.update_user_password(user, current_password, %{password: new_password}) do
       {:ok, _updated_user} ->
+        _ = Umrahly.ActivityLogs.log_user_action(user.id, "Password Changed", nil, %{})
+
         {:noreply,
          socket
          |> put_flash(:info, "Password changed successfully")}
@@ -200,6 +206,8 @@ defmodule UmrahlyWeb.UserProfileLive do
           extension = Path.extname(entry.client_name)
           filename = "#{user.id}_#{System.system_time()}#{extension}"
           dest_path = Path.join(uploads_dir, filename)
+
+          _ = Umrahly.ActivityLogs.log_user_action(user.id, "Profile Photo Uploaded", filename, %{filename: filename})
 
           case File.cp(entry.path, dest_path) do
             :ok ->
@@ -278,6 +286,7 @@ defmodule UmrahlyWeb.UserProfileLive do
   # Private functions
   defp continue_profile_update(socket, _user, profile_attrs) do
     profile = socket.assigns.profile
+    user = socket.assigns.user
     # Update profile
     case Profiles.upsert_profile(profile, profile_attrs) do
       {:ok, updated_profile} ->
@@ -288,6 +297,8 @@ defmodule UmrahlyWeb.UserProfileLive do
         else
           "Identity and contact information updated successfully!"
         end
+
+        _ = Umrahly.ActivityLogs.log_user_action(user.id, if(is_nil(profile), do: "Profile Created", else: "Profile Updated"), nil, %{section: "identity_contact"})
 
         {:noreply,
          socket

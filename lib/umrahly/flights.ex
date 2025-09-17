@@ -8,6 +8,22 @@ defmodule Umrahly.Flights do
 
   alias Umrahly.Flights.Flight
 
+  # Calculate duration in days between departure_time and return_date
+  @doc """
+  Calculates the duration in days between departure_time and return_date.
+  Returns nil if return_date is not present.
+  """
+  def calculate_duration_days(departure_time, return_date) do
+    case return_date do
+      nil -> nil
+      return_date ->
+        departure_date = DateTime.to_date(departure_time)
+        return_date_only = DateTime.to_date(return_date)
+        Date.diff(return_date_only, departure_date)
+    end
+  end
+
+
   @doc """
   Returns the list of flights.
 

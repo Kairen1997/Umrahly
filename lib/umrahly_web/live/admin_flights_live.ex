@@ -21,11 +21,19 @@ defmodule UmrahlyWeb.AdminFlightsLive do
       |> assign(:form, to_form(changeset))
       |> assign(:selected_flight, nil)
       |> assign(:show_view_flight_modal, false)
+      |> assign(:editing_flight_id, nil)
     {:ok, socket}
   end
 
   def handle_event("show_new_flight_form", _, socket) do
-    {:noreply, assign(socket, :show_new_flight_form, true)}
+    # Create a fresh empty changeset for new flight
+    changeset = Flights.change_flight(%Flight{})
+
+    {:noreply,
+      socket
+      |> assign(:show_new_flight_form, true)
+      |> assign(:editing_flight_id, nil)
+      |> assign(:form, to_form(changeset))}
   end
 
   def handle_event("hide_new_flight_form", _, socket) do
@@ -35,53 +43,70 @@ defmodule UmrahlyWeb.AdminFlightsLive do
   def handle_event("save_flight", %{"flight" => flight_params}, socket) do
     case socket.assigns[:editing_flight_id] do
       nil ->
-    flight_params = Map.put(flight_params, "capacity_booked", 0)
+        flight_params = flight_params
+        |> Map.put("capacity_booked", 0)
+        |> calculate_duration_days()
 
-    case Flights.create_flight(flight_params) do
-      {:ok, flight} ->
-        {:noreply,
-          socket
-          |> update(:flights, fn flights -> [flight | flights] end)
-          |> assign(:show_new_flight_form, false)
-          |> assign(:editing_flight_id, nil)
-          |> put_flash(:info, "Flight created successfully")
-        }
+        case Flights.create_flight(flight_params) do
+          {:ok, flight} ->
+            {:noreply,
+              socket
+              |> update(:flights, fn flights -> [flight | flights] end)
+              |> assign(:show_new_flight_form, false)
+              |> assign(:editing_flight_id, nil)
+              |> put_flash(:info, "Flight created successfully")
+            }
 
-      {:error, changeset} ->
-        {:noreply,
-        socket
-        |> assign(:form, to_form(changeset))
-        |> put_flash(:error, "Failed to create flight. Please check the form and try again.")
-        }
-    end
-  id ->
-      flight = Flights.get_flight!(id)
-
-      case Flights.update_flight(flight, flight_params) do
-        {:ok, updated_flight} ->
-          {:noreply,
+          {:error, changeset} ->
+            {:noreply,
             socket
-            |> update(:flights, fn flights ->
-              Enum.map(flights, fn f -> if f.id == updated_flight.id, do: updated_flight, else: f end)
-            end)
-            |> assign(:show_new_flight_form, false)
-            |> assign(:editing_flight_id, nil)
-            |> put_flash(:info, "Flight updated successfully")}
+            |> assign(:form, to_form(changeset))
+            |> put_flash(:error, "Failed to create flight. Please check the form and try again.")
+            }
+        end
 
-        {:error, changeset} ->
-          {:noreply,
+      id when not is_nil(id) ->  # This line should be here, inside the case
+        flight = Flights.get_flight!(id)
+
+        # Calculate duration before updating
+        flight_params_with_duration = calculate_duration_days(flight_params)
+
+        case Flights.update_flight(flight, flight_params_with_duration) do
+          {:ok, updated_flight} ->
+            {:noreply,
+              socket
+              |> update(:flights, fn flights ->
+                Enum.map(flights, fn f -> if f.id == updated_flight.id, do: updated_flight, else: f end)
+              end)
+              |> assign(:show_new_flight_form, false)
+              |> assign(:editing_flight_id, nil)
+              |> put_flash(:info, "Flight updated successfully")}
+
+          {:error, changeset} ->
+            {:noreply,
             socket
             |> assign(:form, to_form(changeset))
             |> put_flash(:error, "Failed to update flight.")}
+        end
     end
   end
-end
 
   def handle_event("validate", %{"flight" => flight_params}, socket) do
-    changeset =
-      %Flight{}
-      |> Flights.change_flight(flight_params)
-      |> Map.put(:action, :validate)
+    # Calculate duration_days if both dates are present
+    flight_params = calculate_duration_days(flight_params)
+
+    changeset = case socket.assigns[:editing_flight_id] do
+      nil ->
+       %Flight{}
+       |> Flights.change_flight(flight_params)
+       |> Map.put(:action, :validate)
+      flight_id ->
+        flight = Flights.get_flight!(flight_id)
+        flight
+        |> Flights.change_flight(flight_params)
+        |> Map.put(:action, :validate)
+    end
+
 
     {:noreply, assign(socket, :form, to_form(changeset))}
   end
@@ -107,14 +132,32 @@ end
 # Edit Flight
 def handle_event("edit_flight", %{"id" => id}, socket) do
   flight = Flights.get_flight!(id)
-  changeset = Flights.change_flight(flight)
+
+  # Convert flight data to form params and calculate duration
+  flight_params = %{
+    "flight_number" => flight.flight_number,
+    "origin" => flight.origin,
+    "destination" => flight.destination,
+    "departure_time" => format_datetime_for_input(flight.departure_time),
+    "arrival_time" => format_datetime_for_input(flight.arrival_time),
+    "aircraft" => flight.aircraft,
+    "capacity_total" => flight.capacity_total,
+    "status" => flight.status,
+    "return_date" => (if flight.return_date, do: format_datetime_for_input(flight.return_date), else: nil)
+  }
+
+  # Calculate duration for the form
+  flight_params_with_duration = calculate_duration_days(flight_params)
+
+  changeset = Flights.change_flight(flight, flight_params_with_duration)
 
   {:noreply,
     socket
     |> assign(:form, to_form(changeset))
-    |> assign(:show_new_flight_form, true) # reuse the modal
+    |> assign(:show_new_flight_form, true)
     |> assign(:editing_flight_id, flight.id)}
 end
+
 
 # Delete Flight
 def handle_event("delete_flight", %{"id" => id}, socket) do
@@ -127,8 +170,35 @@ def handle_event("delete_flight", %{"id" => id}, socket) do
     |> put_flash(:info, "Flight deleted successfully")}
 end
 
+defp calculate_duration_days(flight_params) do
+  case {flight_params["departure_time"], flight_params["return_date"]} do
+    {departure_time, return_date} when not is_nil(departure_time) and not is_nil(return_date) ->
+      # Extract just the date part (YYYY-MM-DD) from datetime-local input
+      departure_date_str = String.split(departure_time, "T") |> List.first()
+      return_date_str = String.split(return_date, "T") |> List.first()
 
+      with {:ok, departure_date} <- Date.from_iso8601(departure_date_str),
+           {:ok, return_date_only} <- Date.from_iso8601(return_date_str) do
+        duration_days = Date.diff(return_date_only, departure_date)
 
+        Map.put(flight_params, "duration_days", duration_days)
+      else
+        _error ->
+
+          flight_params
+      end
+    _ ->
+      flight_params
+  end
+end
+
+defp format_datetime_for_input(datetime) do
+  datetime
+  |> DateTime.to_naive()
+  |> NaiveDateTime.truncate(:second)
+  |> NaiveDateTime.to_string()
+  |> String.slice(0, 16)  # Keep only "YYYY-MM-DDTHH:MM"
+end
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
@@ -147,50 +217,57 @@ end
                 <tr>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flight Number</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departure</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arrival</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departure Time</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arrival Time</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aircraft</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration Days</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <%= for flight <- @flights do %>
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= flight.flight_number %></td>
-                    <td class="px-3 py-3 whitespace-nowrap">
-                      <div class="text-sm text-gray-900">
-                        <div><%= flight.origin %></div>
-                        <div class="text-gray-500">→</div>
-                        <div><%= flight.destination %></div>
-                      </div>
-                    </td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <%= Calendar.strftime(flight.departure_time, "%Y-%m-%d %H:%M") %>
-                    </td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <%= Calendar.strftime(flight.arrival_time, "%Y-%m-%d %H:%M") %>
-                    </td>
-
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <%= if flight.return_date do %>
-                        <%= Calendar.strftime(flight.return_date, "%Y-%m-%d %H:%M") %>
-                      <% else %>
-                        <span class="text-gray-500">N/A</span>
-                      <% end %>
-                    </td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <div class="flex items-center">
-                        <span class="mr-2"><%= flight.capacity_booked %>/<%= flight.capacity_total %></span>
-                        <div class="w-16 bg-gray-200 rounded-full h-2">
-                          <div class="bg-teal-600 h-2 rounded-full" style={"width: #{flight.capacity_booked / flight.capacity_total * 100}%"}>
+                  </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <%= for flight <- @flights do %>
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= flight.flight_number %></td>
+                        <td class="px-3 py-3 whitespace-nowrap">
+                          <div class="text-sm text-gray-900">
+                            <div><%= flight.origin %></div>
+                            <div class="text-gray-500">→</div>
+                            <div><%= flight.destination %></div>
                           </div>
-                        </div>
-                      </div>
-                    </td>
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <%= Calendar.strftime(flight.departure_time, "%Y-%m-%d %H:%M") %>
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <%= Calendar.strftime(flight.arrival_time, "%Y-%m-%d %H:%M") %>
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <%= if flight.return_date do %>
+                            <%= Calendar.strftime(flight.return_date, "%Y-%m-%d %H:%M") %>
+                          <% else %>
+                            <span class="text-gray-500">N/A</span>
+                          <% end %>
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <%= if flight.duration_days do %>
+                            <%= flight.duration_days %> days
+                          <% else %>
+                            <span class="text-gray-500">N/A</span>
+                          <% end %>
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <div class="flex items-center">
+                            <span class="mr-2"><%= flight.capacity_booked %>/<%= flight.capacity_total %></span>
+                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                              <div class="bg-teal-600 h-2 rounded-full" style={"width: #{flight.capacity_booked / flight.capacity_total * 100}%"}>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
                     <td class="px-3 py-3 whitespace-nowrap">
                       <span class={[
                         "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
@@ -239,7 +316,7 @@ end
                 </div>
 
                 <!-- Form -->
-                <.simple_form for={@form} phx-submit="save_flight" class="space-y-6">
+                <.simple_form for={@form} phx-submit="save_flight" phx-change="validate" class="space-y-6">
 
                   <!-- Flight Info -->
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -257,7 +334,17 @@ end
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <.input field={@form[:departure_time]} type="datetime-local" label="Departure Time" />
                     <.input field={@form[:arrival_time]} type="datetime-local" label="Arrival Time" />
-                    <.input field={@form[:return_date]} type="datetime-local" label="Return Date" />
+                    <.input field={@form[:return_date]} type="datetime-local" label="Return Date"/>
+                    <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Duration Days</label>
+                    <div class="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-900">
+                      <%= if @form[:duration_days].value && @form[:duration_days].value != "" do %>
+                        <%= @form[:duration_days].value %> days
+                      <% else %>
+                        <span class="text-gray-500">Enter departure and return dates</span>
+                      <% end %>
+                    </div>
+                  </div>
                   </div>
 
                   <!-- Capacity & Status -->
@@ -300,34 +387,73 @@ end
               <!-- Flight Details -->
               <div class="space-y-4 text-sm text-gray-700">
                 <div class="grid grid-cols-2 gap-4">
+                  <!-- 1. Flight Number -->
                   <div>
                     <p class="font-medium">Flight Number:</p>
                     <p><%= @selected_flight.flight_number %></p>
                   </div>
+
+                  <!-- 2. Route (Origin → Destination) -->
                   <div>
-                    <p class="font-medium">Aircraft:</p>
-                    <p><%= @selected_flight.aircraft %></p>
+                    <p class="font-medium">Route:</p>
+                    <div class="text-sm text-gray-900">
+                      <div><%= @selected_flight.origin %></div>
+                      <div class="text-gray-500">→</div>
+                      <div><%= @selected_flight.destination %></div>
+                    </div>
                   </div>
-                  <div>
-                    <p class="font-medium">Origin:</p>
-                    <p><%= @selected_flight.origin %></p>
-                  </div>
-                  <div>
-                    <p class="font-medium">Destination:</p>
-                    <p><%= @selected_flight.destination %></p>
-                  </div>
+
+                  <!-- 3. Departure -->
                   <div>
                     <p class="font-medium">Departure:</p>
                     <p><%= Calendar.strftime(@selected_flight.departure_time, "%Y-%m-%d %H:%M") %></p>
                   </div>
+
+                  <!-- 4. Arrival -->
                   <div>
                     <p class="font-medium">Arrival:</p>
                     <p><%= Calendar.strftime(@selected_flight.arrival_time, "%Y-%m-%d %H:%M") %></p>
                   </div>
+
+                  <!-- 5. Aircraft -->
+                  <div>
+                    <p class="font-medium">Aircraft:</p>
+                    <p><%= @selected_flight.aircraft %></p>
+                  </div>
+
+                  <!-- 6. Return Date -->
+                  <div>
+                    <p class="font-medium">Return Date:</p>
+                    <p><%= if @selected_flight.return_date do %>
+                      <%= Calendar.strftime(@selected_flight.return_date, "%Y-%m-%d %H:%M") %>
+                    <% else %>
+                      <span class="text-gray-500">N/A</span>
+                    <% end %></p>
+                  </div>
+
+                  <!-- 7. Duration -->
+                  <div>
+                    <p class="font-medium">Duration:</p>
+                    <p><%= if @selected_flight.duration_days do %>
+                      <%= @selected_flight.duration_days %> days
+                    <% else %>
+                      <span class="text-gray-500">N/A</span>
+                    <% end %></p>
+                  </div>
+
+                  <!-- 8. Capacity (with progress bar like in table) -->
                   <div>
                     <p class="font-medium">Capacity:</p>
-                    <p><%= @selected_flight.capacity_booked %> / <%= @selected_flight.capacity_total %></p>
+                    <div class="flex items-center">
+                      <span class="mr-2"><%= @selected_flight.capacity_booked %>/<%= @selected_flight.capacity_total %></span>
+                      <div class="w-16 bg-gray-200 rounded-full h-2">
+                        <div class="bg-teal-600 h-2 rounded-full" style={"width: #{@selected_flight.capacity_booked / @selected_flight.capacity_total * 100}%"}>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+
+                  <!-- 9. Status -->
                   <div>
                     <p class="font-medium">Status:</p>
                     <span class={[
@@ -342,14 +468,6 @@ end
                     ]}>
                       <%= @selected_flight.status %>
                     </span>
-                  </div>
-                  <div>
-                    <p class="font-medium">Return Date:</p>
-                    <p><%= if @selected_flight.return_date do %>
-                      <%= Calendar.strftime(@selected_flight.return_date, "%Y-%m-%d %H:%M") %>
-                    <% else %>
-                      <span class="text-gray-500">N/A</span>
-                    <% end %></p>
                   </div>
                 </div>
               </div>

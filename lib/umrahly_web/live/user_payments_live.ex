@@ -95,8 +95,8 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   defp load_data(socket) do
     user = socket.assigns.current_user
 
-    # Load user's bookings with payment information
-    bookings = Bookings.list_user_bookings_with_payments(user.id)
+    # Build installment-facing bookings from active booking flows enriched with latest booking
+    bookings = build_installment_bookings(user.id)
 
     # Load payment history
     payment_history = load_payment_history(user.id)
@@ -108,6 +108,32 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     |> assign(:bookings, bookings)
     |> assign(:payment_history, payment_history)
     |> assign(:receipts, receipts)
+  end
+
+  defp build_installment_bookings(user_id) do
+    Bookings.get_booking_flow_progress_by_user_id(user_id)
+    |> Enum.filter(fn progress -> progress.payment_plan == "installment" end)
+    |> Enum.map(fn progress ->
+      latest_booking =
+        Bookings.get_latest_booking_for_user_schedule(user_id, progress.package_schedule_id)
+
+      %{
+        id: (latest_booking && latest_booking.id) || progress.id,
+        booking_reference:
+          if latest_booking do
+            "BK" <> Integer.to_string(latest_booking.id)
+          else
+            "BFP" <> Integer.to_string(progress.id)
+          end,
+        package_name: progress.package && progress.package.name,
+        status: (latest_booking && latest_booking.status) || progress.status,
+        total_amount: (latest_booking && latest_booking.total_amount) || progress.total_amount,
+        paid_amount: (latest_booking && latest_booking.deposit_amount) || progress.deposit_amount,
+        payment_method: (latest_booking && latest_booking.payment_method) || progress.payment_method,
+        payment_plan: "installment",
+        booking_date: latest_booking && latest_booking.booking_date
+      }
+    end)
   end
 
   defp load_payment_history(_user_id) do
@@ -318,7 +344,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                           </div>
                         </div>
 
-                        <%= if (booking.total_amount || 0) > (booking.paid_amount || 0) do %>
+                        <%= if Decimal.compare(ensure_decimal(booking.total_amount), ensure_decimal(booking.paid_amount)) == :gt do %>
                           <div class="border-t border-gray-200 pt-4">
                             <h4 class="text-sm font-medium text-gray-900 mb-3">Make a Payment</h4>
                             <form phx-submit="make-payment" class="flex gap-3">

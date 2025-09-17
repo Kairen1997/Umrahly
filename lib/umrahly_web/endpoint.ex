@@ -28,7 +28,13 @@ defmodule UmrahlyWeb.Endpoint do
   # Serve uploaded files
   plug Plug.Static,
   at: "/images",
-  from: {:umrahly, "static/images"},
+  from: {:umrahly, "priv/static/images"},
+  gzip: false
+
+  # Serve payment proof uploads
+  plug Plug.Static,
+  at: "/uploads",
+  from: {:umrahly, "priv/static/uploads"},
   gzip: false
 
   # Code reloading can be explicitly enabled under the

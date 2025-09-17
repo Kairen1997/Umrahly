@@ -3,6 +3,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
 
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Bookings
+  alias Umrahly.Repo
 
   on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
@@ -30,63 +31,141 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
   end
 
   def handle_event("select_booking", %{"id" => booking_id}, socket) do
-    booking = Bookings.get_booking!(booking_id)
-    socket = assign(socket, :selected_booking, booking)
-    {:noreply, socket}
+    try do
+      # Get booking with preloaded associations
+      booking =
+        Umrahly.Bookings.Booking
+        |> Repo.get!(booking_id)
+        |> Repo.preload([:user, package_schedule: :package])
+
+      socket = assign(socket, :selected_booking, booking)
+      {:noreply, socket}
+    rescue
+      Ecto.NoResultsError ->
+        socket = put_flash(socket, :error, "Booking not found.")
+        {:noreply, socket}
+      error ->
+        socket = put_flash(socket, :error, "Error loading booking: #{inspect(error)}")
+        {:noreply, socket}
+    end
   end
 
-  def handle_event("update_admin_notes", %{"notes" => notes}, socket) do
+  def handle_event("update_admin_notes", %{"admin_notes" => notes}, socket) do
     socket = assign(socket, :admin_notes, notes)
     {:noreply, socket}
   end
 
   def handle_event("approve_payment", %{"id" => booking_id}, socket) do
-    booking = Bookings.get_booking!(booking_id)
+    try do
+      booking =
+        Umrahly.Bookings.Booking
+        |> Repo.get!(booking_id)
+        |> Repo.preload([:user, package_schedule: :package])
 
-    case Bookings.update_payment_proof_status(booking, "approved", socket.assigns.admin_notes) do
-      {:ok, updated_booking} ->
-        # Update the booking status to confirmed
-        {:ok, _final_booking} = Bookings.update_booking(updated_booking, %{"status" => "confirmed"})
+      case Bookings.update_payment_proof_status(booking, "approved", socket.assigns.admin_notes) do
+        {:ok, updated_booking} ->
+          # Update the booking status to confirmed
+          {:ok, _final_booking} = Bookings.update_booking(updated_booking, %{"status" => "confirmed"})
 
-        # Refresh the pending proofs list
-        pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
+          # Refresh the pending proofs list
+          pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
 
-        socket =
-          socket
-          |> put_flash(:info, "Payment proof approved and booking confirmed successfully!")
-          |> assign(:pending_proofs, pending_proofs)
-          |> assign(:selected_booking, nil)
-          |> assign(:admin_notes, "")
+          socket =
+            socket
+            |> put_flash(:info, "Payment proof approved and booking confirmed successfully!")
+            |> assign(:pending_proofs, pending_proofs)
+            |> assign(:selected_booking, nil)
+            |> assign(:admin_notes, "")
 
+          {:noreply, socket}
+
+        {:error, _changeset} ->
+          socket = put_flash(socket, :error, "Failed to approve payment proof.")
+          {:noreply, socket}
+      end
+    rescue
+      Ecto.NoResultsError ->
+        socket = put_flash(socket, :error, "Booking not found.")
         {:noreply, socket}
-
-      {:error, _changeset} ->
-        socket = put_flash(socket, :error, "Failed to approve payment proof.")
+      error ->
+        socket = put_flash(socket, :error, "Error processing approval: #{inspect(error)}")
         {:noreply, socket}
     end
   end
 
   def handle_event("reject_payment", %{"id" => booking_id}, socket) do
-    booking = Bookings.get_booking!(booking_id)
+    try do
+      booking =
+        Umrahly.Bookings.Booking
+        |> Repo.get!(booking_id)
+        |> Repo.preload([:user, package_schedule: :package])
 
-    case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
-      {:ok, _updated_booking} ->
-        # Refresh the pending proofs list
-        pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
+      case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
+        {:ok, _updated_booking} ->
+          # Refresh the pending proofs list
+          pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
 
-        socket =
-          socket
-          |> put_flash(:info, "Payment proof rejected successfully!")
-          |> assign(:pending_proofs, pending_proofs)
-          |> assign(:selected_booking, nil)
-          |> assign(:admin_notes, "")
+          socket =
+            socket
+            |> put_flash(:info, "Payment proof rejected successfully!")
+            |> assign(:pending_proofs, pending_proofs)
+            |> assign(:selected_booking, nil)
+            |> assign(:admin_notes, "")
 
+          {:noreply, socket}
+
+        {:error, _changeset} ->
+          socket = put_flash(socket, :error, "Failed to reject payment proof.")
+          {:noreply, socket}
+      end
+    rescue
+      Ecto.NoResultsError ->
+        socket = put_flash(socket, :error, "Booking not found.")
         {:noreply, socket}
-
-      {:error, _changeset} ->
-        socket = put_flash(socket, :error, "Failed to reject payment proof.")
+      error ->
+        socket = put_flash(socket, :error, "Error processing rejection: #{inspect(error)}")
         {:noreply, socket}
     end
+  end
+
+  # Helper function to get file extension
+  defp get_file_extension(filename) do
+    filename
+    |> Path.extname()
+    |> String.downcase()
+  end
+
+  # Helper function to check if file is an image
+  defp is_image_file?(filename) do
+    extension = get_file_extension(filename)
+    Enum.member?([".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"], extension)
+  end
+
+  # Helper function to get file type icon
+  defp get_file_type_icon(filename) do
+    extension = get_file_extension(filename)
+
+    case extension do
+      ext when ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"] ->
+        "image"
+      ".pdf" ->
+        "pdf"
+      ".doc" ->
+        "document"
+      ".docx" ->
+        "document"
+      ".xls" ->
+        "spreadsheet"
+      ".xlsx" ->
+        "spreadsheet"
+      _ ->
+        "file"
+    end
+  end
+
+  # Helper function to generate file URL
+  defp get_file_url(filename) do
+    "/uploads/payment_proof/#{filename}"
   end
 
   def render(assigns) do
@@ -123,7 +202,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                   </div>
                 <% else %>
                   <%= for proof <- @pending_proofs do %>
-                    <div class="px-6 py-4 hover:bg-gray-50 cursor-pointer"
+                    <div class="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
                          phx-click="select_booking"
                          phx-value-id={proof.id}>
                       <div class="flex items-center justify-between">
@@ -195,20 +274,60 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                   <!-- Payment Proof -->
                   <div>
                     <h4 class="text-sm font-medium text-gray-900 mb-2">Payment Proof</h4>
-                    <div class="text-sm text-gray-600 space-y-2">
+                    <div class="text-sm text-gray-600 space-y-3">
                       <%= if @selected_booking.payment_proof_file do %>
-                        <div>
-                          <p><strong>File:</strong> <%= @selected_booking.payment_proof_file %></p>
-                          <a href="#" class="text-blue-600 hover:text-blue-800 underline">
-                            Download File
-                          </a>
+                        <div class="border border-gray-200 rounded-lg p-3">
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center space-x-2">
+                              <!-- File Type Icon -->
+                              <%= cond do %>
+                                <% is_image_file?(@selected_booking.payment_proof_file) -> %>
+                                  <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                <% get_file_type_icon(@selected_booking.payment_proof_file) == "pdf" -> %>
+                                  <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                  </svg>
+                                <% true -> %>
+                                  <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                              <% end %>
+                              <span class="font-medium"><%= @selected_booking.payment_proof_file %></span>
+                            </div>
+                            <a href={get_file_url(@selected_booking.payment_proof_file)}
+                               target="_blank"
+                               class="text-blue-600 hover:text-blue-800 underline text-sm flex items-center space-x-1">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span>Download</span>
+                            </a>
+                          </div>
+
+                          <!-- Image Preview -->
+                          <%= if is_image_file?(@selected_booking.payment_proof_file) do %>
+                            <div class="mt-2">
+                              <img src={get_file_url(@selected_booking.payment_proof_file)}
+                                   alt="Payment proof"
+                                   class="max-w-full h-auto max-h-64 rounded border border-gray-200"
+                                   onerror="this.style.display='none'" />
+                            </div>
+                          <% end %>
+                        </div>
+                      <% else %>
+                        <div class="text-gray-500 text-sm italic">
+                          No payment proof file uploaded
                         </div>
                       <% end %>
 
                       <%= if @selected_booking.payment_proof_notes && @selected_booking.payment_proof_notes != "" do %>
                         <div>
-                          <p><strong>User Notes:</strong></p>
-                          <p class="bg-gray-50 p-2 rounded text-xs"><%= @selected_booking.payment_proof_notes %></p>
+                          <p class="font-medium text-gray-900 mb-1">User Notes:</p>
+                          <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <p class="text-xs text-gray-700 whitespace-pre-wrap"><%= @selected_booking.payment_proof_notes %></p>
+                          </div>
                         </div>
                       <% end %>
                     </div>
@@ -220,11 +339,12 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                       Admin Notes
                     </label>
                     <textarea
+                      name="admin_notes"
                       rows="3"
                       placeholder="Add notes about your decision..."
                       phx-change="update_admin_notes"
                       value={@admin_notes}
-                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     ></textarea>
                   </div>
 
@@ -234,18 +354,24 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                       type="button"
                       phx-click="approve_payment"
                       phx-value-id={@selected_booking.id}
-                      class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center space-x-2"
                     >
-                      Approve Payment
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Approve Payment</span>
                     </button>
 
                     <button
                       type="button"
                       phx-click="reject_payment"
                       phx-value-id={@selected_booking.id}
-                      class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
+                      class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center space-x-2"
                     >
-                      Reject Payment
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span>Reject Payment</span>
                     </button>
                   </div>
                 </div>

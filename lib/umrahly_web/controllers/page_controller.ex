@@ -4,9 +4,15 @@ defmodule UmrahlyWeb.PageController do
   alias Umrahly.Profiles
 
   def home(conn, _params) do
+    # Fetch active packages for the landing page
+    packages = Umrahly.Packages.list_active_packages_with_schedules()
+
+    # Limit to 3 packages for the landing page (or however many you want)
+    featured_packages = packages |> Enum.take(3)
+
     # The home page is often custom made,
     # so skip the default app layout.
-    render(conn, :home, layout: false)
+    render(conn, :home, layout: false, packages: featured_packages)
   end
 
   def test_flash(conn, _params) do
@@ -34,10 +40,32 @@ defmodule UmrahlyWeb.PageController do
       {false, false}
     end
 
+    # Latest active booking with payments for dashboard widgets
+    latest_booking = if current_user, do: Umrahly.Bookings.get_latest_active_booking_with_payments(current_user.id), else: nil
+
+    # Recent user activities
+    recent_activities = if current_user, do: Umrahly.ActivityLogs.recent_user_activities(current_user.id, 10), else: []
+
+    # Compute user stats
+    user_stats = if current_user do
+      %{
+        active_bookings: Umrahly.Bookings.count_active_bookings_for_user(current_user.id),
+        total_paid: Umrahly.Bookings.sum_paid_amount_for_user(current_user.id)
+      }
+    else
+      %{
+        active_bookings: 0,
+        total_paid: 0
+      }
+    end
+
     render(conn, :dashboard,
       current_user: current_user,
       has_profile: has_profile,
-      is_admin: is_admin
+      is_admin: is_admin,
+      latest_booking: latest_booking,
+      recent_activities: recent_activities,
+      user_stats: user_stats
     )
   end
 

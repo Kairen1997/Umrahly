@@ -1830,16 +1830,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                       <span class="text-gray-600">Return:</span>
                       <span class="font-medium"><%= Calendar.strftime(@schedule.return_date, "%B %d, %Y") %></span>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Base package price:</span>
-                      <span class="font-medium">RM <%= @package.price %></span>
-                    </div>
-                    <%= if @has_price_override do %>
-                      <div class="flex justify-between">
-                        <span class="text-gray-600">Price override:</span>
-                        <span class="font-medium">RM <%= @schedule.price_override %></span>
-                      </div>
-                    <% end %>
                     <div class="flex justify-between border-t pt-2">
                       <span class="text-gray-600 font-medium">Total price per person:</span>
                       <span class="font-bold text-green-600">RM <%= @price_per_person %></span>

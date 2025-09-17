@@ -180,9 +180,6 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                           <div class="mt-1">
                             <div>Type: <%= String.upcase(String.replace(booking.package.accommodation_type || "standard", "_", " ")) %></div>
                             <div>Price: RM <%= booking.package.price %></div>
-                            <%= if booking.package_schedule.price_override && Decimal.gt?(booking.package_schedule.price_override, Decimal.new(0)) do %>
-                              <div class="text-orange-600">Override: +RM <%= booking.package_schedule.price_override %></div>
-                            <% end %>
                           </div>
                         </div>
                       </div>

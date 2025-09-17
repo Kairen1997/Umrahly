@@ -889,17 +889,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                         </div>
                                                 <div class="mt-2 space-y-1">
                           <div class="text-xs text-gray-600">
-                            <span class="font-medium">Base Price:</span>
-                            <span class="font-medium text-gray-700">RM <%= @package.price %></span>
-                          </div>
-                          <%= if schedule.price_override && Decimal.to_integer(schedule.price_override) > 0 do %>
-                            <div class="text-xs text-gray-600">
-                              <span class="font-medium">Price Override:</span>
-                              <span class="font-medium text-orange-600">+RM <%= Decimal.to_integer(schedule.price_override) %></span>
-                            </div>
-                          <% end %>
-                          <div class="text-xs text-gray-600">
-                            <span class="font-medium">Total Price:</span>
+                            <span class="font-medium">Total:</span>
                             <span class="font-bold text-green-700">RM <%= schedule.total_price %></span>
                           </div>
                           <div class="text-xs text-gray-600">
@@ -1046,16 +1036,6 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                     </div>
                     <div class="mt-2 space-y-1">
                       <div class="text-xs text-gray-600">
-                        <span class="font-medium">Base:</span>
-                        <span class="font-medium text-gray-700">RM <%= @package.price %></span>
-                      </div>
-                      <%= if schedule.price_override && Decimal.to_integer(schedule.price_override) > 0 do %>
-                        <div class="text-xs text-gray-600">
-                          <span class="font-medium">Override:</span>
-                          <span class="font-medium text-orange-600">+RM <%= Decimal.to_integer(schedule.price_override) %></span>
-                        </div>
-                      <% end %>
-                      <div class="text-xs text-gray-600">
                         <span class="font-medium">Total:</span>
                         <span class="font-bold text-green-700">RM <%= schedule.total_price %></span>
                       </div>
@@ -1136,7 +1116,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-5">
             <div class="text-center">
               <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2v12a2 2 0 002 2z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <h3 class="text-lg font-semibold text-gray-900 mb-2">No Departure Dates Available</h3>
               <p class="text-gray-600 mb-4">

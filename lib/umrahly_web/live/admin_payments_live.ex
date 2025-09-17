@@ -20,6 +20,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       |> assign(:profile, socket.assigns.current_user)
       |> assign(:filter_status, "all")
       |> assign(:search_term, "")
+      |> assign(:show_payment_modal, false)
+      |> assign(:selected_payment, nil)
 
     {:ok, socket}
   end
@@ -39,9 +41,32 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     {:noreply, socket |> assign(:payments, payments) |> assign(:search_term, search_term)}
   end
 
-  def handle_event("view_payment", %{"id" => _id}, socket) do
-    # TODO: Implement payment detail view
-    {:noreply, socket}
+  def handle_event("view_payment", %{"id" => id, "source" => source}, socket) do
+    details =
+      case source do
+        "booking" ->
+          alias Umrahly.Bookings.Booking
+          Booking
+          |> Repo.get!(id)
+          |> Repo.preload([:user, package_schedule: :package])
+          |> booking_to_details()
+        "progress" ->
+          BookingFlowProgress
+          |> Repo.get!(id)
+          |> Repo.preload([:user, :package, :package_schedule])
+          |> progress_to_details()
+        _ ->
+          nil
+      end
+
+    {:noreply, socket |> assign(:selected_payment, details) |> assign(:show_payment_modal, true)}
+  rescue
+    _e ->
+      {:noreply, socket |> put_flash(:error, "Failed to load payment details")}
+  end
+
+  def handle_event("close_payment_modal", _params, socket) do
+    {:noreply, socket |> assign(:show_payment_modal, false) |> assign(:selected_payment, nil)}
   end
 
   def handle_event("process_payment", %{"id" => _id}, socket) do
@@ -104,6 +129,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     filtered_query
     |> select([b, u, ps, p], %{
       id: b.id,
+      source: "booking",
       user_name: u.full_name,
       user_email: u.email,
       package_name: p.name,
@@ -139,6 +165,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     filtered_query
     |> select([bfp, u, p], %{
       id: bfp.id,
+      source: "progress",
       user_name: u.full_name,
       user_email: u.email,
       package_name: p.name,
@@ -190,6 +217,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
         bookings_query
         |> select([b, u, ps, p], %{
           id: b.id,
+          source: "booking",
           user_name: u.full_name,
           user_email: u.email,
           package_name: p.name,
@@ -253,6 +281,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     filtered_query
     |> select([bfp, u, p], %{
       id: bfp.id,
+      source: "progress",
       user_name: u.full_name,
       user_email: u.email,
       package_name: p.name,
@@ -313,6 +342,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   defp format_payment_data(payment) do
     %{
       id: payment.id,
+      source: payment[:source],
       user_name: payment.user_name || "Unknown",
       user_email: payment.user_email || "No email",
       package_name: payment.package_name || "Unknown Package",
@@ -358,6 +388,47 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   defp format_date(nil), do: "Unknown"
   defp format_date(datetime) do
     Calendar.strftime(datetime, "%Y-%m-%d")
+  end
+
+  defp booking_to_details(booking) do
+    %{
+      id: booking.id,
+      source: "booking",
+      user: booking.user,
+      package: booking.package_schedule && booking.package_schedule.package,
+      package_schedule: booking.package_schedule,
+      status: booking.status,
+      total_amount: booking.total_amount,
+      deposit_amount: booking.deposit_amount,
+      payment_plan: booking.payment_plan,
+      payment_method: booking.payment_method,
+      number_of_persons: booking.number_of_persons,
+      booking_date: booking.booking_date,
+      payment_proof_file: booking.payment_proof_file,
+      payment_proof_status: booking.payment_proof_status,
+      payment_proof_notes: booking.payment_proof_notes,
+      inserted_at: booking.inserted_at
+    }
+  end
+
+  defp progress_to_details(bfp) do
+    %{
+      id: bfp.id,
+      source: "progress",
+      user: bfp.user,
+      package: bfp.package,
+      package_schedule: bfp.package_schedule,
+      status: bfp.status,
+      total_amount: bfp.total_amount,
+      deposit_amount: bfp.deposit_amount,
+      payment_plan: bfp.payment_plan,
+      payment_method: bfp.payment_method,
+      number_of_persons: bfp.number_of_persons,
+      travelers_data: bfp.travelers_data,
+      current_step: bfp.current_step,
+      max_steps: bfp.max_steps,
+      inserted_at: bfp.inserted_at
+    }
   end
 
   def render(assigns) do
@@ -527,6 +598,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                         <button
                           phx-click="view_payment"
                           phx-value-id={payment.id}
+                          phx-value-source={payment.source}
                           class="text-teal-600 hover:text-teal-900 mr-3">
                           View
                         </button>
@@ -577,6 +649,94 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
             </div>
           </div>
         </div>
+
+        <%= if @show_payment_modal and @selected_payment do %>
+          <div class="fixed inset-0 z-50 flex items-center justify-center">
+            <div class="absolute inset-0 bg-black opacity-30" phx-click="close_payment_modal"></div>
+            <div class="relative bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold">Payment Details</h2>
+                <button class="text-gray-500 hover:text-gray-700" phx-click="close_payment_modal">✕</button>
+              </div>
+
+              <div class="space-y-3 text-sm">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-gray-500">Type</div>
+                    <div class="font-medium capitalize"><%= @selected_payment.source %></div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">Status</div>
+                    <div class="font-medium capitalize"><%= @selected_payment.status %></div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">User</div>
+                    <div class="font-medium"><%= @selected_payment.user && @selected_payment.user.full_name %> (<%= @selected_payment.user && @selected_payment.user.email %>)</div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">Package</div>
+                    <div class="font-medium"><%= @selected_payment.package && @selected_payment.package.name %></div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">Payment Method</div>
+                    <div class="font-medium capitalize"><%= @selected_payment.payment_method %></div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">Payment Plan</div>
+                    <div class="font-medium capitalize"><%= @selected_payment.payment_plan %></div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">Total Amount</div>
+                    <div class="font-medium"><%= format_amount(@selected_payment.total_amount) %></div>
+                  </div>
+                  <div>
+                    <div class="text-gray-500">Deposit</div>
+                    <div class="font-medium"><%= format_amount(@selected_payment[:deposit_amount]) %></div>
+                  </div>
+                </div>
+
+                <%= if @selected_payment.source == "progress" and is_list(@selected_payment[:travelers_data]) do %>
+                  <div class="mt-4">
+                    <div class="text-gray-700 font-semibold mb-2">Travelers</div>
+                    <div class="space-y-2">
+                      <%= for t <- @selected_payment[:travelers_data] do %>
+                        <div class="border rounded p-2">
+                          <div class="font-medium"><%= t["full_name"] || t[:full_name] %></div>
+                          <div class="text-gray-600 text-xs">ID: <%= t["identity_card_number"] || t[:identity_card_number] || t["passport_number"] || t[:passport_number] || "N/A" %></div>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+
+                <%= if @selected_payment.source == "booking" do %>
+                  <div class="mt-4">
+                    <div class="text-gray-700 font-semibold mb-2">Payment Proof</div>
+                    <div class="text-sm">
+                      <div>Status: <span class="capitalize font-medium"><%= @selected_payment.payment_proof_status %></span></div>
+                      <%= if @selected_payment.payment_proof_file do %>
+                        <div class="mt-1">
+                          <a class="text-blue-600 hover:underline" href={~p"/uploads/payment_proof/#{@selected_payment.payment_proof_file}"} target="_blank">View Proof</a>
+                        </div>
+                      <% else %>
+                        <div class="text-gray-500">No file uploaded</div>
+                      <% end %>
+                      <%= if @selected_payment.payment_proof_notes do %>
+                        <div class="mt-1 text-gray-700">Notes: <%= @selected_payment.payment_proof_notes %></div>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+
+              <div class="mt-6 flex justify-end gap-2">
+                <button class="px-4 py-2 rounded bg-gray-200 text-gray-700" phx-click="close_payment_modal">Close</button>
+                <button class="px-4 py-2 rounded bg-blue-600 text-white">Process</button>
+                <button class="px-4 py-2 rounded bg-red-600 text-white">Refund</button>
+              </div>
+            </div>
+          </div>
+        <% end %>
       </div>
     </.admin_layout>
     """

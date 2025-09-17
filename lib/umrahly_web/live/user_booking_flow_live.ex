@@ -170,7 +170,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
         |> assign(:current_page, "packages")
         |> assign(:page_title, "Book Package")
         |> assign(:current_step, progress.current_step)
-        |> assign(:max_steps, progress.max_steps)
+        |> assign(:max_steps, 5)
         |> assign(:requires_online_payment, false)
         |> assign(:payment_gateway_url, nil)
         |> assign(:payment_proof_file, nil)
@@ -1525,7 +1525,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                 }
               )
 
-              _ = Umrahly.ActivityLogs.log_user_action(socket.assigns.current_user.id, "Booking Created", booking.package_name, %{booking_id: booking.id, total_amount: booking.total_amount})
+              _ = Umrahly.ActivityLogs.log_user_action(socket.assigns.current_user.id, "Booking Created", socket.assigns.package.name, %{booking_id: booking.id, total_amount: booking.total_amount})
 
               socket = if requires_online_payment do
                 payment_url = generate_payment_gateway_url(booking, socket.assigns)

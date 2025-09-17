@@ -243,7 +243,7 @@ defmodule Umrahly.Bookings do
           package_id: package_id,
           package_schedule_id: schedule_id,
           current_step: 1,
-          max_steps: 4,
+          max_steps: 5,
           number_of_persons: 1,
           is_booking_for_self: true,
           payment_method: "bank_transfer",

@@ -165,8 +165,6 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     socket =
       socket
       |> assign(:selected_payment_method, payment_method)
-      |> assign(:uploaded_files, [])  # Clear uploaded files when payment method changes
-      |> assign(:upload_errors, [])   # Clear upload errors
 
     {:noreply, socket}
   end
@@ -202,9 +200,6 @@ defmodule UmrahlyWeb.UserPaymentsLive do
               |> assign(:selected_payment_method, "")
               |> load_data()
 
-            {:noreply, socket}
-          {:error, reason} ->
-            socket = put_flash(socket, :error, "Failed to process payment: #{reason}")
             {:noreply, socket}
         end
       end
@@ -360,7 +355,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   defp process_installment_payment(booking_id, installment_number, amount, payment_method, upload_entries, user) do
-    booking = Bookings.get_booking!(booking_id)
+    _booking = Bookings.get_booking!(booking_id)
 
     # Check if this is an online payment method that requires gateway redirect
     requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
@@ -431,7 +426,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
       # Generate unique filename
       timestamp = DateTime.utc_now() |> DateTime.to_unix()
-      extension = Path.extname(entry.client_name)
+      _extension = Path.extname(entry.client_name)
       filename = "#{timestamp}_#{entry.client_name}"
       file_path = Path.join(upload_dir, filename)
 
@@ -1171,23 +1166,25 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                 </div>
               </div>
 
-              <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Select Payment Method
-                </label>
-                <select
-                  phx-change="update_payment_method"
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={@selected_payment_method}
-                >
-                  <option value="">Choose payment method</option>
-                  <option value="credit_card">Credit Card</option>
-                  <option value="online_banking">Online Banking (FPX)</option>
-                  <option value="e_wallet">E-Wallet (Boost, Touch 'n Go)</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="cash">Cash</option>
-                </select>
-              </div>
+              <form phx-change="update_payment_method">
+                <div class="mb-6">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Select Payment Method
+                  </label>
+                  <select
+                    name="payment_method"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={@selected_payment_method}
+                  >
+                    <option value="">Choose payment method</option>
+                    <option value="credit_card">Credit Card</option>
+                    <option value="online_banking">Online Banking (FPX)</option>
+                    <option value="e_wallet">E-Wallet (Boost, Touch 'n Go)</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cash">Cash</option>
+                  </select>
+                </div>
+              </form>
 
               <!-- File Upload Section (only for offline payment methods) -->
               <%= if @selected_payment_method in ["bank_transfer", "cash"] do %>

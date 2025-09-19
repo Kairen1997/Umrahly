@@ -325,7 +325,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                 </div>
 
                 <!-- Traveler Details Section -->
-                <div class="p-6 bg-gray-50">
+                <div id={"traveler-section-" <> to_string(booking.id)} class="p-6 bg-gray-50">
                   <div class="flex items-center justify-between mb-4">
                     <h4 class="text-lg font-medium text-gray-900 flex items-center">
                       <svg class="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,8 +357,25 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                           Booking for Others
                         </span>
                       <% end %>
+                      <button
+                        id={"toggle-travelers-" <> to_string(booking.id)}
+                        data-toggle-id={"traveler-details-" <> to_string(booking.id)}
+                        data-scroll-id={"traveler-list-" <> to_string(booking.id)}
+                        data-scroll-offset="80"
+                        data-show-text="View Travelers"
+                        data-hide-text="Hide Travelers"
+                        phx-hook="ToggleSection"
+                        class="bg-gray-100 text-gray-800 px-3 py-1 rounded hover:bg-gray-200 transition-colors text-sm"
+                      >
+                        View Travelers
+                      </button>
                     </div>
                   </div>
+
+                 <!-- Toggleable traveler details wrapper -->
+                 <div id={"traveler-details-" <> to_string(booking.id)} class="hidden">
+                  <!-- Anchor to scroll into view just above the list -->
+                  <div id={"traveler-list-" <> to_string(booking.id)}></div>
 
                   <%= if booking.travelers_data && length(booking.travelers_data) > 0 do %>
                     <div class="overflow-x-auto">
@@ -556,6 +573,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
                     <% end %>
                   <% end %>
+                 </div>
                 </div>
               </div>
             <% end %>

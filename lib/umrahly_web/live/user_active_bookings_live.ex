@@ -35,8 +35,15 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
       nil ->
         {:noreply, put_flash(socket, :error, "Booking flow not found")}
       booking_flow ->
-        # Redirect to the booking flow with the saved progress
-        {:noreply, push_navigate(socket, to: ~p"/book/#{booking_flow.package_id}/#{booking_flow.package_schedule_id}?resume=true")}
+        # Prevent resuming if payment has been approved for full payment plan only
+        if booking_flow._latest_booking &&
+             booking_flow._latest_booking.payment_proof_status == "approved" &&
+             booking_flow.payment_plan == "full_payment" do
+          {:noreply, put_flash(socket, :info, "Payment approved. Please wait for your flight schedule.")}
+        else
+          # Redirect to the booking flow with the saved progress
+          {:noreply, push_navigate(socket, to: ~p"/book/#{booking_flow.package_id}/#{booking_flow.package_schedule_id}?resume=true")}
+        end
     end
   end
 
@@ -240,13 +247,19 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                     </div>
 
                     <div class="flex flex-col space-y-2 ml-4">
-                      <button
-                        phx-click="resume_booking"
-                        phx-value-id={booking.id}
-                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-                      >
-                        Resume Booking
-                      </button>
+                      <%= if booking._latest_booking && booking._latest_booking.payment_proof_status == "approved" && booking.payment_plan == "full_payment" do %>
+                        <div class="bg-green-50 text-green-800 px-4 py-2 rounded-lg border border-green-200 text-sm">
+                          Payment approved. Please wait for your flight schedule.
+                        </div>
+                      <% else %>
+                        <button
+                          phx-click="resume_booking"
+                          phx-value-id={booking.id}
+                          class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                        >
+                          Resume Booking
+                        </button>
+                      <% end %>
                       <%= if booking._latest_booking && booking._latest_booking.payment_proof_status in ["submitted", "approved", "rejected"] do %>
                         <%= if booking._latest_booking.payment_proof_status == "rejected" do %>
                           <button

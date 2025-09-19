@@ -717,7 +717,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                       <div>Status: <span class="capitalize font-medium"><%= @selected_payment.payment_proof_status %></span></div>
                       <%= if @selected_payment.payment_proof_file do %>
                         <div class="mt-1">
-                          <a class="text-blue-600 hover:underline" href={~p"/uploads/payment_proof/#{@selected_payment.payment_proof_file}"} target="_blank">View Proof</a>
+                          <a class="text-blue-600 hover:underline" href={"/uploads/payment_proof/#{@selected_payment.payment_proof_file}"} target="_blank">View Proof</a>
                         </div>
                       <% else %>
                         <div class="text-gray-500">No file uploaded</div>

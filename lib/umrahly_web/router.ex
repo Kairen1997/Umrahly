@@ -80,6 +80,7 @@ defmodule UmrahlyWeb.Router do
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new
     live "/payments", UserPaymentsLive, :index
     live "/payments/:tab", UserPaymentsLive, :index
+    get "/receipts/:id/view", PageController, :view_receipt
     get "/receipts/:id/download", PageController, :download_receipt
   end
 

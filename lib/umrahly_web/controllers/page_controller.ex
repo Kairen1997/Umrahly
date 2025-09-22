@@ -2,6 +2,8 @@ defmodule UmrahlyWeb.PageController do
   use UmrahlyWeb, :controller
 
   alias Umrahly.Profiles
+  alias Umrahly.Repo
+  alias Umrahly.Bookings.Booking
 
   def home(conn, _params) do
     # Fetch active packages for the landing page
@@ -69,19 +71,38 @@ defmodule UmrahlyWeb.PageController do
     )
   end
 
+  def view_receipt(conn, %{"id" => receipt_id}) do
+    current_user = conn.assigns.current_user
+
+    with {id, _} <- Integer.parse(to_string(receipt_id)),
+         %Booking{} = booking <- Repo.get(Booking, id) |> Repo.preload([:package_schedule, package_schedule: :package]),
+         true <- booking.user_id == current_user.id do
+      total = booking.total_amount || Decimal.new(0)
+      paid = booking.deposit_amount || Decimal.new(0)
+      booking_ref = "BK" <> Integer.to_string(booking.id)
+
+      render(conn, :receipt_a4,
+        layout: {UmrahlyWeb.Layouts, :app},
+        booking: booking,
+        booking_ref: booking_ref,
+        total: total,
+        paid: paid,
+        generated_date: Date.utc_today(),
+        current_user: current_user
+      )
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Invalid or unauthorized receipt")
+        |> redirect(to: ~p"/payments")
+    end
+  end
+
   def download_receipt(conn, %{"id" => receipt_id}) do
     current_user = conn.assigns.current_user
 
-    # In a real application, you would:
-    # 1. Verify the receipt belongs to the current user
-    # 2. Get the actual file path from the database
-    # 3. Check if the file exists
-    # 4. Stream the file to the client
-
-    # For now, we'll simulate a receipt download
     case get_receipt_file(receipt_id, current_user.id) do
       {:ok, file_path, filename} ->
-        # Check if file exists
         if File.exists?(file_path) do
           conn
           |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
@@ -99,16 +120,38 @@ defmodule UmrahlyWeb.PageController do
     end
   end
 
-  defp get_receipt_file(receipt_id, _user_id) do
-    # This would typically query a receipts table
-    # For now, returning mock data
-    case receipt_id do
-      "1" ->
-        {:ok, "priv/static/receipts/receipt_1.txt", "receipt_BK001_#{Date.utc_today()}.txt"}
-      "2" ->
-        {:ok, "priv/static/receipts/receipt_2.txt", "receipt_BK002_#{Date.utc_today()}.txt"}
-      _ ->
-        {:error, "Invalid receipt ID"}
+  defp get_receipt_file(receipt_id, user_id) do
+    with {id, _} <- Integer.parse(to_string(receipt_id)),
+         booking when not is_nil(booking) <- Repo.get(Booking, id),
+         true <- booking.user_id == user_id do
+      # Ensure receipt directory
+      receipt_dir = Path.join(["priv", "static", "receipts"]) |> tap(&File.mkdir_p!/1)
+
+      booking_ref = "BK" <> Integer.to_string(booking.id)
+      filename = "receipt_#{booking_ref}_#{Date.utc_today()}.txt"
+      file_path = Path.join(receipt_dir, filename)
+
+      # Generate a simple text receipt if it doesn't exist
+      unless File.exists?(file_path) do
+        total = booking.total_amount || Decimal.new(0)
+        paid = booking.deposit_amount || Decimal.new(0)
+        content = [
+          "Umrahly Payment Receipt\n",
+          "=======================\n",
+          "Date: #{Date.utc_today()}\n",
+          "Booking Reference: ##{booking_ref}\n",
+          "Payment Method: #{booking.payment_method || "unknown"}\n",
+          "Status: #{booking.status}\n",
+          "Total Amount (RM): #{Decimal.to_string(total)}\n",
+          "Paid Amount (RM): #{Decimal.to_string(paid)}\n"
+        ] |> IO.iodata_to_binary()
+
+        File.write!(file_path, content)
+      end
+
+      {:ok, file_path, filename}
+    else
+      _ -> {:error, "Invalid or unauthorized receipt"}
     end
   end
 end

@@ -23,8 +23,21 @@ defmodule UmrahlyWeb.UserPaymentsLive do
       |> assign(:current_tab, "installment")
       |> assign(:current_user, socket.assigns.current_user)
       |> assign(:bookings, [])
-      |> assign(:payment_history, [])
-      |> assign(:receipts, [])
+      |> assign(:payment_history_all, [])
+      |> assign(:payment_history_items, [])
+      |> assign(:payment_history_page, 1)
+      |> assign(:payment_history_per_page, 10)
+      |> assign(:payment_history_total_pages, 1)
+      |> assign(:installments_all, [])
+      |> assign(:installments_items, [])
+      |> assign(:installments_page, 1)
+      |> assign(:installments_per_page, 10)
+      |> assign(:installments_total_pages, 1)
+      |> assign(:receipts_all, [])
+      |> assign(:receipts_items, [])
+      |> assign(:receipts_page, 1)
+      |> assign(:receipts_per_page, 9)
+      |> assign(:receipts_total_pages, 1)
       |> assign(:selected_payment, nil)
       |> assign(:show_payment_modal, false)
       |> assign(:selected_booking, nil)
@@ -54,8 +67,72 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     {:noreply, socket}
   end
 
+  # --- Installments Pagination Events ---
+  def handle_event("inst-first", _params, socket) do
+    socket = socket |> assign(:installments_page, 1) |> paginate_installments()
+    {:noreply, socket}
+  end
+
+  def handle_event("inst-prev", _params, socket) do
+    page = max(1, socket.assigns.installments_page - 1)
+    socket = socket |> assign(:installments_page, page) |> paginate_installments()
+    {:noreply, socket}
+  end
+
+  def handle_event("inst-next", _params, socket) do
+    page = min(socket.assigns.installments_total_pages, socket.assigns.installments_page + 1)
+    socket = socket |> assign(:installments_page, page) |> paginate_installments()
+    {:noreply, socket}
+  end
+
+  def handle_event("inst-last", _params, socket) do
+    last = socket.assigns.installments_total_pages
+    socket = socket |> assign(:installments_page, last) |> paginate_installments()
+    {:noreply, socket}
+  end
+
+  # --- Tab Switching ---
   def handle_event("switch-tab", %{"tab" => tab}, socket) do
     socket = assign(socket, :current_tab, tab)
+    {:noreply, socket}
+  end
+
+  def handle_event("ph-prev", _params, socket) do
+    page = max(1, socket.assigns.payment_history_page - 1)
+    socket = socket |> assign(:payment_history_page, page) |> paginate_payment_history()
+    {:noreply, socket}
+  end
+
+  def handle_event("ph-next", _params, socket) do
+    page = min(socket.assigns.payment_history_total_pages, socket.assigns.payment_history_page + 1)
+    socket = socket |> assign(:payment_history_page, page) |> paginate_payment_history()
+    {:noreply, socket}
+  end
+
+  def handle_event("ph-first", _params, socket) do
+    socket = socket |> assign(:payment_history_page, 1) |> paginate_payment_history()
+    {:noreply, socket}
+  end
+
+  def handle_event("ph-last", _params, socket) do
+    last = socket.assigns.payment_history_total_pages
+    socket = socket |> assign(:payment_history_page, last) |> paginate_payment_history()
+    {:noreply, socket}
+  end
+
+  def handle_event("ph-go", %{"page" => page_str}, socket) do
+    page =
+      case Integer.parse(page_str) do
+        {p, _} -> p
+        :error -> socket.assigns.payment_history_page
+      end
+
+    page =
+      page
+      |> max(1)
+      |> min(socket.assigns.payment_history_total_pages)
+
+    socket = socket |> assign(:payment_history_page, page) |> paginate_payment_history()
     {:noreply, socket}
   end
 
@@ -87,11 +164,16 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     end)
 
     if booking do
+      installments = calculate_installment_breakdown_dynamic(booking.total_amount, booking.paid_amount || 0, booking.departure_date)
       socket =
         socket
         |> assign(:selected_booking, booking)
         |> assign(:show_booking_modal, false)
         |> assign(:show_booking_plan, true)
+        |> assign(:installments_all, installments)
+        |> assign(:installments_page, 1)
+        |> assign(:installments_total_pages, calculate_total_pages(installments, socket.assigns.installments_per_page))
+        |> paginate_installments()
 
       {:noreply, socket}
     else
@@ -133,19 +215,12 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   def handle_event("download-receipt", %{"receipt_id" => receipt_id}, socket) do
-    # Handle receipt download
-    case download_receipt(receipt_id, socket.assigns.current_user) do
-      {:ok, file_path, filename} ->
-        # Send file download response to the client
-        socket = push_event(socket, "receipt_download_ready", %{
-          file_path: file_path,
-          filename: filename
-        })
-        {:noreply, socket}
-      {:error, reason} ->
-        socket = put_flash(socket, :error, "Failed to download receipt: #{reason}")
-        {:noreply, socket}
-    end
+    {:ok, file_path, filename} = download_receipt(receipt_id, socket.assigns.current_user)
+    socket = push_event(socket, "receipt_download_ready", %{
+      file_path: file_path,
+      filename: filename
+    })
+    {:noreply, socket}
   end
 
   def handle_event("pay-installment", %{"booking_id" => booking_id, "installment_number" => installment_number, "amount" => amount}, socket) do
@@ -243,7 +318,29 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     {:noreply, socket}
   end
 
+  # --- Receipts Pagination Events ---
+  def handle_event("rcp-first", _params, socket) do
+    socket = socket |> assign(:receipts_page, 1) |> paginate_receipts()
+    {:noreply, socket}
+  end
 
+  def handle_event("rcp-prev", _params, socket) do
+    page = max(1, socket.assigns.receipts_page - 1)
+    socket = socket |> assign(:receipts_page, page) |> paginate_receipts()
+    {:noreply, socket}
+  end
+
+  def handle_event("rcp-next", _params, socket) do
+    page = min(socket.assigns.receipts_total_pages, socket.assigns.receipts_page + 1)
+    socket = socket |> assign(:receipts_page, page) |> paginate_receipts()
+    {:noreply, socket}
+  end
+
+  def handle_event("rcp-last", _params, socket) do
+    last = socket.assigns.receipts_total_pages
+    socket = socket |> assign(:receipts_page, last) |> paginate_receipts()
+    {:noreply, socket}
+  end
 
   defp load_data(socket) do
     user = socket.assigns.current_user
@@ -259,8 +356,14 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
     socket
     |> assign(:bookings, bookings)
-    |> assign(:payment_history, payment_history)
-    |> assign(:receipts, receipts)
+    |> assign(:payment_history_all, payment_history)
+    |> assign(:receipts_all, receipts)
+    |> assign(:receipts_total_pages, calculate_total_pages(receipts, socket.assigns.receipts_per_page))
+    |> assign(:receipts_page, 1)
+    |> assign(:payment_history_total_pages, calculate_total_pages(payment_history, socket.assigns.payment_history_per_page))
+    |> assign(:payment_history_page, 1)
+    |> paginate_payment_history()
+    |> paginate_receipts()
   end
 
   defp build_installment_bookings(user_id) do
@@ -307,64 +410,82 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     end
   end
 
-  defp load_payment_history(_user_id) do
-    # This would typically query a payments table
-    # For now, returning mock data with more detailed information
-    [
+  defp load_payment_history(user_id) do
+    # Use existing booking data as payment history entries until a dedicated payments table exists
+    Bookings.list_user_bookings_with_payments(user_id)
+    |> Enum.map(fn booking ->
+      paid_amount = booking.paid_amount || Decimal.new(0)
+
+      # Determine status for display
+      status =
+        case booking.status do
+          s when s in ["confirmed", "completed"] -> "completed"
+          _ -> "pending"
+        end
+
+      # Compose a pseudo transaction id for traceability
+      transaction_id = "BOOKING-" <> to_string(booking.id)
+
+      # Fees are not tracked yet; default to 0 and net = amount
+      fees = Decimal.new(0)
+
       %{
-        id: "1",
-        date: ~D[2024-01-15],
-        amount: 1500.00,
-        status: "completed",
-        method: "credit_card",
-        booking_reference: "BK001",
-        transaction_id: "TXN_001_20240115",
-        card_last4: "1234",
-        card_brand: "Visa",
-        description: "Umrah Package - Standard Plan",
-        fees: 15.00,
-        net_amount: 1485.00
-      },
-      %{
-        id: "2",
-        date: ~D[2024-01-10],
-        amount: 750.00,
-        status: "completed",
-        method: "bank_transfer",
-        booking_reference: "BK002",
-        transaction_id: "TXN_002_20240110",
-        bank_name: "Maybank",
-        account_last4: "5678",
-        description: "Umrah Package - Economy Plan",
-        fees: 5.00,
-        net_amount: 745.00
+        id: to_string(booking.id),
+        date: booking.booking_date || Date.utc_today(),
+        amount: paid_amount,
+        status: status,
+        method: booking.payment_method || "unknown",
+        booking_reference: booking.booking_reference,
+        transaction_id: transaction_id,
+        description: booking.package_name,
+        fees: fees,
+        net_amount: Decimal.sub(paid_amount, fees)
       }
-    ]
+    end)
+    |> Enum.sort_by(& &1.date, {:desc, Date})
+  end
+
+  # --- Payment History Pagination Helpers ---
+  defp calculate_total_pages(list, per_page) when is_list(list) and is_integer(per_page) and per_page > 0 do
+    total = length(list)
+    case total do
+      0 -> 1
+      _ -> div(total + per_page - 1, per_page)
+    end
+  end
+
+  defp paginate_payment_history(socket) do
+    list = socket.assigns.payment_history_all
+    per_page = socket.assigns.payment_history_per_page
+    total_pages = calculate_total_pages(list, per_page)
+    page = socket.assigns.payment_history_page |> max(1) |> min(total_pages)
+
+    start_index = (page - 1) * per_page
+    items = list |> Enum.drop(start_index) |> Enum.take(per_page)
+
+    socket
+    |> assign(:payment_history_total_pages, total_pages)
+    |> assign(:payment_history_page, page)
+    |> assign(:payment_history_items, items)
   end
 
   defp find_payment_by_id(payment_id, payment_history) do
     Enum.find(payment_history, fn payment -> payment.id == payment_id end)
   end
 
-  defp load_receipts(_user_id) do
-    # This would typically query a receipts table
-    # For now, returning mock data
-    [
+  defp load_receipts(user_id) do
+    # Build receipts list from actual bookings with payment info
+    Bookings.list_user_bookings_with_payments(user_id)
+    |> Enum.map(fn booking ->
       %{
-        id: "1",
-        date: ~D[2024-01-15],
-        amount: 1500.00,
-        booking_reference: "BK001",
-        file_path: "/receipts/receipt_1.pdf"
-      },
-      %{
-        id: "2",
-        date: ~D[2024-01-10],
-        amount: 750.00,
-        booking_reference: "BK002",
-        file_path: "/receipts/receipt_2.pdf"
+        id: to_string(booking.id),
+        date: booking.booking_date || Date.utc_today(),
+        amount: booking.paid_amount || Decimal.new(0),
+        booking_reference: booking.booking_reference,
+        file_path: "/receipts/#{booking.id}/download"
       }
-    ]
+    end)
+    |> Enum.sort_by(& &1.date, {:desc, Date})
   end
 
   defp process_payment(_booking_id, _amount, _user) do
@@ -374,16 +495,10 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   defp download_receipt(receipt_id, _user) do
-    # This would handle actual file download
-    # For now, simulating success with proper file information
-    case receipt_id do
-      "1" ->
-        {:ok, "/receipts/#{receipt_id}/download", "receipt_BK001_#{Date.utc_today()}.txt"}
-      "2" ->
-        {:ok, "/receipts/#{receipt_id}/download", "receipt_BK002_#{Date.utc_today()}.txt"}
-      _ ->
-        {:error, "Invalid receipt ID"}
-    end
+    # Build real download path and a friendly filename; controller enforces access and streams file
+    path = "/receipts/#{receipt_id}/download"
+    filename = "receipt_#{Date.utc_today()}.txt"
+    {:ok, path, filename}
   end
 
   defp process_installment_payment(booking_id, installment_number, amount, payment_method, socket, user) do
@@ -600,6 +715,103 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     end)
   end
 
+
+  defp error_to_string(:too_large), do: "File is too large (max 10MB)"
+  defp error_to_string(:too_many_files), do: "Too many files (max 5)"
+  defp error_to_string(:not_accepted), do: "File type not accepted"
+  defp error_to_string(error), do: "Upload error: #{inspect(error)}"
+
+  defp generate_installment_payment_url(booking, installment_number, amount, payment_method, user) do
+    config = Application.get_env(:umrahly, :payment_gateway)
+
+     # Get package and schedule information
+     package = booking.package_schedule.package
+     schedule = booking.package_schedule
+
+    # Create installment payment context similar to booking context
+    installment_assigns = %{
+      payment_method: payment_method,
+      deposit_amount: amount,
+      current_user: user,
+      booking: booking,
+      installment_number: installment_number,
+      package: package,
+      schedule: schedule,
+      number_of_persons: booking.number_of_persons
+    }
+
+    case payment_method do
+      "toyyibpay" ->
+        generate_toyyibpay_installment_payment_url(booking, installment_assigns, config[:toyyibpay])
+      _ ->
+        generate_generic_installment_payment_url(booking, installment_assigns, config[:generic])
+    end
+  end
+
+  defp generate_toyyibpay_installment_payment_url(booking, assigns, _toyyibpay_config) do
+    case Umrahly.ToyyibPay.create_bill(booking, assigns) do
+      {:ok, %{payment_url: payment_url}} ->
+        payment_url
+      {:error, reason} ->
+        # Log error and fallback to demo URL
+        require Logger
+        Logger.error("ToyyibPay installment payment bill creation failed: #{inspect(reason)}")
+        "https://dev.toyyibpay.com"
+    end
+  end
+
+  defp generate_generic_installment_payment_url(booking, assigns, _generic_config) do
+    base_url = "https://demo-generic-gateway.com"
+
+    booking_id_str = case booking do
+      %{id: id} when is_integer(id) -> Integer.to_string(id)
+      %{id: id} when is_binary(id) -> id
+      _ -> "demo"
+    end
+
+    id_suffix = if String.length(booking_id_str) >= 8 do
+      String.slice(booking_id_str, -8..-1)
+    else
+      String.pad_leading(booking_id_str, 8, "0")
+    end
+
+    installment_suffix = String.pad_leading(Integer.to_string(assigns.installment_number), 2, "0")
+    payment_id = "INST-#{id_suffix}-#{installment_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
+
+    "#{base_url}/pay/#{payment_id}"
+  end
+
+
+  defp paginate_installments(socket) do
+    list = socket.assigns.installments_all
+    per_page = socket.assigns.installments_per_page
+    total_pages = calculate_total_pages(list, per_page)
+    page = socket.assigns.installments_page |> max(1) |> min(total_pages)
+
+    start_index = (page - 1) * per_page
+    items = list |> Enum.drop(start_index) |> Enum.take(per_page)
+
+    socket
+    |> assign(:installments_total_pages, total_pages)
+    |> assign(:installments_page, page)
+    |> assign(:installments_items, items)
+  end
+
+  defp paginate_receipts(socket) do
+    list = socket.assigns.receipts_all
+    per_page = socket.assigns.receipts_per_page
+    total_pages = calculate_total_pages(list, per_page)
+    page = socket.assigns.receipts_page |> max(1) |> min(total_pages)
+
+    start_index = (page - 1) * per_page
+    items = list |> Enum.drop(start_index) |> Enum.take(per_page)
+
+    socket
+    |> assign(:receipts_total_pages, total_pages)
+    |> assign(:receipts_page, page)
+    |> assign(:receipts_items, items)
+  end
+
   def render(assigns) do
     ~H"""
     <.sidebar page_title="Payments">
@@ -707,7 +919,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                             </tr>
                           </thead>
                           <tbody class="bg-white divide-y divide-gray-200">
-                            <%= for installment <- calculate_installment_breakdown_dynamic(@selected_booking.total_amount, @selected_booking.paid_amount || 0, @selected_booking.departure_date) do %>
+                            <%= for installment <- @installments_items do %>
                               <tr class={if installment.is_last, do: "bg-yellow-50", else: ""}>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                   <%= installment.n %>
@@ -758,6 +970,41 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                             <% end %>
                           </tbody>
                         </table>
+                        <div class="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
+                          <div class="text-sm text-gray-700">
+                            Page <span class="font-medium"><%= @installments_page %></span> of <span class="font-medium"><%= @installments_total_pages %></span>
+                          </div>
+                          <div class="space-x-2">
+                            <button
+                              phx-click="inst-first"
+                              class={"px-3 py-1.5 border text-sm rounded-md " <> if(@installments_page == 1, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                              disabled={@installments_page == 1}
+                            >
+                              First
+                            </button>
+                            <button
+                              phx-click="inst-prev"
+                              class={"px-3 py-1.5 border text-sm rounded-md " <> if(@installments_page == 1, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                              disabled={@installments_page == 1}
+                            >
+                              Prev
+                            </button>
+                            <button
+                              phx-click="inst-next"
+                              class={"px-3 py-1.5 border text-sm rounded-md " <> if(@installments_page == @installments_total_pages, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                              disabled={@installments_page == @installments_total_pages}
+                            >
+                              Next
+                            </button>
+                            <button
+                              phx-click="inst-last"
+                              class={"px-3 py-1.5 border text-sm rounded-md " <> if(@installments_page == @installments_total_pages, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                              disabled={@installments_page == @installments_total_pages}
+                            >
+                              Last
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -834,7 +1081,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
               <div class="p-6">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">Payment History</h2>
 
-                <%= if Enum.empty?(@payment_history) do %>
+                <%= if Enum.empty?(@payment_history_all) do %>
                   <div class="text-center py-12">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
@@ -856,7 +1103,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
-                        <%= for payment <- @payment_history do %>
+                        <%= for payment <- @payment_history_items do %>
                           <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               <%= Calendar.strftime(payment.date, "%B %d, %Y") %>
@@ -888,6 +1135,41 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                         <% end %>
                       </tbody>
                     </table>
+                    <div class="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
+                      <div class="text-sm text-gray-700">
+                        Page <span class="font-medium"><%= @payment_history_page %></span> of <span class="font-medium"><%= @payment_history_total_pages %></span>
+                      </div>
+                      <div class="space-x-2">
+                        <button
+                          phx-click="ph-first"
+                          class={"px-3 py-1.5 border text-sm rounded-md " <> if(@payment_history_page == 1, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                          disabled={@payment_history_page == 1}
+                        >
+                          First
+                        </button>
+                        <button
+                          phx-click="ph-prev"
+                          class={"px-3 py-1.5 border text-sm rounded-md " <> if(@payment_history_page == 1, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                          disabled={@payment_history_page == 1}
+                        >
+                          Prev
+                        </button>
+                        <button
+                          phx-click="ph-next"
+                          class={"px-3 py-1.5 border text-sm rounded-md " <> if(@payment_history_page == @payment_history_total_pages, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                          disabled={@payment_history_page == @payment_history_total_pages}
+                        >
+                          Next
+                        </button>
+                        <button
+                          phx-click="ph-last"
+                          class={"px-3 py-1.5 border text-sm rounded-md " <> if(@payment_history_page == @payment_history_total_pages, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                          disabled={@payment_history_page == @payment_history_total_pages}
+                        >
+                          Last
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 <% end %>
               </div>
@@ -897,7 +1179,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
               <div class="p-6">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">Receipts</h2>
 
-                <%= if Enum.empty?(@receipts) do %>
+                <%= if Enum.empty?(@receipts_items) do %>
                   <div class="text-center py-12">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -906,42 +1188,90 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                     <p class="mt-1 text-sm text-gray-500">Receipts will appear here after you make payments.</p>
                   </div>
                 <% else %>
-                  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <%= for receipt <- @receipts do %>
-                      <div class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow duration-200">
-                        <div class="flex items-center justify-between mb-4">
-                          <div class="flex-shrink-0">
-                            <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                          </div>
-                          <div class="text-right">
-                            <p class="text-sm font-medium text-gray-900">RM <%= format_amount(receipt.amount) %></p>
-                            <p class="text-xs text-gray-500"><%= receipt.booking_reference %></p>
-                          </div>
-                        </div>
-
-                        <div class="mb-4">
-                          <p class="text-sm text-gray-600">
-                            <span class="font-medium">Date:</span> <%= Calendar.strftime(receipt.date, "%B %d, %Y") %>
-                          </p>
-                        </div>
-
-                        <button
-                          id={"receipt-download-#{receipt.id}"}
-                          phx-click="download-receipt"
-                          phx-value-receipt_id={receipt.id}
-                          phx-hook="DownloadReceipt"
-                          data-receipt-id={receipt.id}
-                          class="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                          </svg>
-                          Download Receipt
-                        </button>
-                      </div>
-                    <% end %>
+                  <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-300">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (RM)</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                        <%= for receipt <- @receipts_items do %>
+                          <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <%= Calendar.strftime(receipt.date, "%B %d, %Y") %>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              <%= format_amount(receipt.amount) %>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <%= receipt.booking_reference %>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                              <div class="flex items-center gap-2">
+                                <a
+                                  href={~p"/receipts/#{receipt.id}/view"}
+                                  target="_blank"
+                                  class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553 2.276A1 1 0 0120 13.191V18a2 2 0 01-2 2H6a2 2 0 01-2-2v-4.809a1 1 0 01.447-.915L9 10m6 0V6a3 3 0 10-6 0v4"/>
+                                  </svg>
+                                  View
+                                </a>
+                                <a
+                                  href={~p"/receipts/#{receipt.id}/download"}
+                                  class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                  </svg>
+                                  Download
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 mt-4 rounded-md">
+                    <div class="text-sm text-gray-700">
+                      Page <span class="font-medium"><%= @receipts_page %></span> of <span class="font-medium"><%= @receipts_total_pages %></span>
+                    </div>
+                    <div class="space-x-2">
+                      <button
+                        phx-click="rcp-first"
+                        class={"px-3 py-1.5 border text-sm rounded-md " <> if(@receipts_page == 1, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                        disabled={@receipts_page == 1}
+                      >
+                        First
+                      </button>
+                      <button
+                        phx-click="rcp-prev"
+                        class={"px-3 py-1.5 border text-sm rounded-md " <> if(@receipts_page == 1, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                        disabled={@receipts_page == 1}
+                      >
+                        Prev
+                      </button>
+                      <button
+                        phx-click="rcp-next"
+                        class={"px-3 py-1.5 border text-sm rounded-md " <> if(@receipts_page == @receipts_total_pages, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                        disabled={@receipts_page == @receipts_total_pages}
+                      >
+                        Next
+                      </button>
+                      <button
+                        phx-click="rcp-last"
+                        class={"px-3 py-1.5 border text-sm rounded-md " <> if(@receipts_page == @receipts_total_pages, do: "text-gray-400 border-gray-200 cursor-not-allowed", else: "text-gray-700 border-gray-300 hover:bg-gray-50")}
+                        disabled={@receipts_page == @receipts_total_pages}
+                      >
+                        Last
+                      </button>
+                    </div>
                   </div>
                 <% end %>
               </div>
@@ -1116,7 +1446,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                           </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                          <%= for installment <- calculate_installment_breakdown_dynamic(@selected_booking.total_amount, @selected_booking.paid_amount || 0, @selected_booking.departure_date) do %>
+                          <%= for installment <- @installments_items do %>
                             <tr class={if installment.is_last, do: "bg-yellow-50", else: ""}>
                               <td class="px-4 py-2 text-sm font-medium text-gray-900">
                                 <%= installment.n %>
@@ -1321,70 +1651,5 @@ defmodule UmrahlyWeb.UserPaymentsLive do
       <% end %>
     </div>
     """
-  end
-
-  defp error_to_string(:too_large), do: "File is too large (max 10MB)"
-  defp error_to_string(:too_many_files), do: "Too many files (max 5)"
-  defp error_to_string(:not_accepted), do: "File type not accepted"
-  defp error_to_string(error), do: "Upload error: #{inspect(error)}"
-
-  defp generate_installment_payment_url(booking, installment_number, amount, payment_method, user) do
-    config = Application.get_env(:umrahly, :payment_gateway)
-
-     # Get package and schedule information
-     package = booking.package_schedule.package
-     schedule = booking.package_schedule
-
-    # Create installment payment context similar to booking context
-    installment_assigns = %{
-      payment_method: payment_method,
-      deposit_amount: amount,
-      current_user: user,
-      booking: booking,
-      installment_number: installment_number,
-      package: package,
-      schedule: schedule,
-      number_of_persons: booking.number_of_persons
-    }
-
-    case payment_method do
-      "toyyibpay" ->
-        generate_toyyibpay_installment_payment_url(booking, installment_assigns, config[:toyyibpay])
-      _ ->
-        generate_generic_installment_payment_url(booking, installment_assigns, config[:generic])
-    end
-  end
-
-  defp generate_toyyibpay_installment_payment_url(booking, assigns, _toyyibpay_config) do
-    case Umrahly.ToyyibPay.create_bill(booking, assigns) do
-      {:ok, %{payment_url: payment_url}} ->
-        payment_url
-      {:error, reason} ->
-        # Log error and fallback to demo URL
-        require Logger
-        Logger.error("ToyyibPay installment payment bill creation failed: #{inspect(reason)}")
-        "https://dev.toyyibpay.com"
-    end
-  end
-
-  defp generate_generic_installment_payment_url(booking, assigns, _generic_config) do
-    base_url = "https://demo-generic-gateway.com"
-
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    installment_suffix = String.pad_leading(Integer.to_string(assigns.installment_number), 2, "0")
-    payment_id = "INST-#{id_suffix}-#{installment_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
-
-    "#{base_url}/pay/#{payment_id}"
   end
 end

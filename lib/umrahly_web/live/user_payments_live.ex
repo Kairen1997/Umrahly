@@ -78,13 +78,10 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   def handle_event("view-booking", %{"booking_id" => booking_id}, socket) do
-    # Debug: Log what we're looking for
-    IO.inspect(booking_id, label: "Looking for booking_id")
-    IO.inspect(socket.assigns.bookings, label: "Available bookings")
+
 
     # Find the booking in the @bookings list
     booking = Enum.find(socket.assigns.bookings, fn b ->
-      IO.inspect(b.id, label: "Checking booking id")
       to_string(b.id) == to_string(booking_id)
     end)
 
@@ -377,7 +374,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     _booking = Bookings.get_booking!(booking_id)
 
     # Check if this is an online payment method that requires gateway redirect
-    requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
+    requires_online_payment = payment_method in ["toyyibpay"]
 
     if requires_online_payment do
       # For online payments, we would redirect to payment gateway
@@ -1210,9 +1207,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                     value={@selected_payment_method}
                   >
                     <option value="">Choose payment method</option>
-                    <option value="credit_card">Credit Card</option>
-                    <option value="online_banking">Online Banking (FPX)</option>
-                    <option value="e_wallet">E-Wallet (Boost, Touch 'n Go)</option>
+                    <option value="toyyibpay">ToyyibPay (FPX & Credit Card)</option>
                     <option value="bank_transfer">Bank Transfer</option>
                     <option value="cash">Cash</option>
                   </select>

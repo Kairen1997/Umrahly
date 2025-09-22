@@ -63,24 +63,14 @@ config :phoenix, :json_library, Jason
 
 # Payment Gateway Configuration
 config :umrahly, :payment_gateway,
-  # Stripe configuration (example)
-  stripe: [
-    publishable_key: System.get_env("STRIPE_PUBLISHABLE_KEY") || "pk_test_example",
-    secret_key: System.get_env("STRIPE_SECRET_KEY") || "sk_test_example",
-    webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET") || "whsec_example",
-    mode: System.get_env("STRIPE_MODE") || "test"
-  ],
-  # PayPal configuration (example)
-  paypal: [
-    client_id: System.get_env("PAYPAL_CLIENT_ID") || "client_id_example",
-    client_secret: System.get_env("PAYPAL_CLIENT_SECRET") || "client_secret_example",
-    mode: System.get_env("PAYPAL_MODE") || "sandbox" # or "live"
-  ],
-  # E-Wallet configuration (Boost, Touch 'n Go, etc.)
-  ewallet: [
-    boost_api_key: System.get_env("BOOST_API_KEY") || "boost_api_key_example",
-    touchngo_api_key: System.get_env("TOUCHNGO_API_KEY") || "touchngo_api_key_example",
-    mode: System.get_env("EWALLET_MODE") || "test"
+  # ToyyibPay configuration
+  toyyibpay: [
+    user_secret_key: System.get_env("TOYYIBPAY_USER_SECRET_KEY") || "toyyibpay_secret_key_example",
+    category_code: System.get_env("TOYYIBPAY_CATEGORY_CODE") || "toyyibpay_category_example",
+    redirect_uri: System.get_env("TOYYIBPAY_REDIRECT_URI") || "https://yourdomain.com/payment/return",
+    callback_uri: System.get_env("TOYYIBPAY_CALLBACK_URI") || "https://yourdomain.com/payment/callback",
+    sandbox: System.get_env("TOYYIBPAY_SANDBOX") == "true" || true,
+    api_url: System.get_env("TOYYIBPAY_API_URL") || "https://dev.toyyibpay.com/index.php/api"
   ],
   # Generic payment gateway (for development/testing)
   generic: [

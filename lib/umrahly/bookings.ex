@@ -291,6 +291,16 @@ defmodule Umrahly.Bookings do
   end
 
   @doc """
+  Updates booking payment fields and attaches payment proof without requiring all booking validations.
+  Safe for partial updates after user submits an offline payment proof.
+  """
+  def update_booking_payment_with_proof(%Booking{} = booking, attrs) when is_map(attrs) do
+    booking
+    |> Ecto.Changeset.change(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
   Submits a payment proof for a booking.
   """
   def submit_payment_proof(%Booking{} = booking, attrs) do

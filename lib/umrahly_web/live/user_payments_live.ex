@@ -78,15 +78,29 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   def handle_event("view-booking", %{"booking_id" => booking_id}, socket) do
-    booking = Enum.find(socket.assigns.bookings, fn b -> to_string(b.id) == to_string(booking_id) end)
+    # Debug: Log what we're looking for
+    IO.inspect(booking_id, label: "Looking for booking_id")
+    IO.inspect(socket.assigns.bookings, label: "Available bookings")
 
-    socket =
-      socket
-      |> assign(:selected_booking, booking)
-      |> assign(:show_booking_modal, false)
-      |> assign(:show_booking_plan, true)
+    # Find the booking in the @bookings list
+    booking = Enum.find(socket.assigns.bookings, fn b ->
+      IO.inspect(b.id, label: "Checking booking id")
+      to_string(b.id) == to_string(booking_id)
+    end)
 
-    {:noreply, socket}
+    if booking do
+      socket =
+        socket
+        |> assign(:selected_booking, booking)
+        |> assign(:show_booking_modal, false)
+        |> assign(:show_booking_plan, true)
+
+      {:noreply, socket}
+    else
+      # Enhanced error message with debugging info
+      socket = put_flash(socket, :error, "Booking not found. ID: #{booking_id}, Available IDs: #{Enum.map(socket.assigns.bookings, & &1.id) |> inspect}")
+      {:noreply, socket}
+    end
   end
 
   def handle_event("close-booking-modal", _params, socket) do
@@ -188,7 +202,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
           installment.installment_number,
           installment.amount,
           socket.assigns.selected_payment_method,
-          socket.assigns.uploads.payment_proof.entries,
+          socket,
           socket.assigns.current_user
         ) do
           {:ok, _payment} ->
@@ -245,8 +259,13 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
       schedule = safe_get_schedule(progress.package_schedule_id)
 
+      # Always use the latest booking ID, or create a consistent identifier
+      booking_id = if latest_booking, do: latest_booking.id, else: progress.id
+
       %{
-        id: (latest_booking && latest_booking.id) || progress.id,
+        id: booking_id,  # This will always be the same type
+        booking_id: latest_booking && latest_booking.id,  # Keep original booking ID separate
+        progress_id: progress.id,  # Keep original progress ID separate
         booking_reference:
           if latest_booking do
             "BK" <> Integer.to_string(latest_booking.id)
@@ -354,7 +373,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     end
   end
 
-  defp process_installment_payment(booking_id, installment_number, amount, payment_method, upload_entries, user) do
+  defp process_installment_payment(booking_id, installment_number, amount, payment_method, socket, user) do
     _booking = Bookings.get_booking!(booking_id)
 
     # Check if this is an online payment method that requires gateway redirect
@@ -365,11 +384,27 @@ defmodule UmrahlyWeb.UserPaymentsLive do
       # This is a placeholder - you'd implement actual gateway integration
       {:ok, :redirect_to_gateway}
     else
-      # For offline payments, we need to handle file uploads and create a pending payment record
-      # Save uploaded files
-      file_paths = save_uploaded_files(upload_entries, booking_id, installment_number)
+      # For offline payments, handle file uploads and create a pending payment record
+      file_paths = save_uploaded_files(socket, booking_id, installment_number)
 
-      # Create a payment record with pending status
+      # Persist proof and update payment progress on the booking record
+      booking = Bookings.get_booking!(booking_id)
+
+      current_paid = ensure_decimal(booking.deposit_amount)
+      incoming_amount = ensure_decimal(amount)
+      new_paid = Decimal.add(current_paid, incoming_amount) |> Decimal.round(2)
+
+      update_attrs = %{
+        deposit_amount: new_paid,
+        payment_method: payment_method,
+        payment_proof_file: List.first(file_paths),
+        payment_proof_status: "submitted",
+        payment_proof_submitted_at: DateTime.utc_now()
+      }
+
+      {:ok, _updated_booking} = Bookings.update_booking_payment_with_proof(booking, update_attrs)
+
+      # Create a payment record with pending status (for future use / audit trail)
       payment_attrs = %{
         booking_id: booking_id,
         installment_number: installment_number,
@@ -380,8 +415,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
         submitted_at: DateTime.utc_now()
       }
 
-      # For now, we'll just log the activity and notify
-      # In a real implementation, you'd save this to a payments table
+      # For now, log the activity and notify
       Umrahly.ActivityLogs.log_user_action(
         user.id,
         "Installment Payment Submitted",
@@ -395,7 +429,6 @@ defmodule UmrahlyWeb.UserPaymentsLive do
         }
       )
 
-      # Notify admin about pending payment verification
       Phoenix.PubSub.broadcast(Umrahly.PubSub, "admin:payments", {
         :payment_submitted_for_verification,
         %{
@@ -412,10 +445,9 @@ defmodule UmrahlyWeb.UserPaymentsLive do
     end
   end
 
-  defp save_uploaded_files(upload_entries, booking_id, installment_number) do
-    # Save uploaded files to the filesystem
-    Enum.map(upload_entries, fn entry ->
-      # Create directory structure: priv/static/uploads/payment_proof/booking_id/installment_number/
+  defp save_uploaded_files(socket, booking_id, installment_number) do
+    # Consume entries and copy to static uploads dir; return list of relative URLs
+    consume_uploaded_entries(socket, :payment_proof, fn %{path: path, client_name: client_name}, _entry ->
       upload_dir = Path.join([
         "priv/static/uploads/payment_proof",
         to_string(booking_id),
@@ -424,17 +456,18 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
       File.mkdir_p!(upload_dir)
 
-      # Generate unique filename
       timestamp = DateTime.utc_now() |> DateTime.to_unix()
-      _extension = Path.extname(entry.client_name)
-      filename = "#{timestamp}_#{entry.client_name}"
+      filename = "#{timestamp}_#{client_name}"
       file_path = Path.join(upload_dir, filename)
 
-      # Copy file to upload directory
-      File.cp!(entry.path, file_path)
+      File.cp!(path, file_path)
 
-      # Return relative path for database storage
-      "/uploads/payment_proof/#{booking_id}/installment_#{installment_number}/#{filename}"
+      rel = "/uploads/payment_proof/#{booking_id}/installment_#{installment_number}/#{filename}"
+      {:ok, rel}
+    end)
+    |> Enum.map(fn
+      {:ok, rel} -> rel
+      other -> other
     end)
   end
 
@@ -681,7 +714,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                                   <%= if installment.can_pay do %>
                                     <button
                                       phx-click="pay-installment"
-                                      phx-value-booking_id={@selected_booking.id}
+                                      phx-value-booking_id={@selected_booking.booking_id || @selected_booking.id}
                                       phx-value-installment_number={installment.n}
                                       phx-value-amount={Decimal.to_string(installment.amount)}
                                       class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
@@ -1192,52 +1225,51 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                   <label class="block text-sm font-medium text-gray-700 mb-2">
                     Upload Transaction Proof
                   </label>
-                  <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                    <div class="space-y-1 text-center">
-                      <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
-                      <div class="flex text-sm text-gray-600">
-                        <label for="payment_proof" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                          <span>Upload files</span>
-                          <.live_file_input upload={@uploads.payment_proof} class="sr-only" />
-                        </label>
-                        <p class="pl-1">or drag and drop</p>
-                      </div>
-                      <p class="text-xs text-gray-500">PNG, JPG, PDF, DOC up to 10MB each</p>
-                    </div>
-                  </div>
-
-                  <!-- Show uploaded files -->
-                  <%= for entry <- @uploads.payment_proof.entries do %>
-                    <div class="mt-3">
-                      <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <div class="flex items-center">
-                          <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                          </svg>
-                          <span class="text-sm text-gray-700"><%= entry.client_name %></span>
-                          <span class="ml-2 text-xs text-gray-500">(<%= entry.client_size %> bytes)</span>
+                  <form phx-change="validate">
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md phx-drop-target">
+                      <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="flex flex-col items-center gap-2 text-sm text-gray-600">
+                          <.live_file_input upload={@uploads.payment_proof} id="payment_proof" class="px-3 py-2 border rounded cursor-pointer text-blue-600 hover:text-blue-700" />
+                          <p class="text-xs text-gray-500">or drag and drop</p>
                         </div>
-                        <button
-                          phx-click="cancel-upload"
-                          phx-value-ref={entry.ref}
-                          class="text-red-500 hover:text-red-700"
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                          </svg>
-                        </button>
+                        <p class="text-xs text-gray-500">PNG, JPG, PDF, DOC up to 10MB each</p>
                       </div>
                     </div>
-                  <% end %>
 
-                  <!-- Show upload errors -->
-                  <%= for {_ref, error} <- @uploads.payment_proof.errors do %>
-                    <div class="mt-2 text-sm text-red-600">
-                      <%= error_to_string(error) %>
-                    </div>
-                  <% end %>
+                    <!-- Show uploaded files -->
+                    <%= for entry <- @uploads.payment_proof.entries do %>
+                      <div class="mt-3">
+                        <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div class="flex items-center">
+                            <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span class="text-sm text-gray-700"><%= entry.client_name %></span>
+                            <span class="ml-2 text-xs text-gray-500">(<%= entry.client_size %> bytes)</span>
+                          </div>
+                          <button
+                            phx-click="cancel-upload"
+                            phx-value-ref={entry.ref}
+                            class="text-red-500 hover:text-red-700"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    <% end %>
+
+                    <!-- Show upload errors -->
+                    <%= for {_ref, error} <- @uploads.payment_proof.errors do %>
+                      <div class="mt-2 text-sm text-red-600">
+                        <%= error_to_string(error) %>
+                      </div>
+                    <% end %>
+                  </form>
                 </div>
               <% end %>
 

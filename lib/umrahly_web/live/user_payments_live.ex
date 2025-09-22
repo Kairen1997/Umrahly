@@ -3,6 +3,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
   import UmrahlyWeb.SidebarComponent
   alias Umrahly.Bookings
+  alias Umrahly.Repo
   alias Decimal
   alias Calendar
   alias Float
@@ -202,7 +203,19 @@ defmodule UmrahlyWeb.UserPaymentsLive do
           socket,
           socket.assigns.current_user
         ) do
+          {:ok, %{redirect_to: payment_url}} ->
+            # For online payments, redirect to payment gateway
+            socket =
+              socket
+              |> put_flash(:info, "Redirecting to payment gateway...")
+              |> assign(:show_installment_payment_modal, false)
+              |> assign(:selected_installment, nil)
+              |> assign(:selected_payment_method, "")
+
+            {:noreply, redirect(socket, external: payment_url)}
+
           {:ok, _payment} ->
+            # For offline payments, show success message
             socket =
               socket
               |> put_flash(:info, "Installment payment submitted successfully! We will verify your payment and update your account.")
@@ -212,6 +225,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
               |> load_data()
 
             {:noreply, socket}
+
         end
       end
     end
@@ -228,6 +242,8 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
     {:noreply, socket}
   end
+
+
 
   defp load_data(socket) do
     user = socket.assigns.current_user
@@ -371,15 +387,31 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   defp process_installment_payment(booking_id, installment_number, amount, payment_method, socket, user) do
-    _booking = Bookings.get_booking!(booking_id)
+    booking = Bookings.get_booking!(booking_id)
+    |> Repo.preload([:package_schedule, package_schedule: :package])
 
     # Check if this is an online payment method that requires gateway redirect
     requires_online_payment = payment_method in ["toyyibpay"]
 
     if requires_online_payment do
-      # For online payments, we would redirect to payment gateway
-      # This is a placeholder - you'd implement actual gateway integration
-      {:ok, :redirect_to_gateway}
+      # For online payments, generate payment gateway URL
+      payment_url = generate_installment_payment_url(booking, installment_number, amount, payment_method, socket.assigns.current_user)
+
+      # Log the payment attempt
+      Umrahly.ActivityLogs.log_user_action(
+        user.id,
+        "Installment Payment Initiated",
+        "Payment #{installment_number} for booking #{booking_id}",
+        %{
+          booking_id: booking_id,
+          installment_number: installment_number,
+          amount: amount,
+          payment_method: payment_method,
+          payment_url: payment_url
+        }
+      )
+
+      {:ok, %{redirect_to: payment_url}}
     else
       # For offline payments, handle file uploads and create a pending payment record
       file_paths = save_uploaded_files(socket, booking_id, installment_number)
@@ -1295,4 +1327,64 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   defp error_to_string(:too_many_files), do: "Too many files (max 5)"
   defp error_to_string(:not_accepted), do: "File type not accepted"
   defp error_to_string(error), do: "Upload error: #{inspect(error)}"
+
+  defp generate_installment_payment_url(booking, installment_number, amount, payment_method, user) do
+    config = Application.get_env(:umrahly, :payment_gateway)
+
+     # Get package and schedule information
+     package = booking.package_schedule.package
+     schedule = booking.package_schedule
+
+    # Create installment payment context similar to booking context
+    installment_assigns = %{
+      payment_method: payment_method,
+      deposit_amount: amount,
+      current_user: user,
+      booking: booking,
+      installment_number: installment_number,
+      package: package,
+      schedule: schedule,
+      number_of_persons: booking.number_of_persons
+    }
+
+    case payment_method do
+      "toyyibpay" ->
+        generate_toyyibpay_installment_payment_url(booking, installment_assigns, config[:toyyibpay])
+      _ ->
+        generate_generic_installment_payment_url(booking, installment_assigns, config[:generic])
+    end
+  end
+
+  defp generate_toyyibpay_installment_payment_url(booking, assigns, _toyyibpay_config) do
+    case Umrahly.ToyyibPay.create_bill(booking, assigns) do
+      {:ok, %{payment_url: payment_url}} ->
+        payment_url
+      {:error, reason} ->
+        # Log error and fallback to demo URL
+        require Logger
+        Logger.error("ToyyibPay installment payment bill creation failed: #{inspect(reason)}")
+        "https://dev.toyyibpay.com"
+    end
+  end
+
+  defp generate_generic_installment_payment_url(booking, assigns, _generic_config) do
+    base_url = "https://demo-generic-gateway.com"
+
+    booking_id_str = case booking do
+      %{id: id} when is_integer(id) -> Integer.to_string(id)
+      %{id: id} when is_binary(id) -> id
+      _ -> "demo"
+    end
+
+    id_suffix = if String.length(booking_id_str) >= 8 do
+      String.slice(booking_id_str, -8..-1)
+    else
+      String.pad_leading(booking_id_str, 8, "0")
+    end
+
+    installment_suffix = String.pad_leading(Integer.to_string(assigns.installment_number), 2, "0")
+    payment_id = "INST-#{id_suffix}-#{installment_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
+
+    "#{base_url}/pay/#{payment_id}"
+  end
 end

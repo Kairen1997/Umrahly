@@ -35,8 +35,15 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
       nil ->
         {:noreply, put_flash(socket, :error, "Booking flow not found")}
       booking_flow ->
-        # Redirect to the booking flow with the saved progress
-        {:noreply, push_navigate(socket, to: ~p"/book/#{booking_flow.package_id}/#{booking_flow.package_schedule_id}?resume=true")}
+        # Prevent resuming if payment has been approved for full payment plan only
+        if booking_flow._latest_booking &&
+             booking_flow._latest_booking.payment_proof_status == "approved" &&
+             booking_flow.payment_plan == "full_payment" do
+          {:noreply, put_flash(socket, :info, "Payment approved. Please wait for your flight schedule.")}
+        else
+          # Redirect to the booking flow with the saved progress
+          {:noreply, push_navigate(socket, to: ~p"/book/#{booking_flow.package_id}/#{booking_flow.package_schedule_id}?resume=true")}
+        end
     end
   end
 
@@ -196,7 +203,6 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                                 "bank_transfer" -> "bg-blue-100 text-blue-800"
                                 "online_banking" -> "bg-green-100 text-green-800"
                                 "cash" -> "bg-yellow-100 text-yellow-800"
-                                "e_wallet" -> "bg-orange-100 text-orange-800"
                                 _ -> "bg-gray-100 text-gray-800"
                               end
                             ]}>
@@ -235,18 +241,24 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
 
                       <div class="text-xs text-gray-500">
-                        Last updated: <%= Calendar.strftime(booking.last_updated, "%B %d, %Y at %I:%M %p") %>
+                        Last updated: <%= UmrahlyWeb.Timezone.format_local(booking.last_updated, "%B %d, %Y at %I:%M %p") %>
                       </div>
                     </div>
 
                     <div class="flex flex-col space-y-2 ml-4">
-                      <button
-                        phx-click="resume_booking"
-                        phx-value-id={booking.id}
-                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-                      >
-                        Resume Booking
-                      </button>
+                      <%= if booking._latest_booking && booking._latest_booking.payment_proof_status == "approved" && booking.payment_plan == "full_payment" do %>
+                        <div class="bg-green-50 text-green-800 px-4 py-2 rounded-lg border border-green-200 text-sm">
+                          Payment approved. Please wait for your flight schedule.
+                        </div>
+                      <% else %>
+                        <button
+                          phx-click="resume_booking"
+                          phx-value-id={booking.id}
+                          class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                        >
+                          Resume Booking
+                        </button>
+                      <% end %>
                       <%= if booking._latest_booking && booking._latest_booking.payment_proof_status in ["submitted", "approved", "rejected"] do %>
                         <%= if booking._latest_booking.payment_proof_status == "rejected" do %>
                           <button
@@ -312,7 +324,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                 </div>
 
                 <!-- Traveler Details Section -->
-                <div class="p-6 bg-gray-50">
+                <div id={"traveler-section-" <> to_string(booking.id)} class="p-6 bg-gray-50">
                   <div class="flex items-center justify-between mb-4">
                     <h4 class="text-lg font-medium text-gray-900 flex items-center">
                       <svg class="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -344,8 +356,25 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                           Booking for Others
                         </span>
                       <% end %>
+                      <button
+                        id={"toggle-travelers-" <> to_string(booking.id)}
+                        data-toggle-id={"traveler-details-" <> to_string(booking.id)}
+                        data-scroll-id={"traveler-list-" <> to_string(booking.id)}
+                        data-scroll-offset="80"
+                        data-show-text="View Travelers"
+                        data-hide-text="Hide Travelers"
+                        phx-hook="ToggleSection"
+                        class="bg-gray-100 text-gray-800 px-3 py-1 rounded hover:bg-gray-200 transition-colors text-sm"
+                      >
+                        View Travelers
+                      </button>
                     </div>
                   </div>
+
+                 <!-- Toggleable traveler details wrapper -->
+                 <div id={"traveler-details-" <> to_string(booking.id)} class="hidden">
+                  <!-- Anchor to scroll into view just above the list -->
+                  <div id={"traveler-list-" <> to_string(booking.id)}></div>
 
                   <%= if booking.travelers_data && length(booking.travelers_data) > 0 do %>
                     <div class="overflow-x-auto">
@@ -543,6 +572,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
                     <% end %>
                   <% end %>
+                 </div>
                 </div>
               </div>
             <% end %>

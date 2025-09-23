@@ -31,7 +31,7 @@ defmodule Umrahly.Bookings.BookingFlowProgress do
     |> validate_required([:travelers_data])
     |> validate_inclusion(:status, ["in_progress", "completed", "abandoned"])
     |> validate_inclusion(:payment_plan, ["full_payment", "installment"])
-    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash"])
+    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash", "toyyibpay"])
     |> validate_number(:current_step, greater_than: 0, less_than_or_equal_to: 5)
     |> validate_number(:max_steps, greater_than: 0, less_than_or_equal_to: 5)
     |> validate_number(:number_of_persons, greater_than: 0, less_than_or_equal_to: 10)

@@ -24,6 +24,14 @@ defmodule UmrahlyWeb.Router do
     get "/test-flash", PageController, :test_flash
   end
 
+  # Payment callback routes (no authentication required)
+  scope "/payment", UmrahlyWeb do
+    pipe_through [:browser]
+
+    post "/toyyibpay/callback", PaymentController, :toyyibpay_callback
+    get "/toyyibpay/return", PaymentController, :toyyibpay_return
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", UmrahlyWeb do
   #   pipe_through :api
@@ -72,6 +80,7 @@ defmodule UmrahlyWeb.Router do
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new
     live "/payments", UserPaymentsLive, :index
     live "/payments/:tab", UserPaymentsLive, :index
+    get "/receipts/:id/view", PageController, :view_receipt
     get "/receipts/:id/download", PageController, :download_receipt
   end
 

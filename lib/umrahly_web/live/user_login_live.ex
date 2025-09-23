@@ -3,45 +3,54 @@ defmodule UmrahlyWeb.UserLoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="flex justify-center items-center min-h-screen bg-[#F9FAF5]">
-      <div class="max-w-md w-full bg-[#EAD4AB] rounded-lg p-8 shadow-lg">
-        <h2 class="text-center text-xl font-semibold mb-6">Login to your account</h2>
-        <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-6">
-          <div>
-            <label for="email" class="block mb-1 text-sm font-medium text-gray-900">Email</label>
-            <.input
-              field={@form[:email]}
-              id="email"
-              type="email"
-              placeholder="Enter your email"
-              required
-              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
-            />
-          </div>
+    <div class="relative min-h-screen">
+      <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover">
+        <source src={~p"/images/login.video.mp4"} type="video/mp4" />
+      </video>
+      <div class="absolute inset-0 bg-black/40"></div>
 
-          <div>
-            <label for="password" class="block mb-1 text-sm font-medium text-gray-900">Password</label>
-            <.input
-              field={@form[:password]}
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              required
-              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
-            />
+      <div class="relative flex justify-center items-center min-h-screen">
+        <div class="w-full max-w-md p-8 rounded-2xl text-white shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
+          <div class="flex justify-center mb-6 space-x-8 text-sm font-medium">
+            <.link navigate={~p"/users/register"} class="text-white/80 hover:text-white">Register</.link>
+            <span class="text-white cursor-pointer border-b-2 border-white pb-1">Login</span>
           </div>
+          <form id="login_form" action={~p"/users/log_in"} method="post" phx-update="ignore" class="space-y-4">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <div>
+              <label for="email" class="block mb-1 text-sm font-medium text-white/90">Email</label>
+              <.input
+                field={@form[:email]}
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                required
+                class="w-full rounded-md border border-white/30 bg-white/20 text-white placeholder-white/70 px-3 py-2 focus:border-white/50 focus:ring-white/40"
+              />
+            </div>
 
-          <:actions>
+            <div>
+              <label for="password" class="block mb-1 text-sm font-medium text-white/90">Password</label>
+              <.input
+                field={@form[:password]}
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                required
+                class="w-full rounded-md border border-white/30 bg-white/20 text-white placeholder-white/70 px-3 py-2 focus:border-white/50 focus:ring-white/40"
+              />
+            </div>
+
             <.button phx-disable-with="Logging in..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
               Login
             </.button>
-          </:actions>
-        </.simple_form>
+          </form>
 
-        <p class="mt-4 text-center text-sm text-gray-700">
-          Don't have an account?
-          <.link navigate={~p"/users/register"} class="text-teal-700 hover:underline">Register</.link>
-        </p>
+          <p class="mt-4 text-center text-sm text-white/80">
+            Don't have an account?
+            <.link navigate={~p"/users/register"} class="text-white hover:underline">Register</.link>
+          </p>
+        </div>
       </div>
     </div>
     """

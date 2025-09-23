@@ -23,6 +23,11 @@ import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import "./flash_config"
 
+// Initialize Alpine.js for simple UI interactions (e.g., sidebar toggle)
+import Alpine from "alpinejs"
+window.Alpine = Alpine
+Alpine.start()
+
 
 // Custom hook for form validation
 const FormValidationHook = {
@@ -562,6 +567,81 @@ const AutoScroll = {
   }
 };
 
+// New hook to scroll to a target element by id
+const ScrollTo = {
+  mounted() {
+    this.onClick = (e) => {
+      e.preventDefault();
+      const targetId = this.el.dataset.targetId;
+      if (!targetId) return;
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    this.el.addEventListener('click', this.onClick);
+  },
+  destroyed() {
+    if (this.onClick) {
+      this.el.removeEventListener('click', this.onClick);
+    }
+  }
+};
+
+// New hook to toggle target visibility and optionally scroll when showing
+const ToggleSection = {
+  mounted() {
+    this.onClick = (e) => {
+      e.preventDefault();
+      const toggleId = this.el.dataset.toggleId || this.el.dataset.targetId;
+      const scrollId = this.el.dataset.scrollId || this.el.dataset.targetId;
+      if (!toggleId) return;
+      const toggleEl = document.getElementById(toggleId);
+      if (!toggleEl) return;
+
+      const isHidden = toggleEl.classList.contains('hidden');
+      if (isHidden) {
+        toggleEl.classList.remove('hidden');
+        const hideText = this.el.dataset.hideText;
+        if (hideText) this.el.textContent = hideText;
+        // Scroll with offset to account for fixed headers
+        const offset = parseInt(this.el.dataset.scrollOffset || '80', 10);
+        const scrollEl = scrollId ? document.getElementById(scrollId) : toggleEl;
+        if (scrollEl) {
+          const rect = scrollEl.getBoundingClientRect();
+          const top = rect.top + window.pageYOffset - offset;
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+      } else {
+        toggleEl.classList.add('hidden');
+        const showText = this.el.dataset.showText;
+        if (showText) this.el.textContent = showText;
+      }
+    };
+    this.el.addEventListener('click', this.onClick);
+
+    // Initialize button text based on current visibility
+    const toggleId = this.el.dataset.toggleId || this.el.dataset.targetId;
+    const showText = this.el.dataset.showText;
+    const hideText = this.el.dataset.hideText;
+    if (toggleId && (showText || hideText)) {
+      const toggleEl = document.getElementById(toggleId);
+      if (toggleEl) {
+        if (toggleEl.classList.contains('hidden')) {
+          if (showText) this.el.textContent = showText;
+        } else {
+          if (hideText) this.el.textContent = hideText;
+        }
+      }
+    }
+  },
+  destroyed() {
+    if (this.onClick) {
+      this.el.removeEventListener('click', this.onClick);
+    }
+  }
+};
+
 // Custom hook for debugging Add Item button
 const AddItemDebugHook = {
   mounted() {
@@ -736,6 +816,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     PackageDetails,
     ScheduleDetails,
     AutoScroll,
+    ScrollTo,
+    ToggleSection,
     AddItemDebugHook,
     DebugClick,
     BookingProgress,

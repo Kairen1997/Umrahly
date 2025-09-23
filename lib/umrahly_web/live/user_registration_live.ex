@@ -6,19 +6,24 @@ defmodule UmrahlyWeb.UserRegistrationLive do
 
   def render(assigns) do
     ~H"""
-    <div class="flex justify-center items-center min-h-screen bg-[#F9FAF5]">
+    <div class="relative min-h-screen">
+    <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover">
+        <source src={~p"/images/login.video.mp4"} type="video/mp4" />
+      </video>
+      <div class="absolute inset-0 bg-black/40"></div>
+
+      <div class="relative flex justify-center items-center min-h-screen">
       <!-- Form Container -->
-      <div class="bg-[#EAD4AB] p-8 rounded-lg shadow-lg w-full max-w-md">
+      <div class="w-full max-w-md p-8 rounded-2xl text-white shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
 
         <!-- Tabs -->
         <div class="flex justify-center mb-6 space-x-8 text-sm font-medium">
-          <span class="text-[#00897B] cursor-pointer border-b-2 border-[#00897B] pb-1">Register</span>
-          <.link navigate={~p"/users/log_in"} class="text-gray-500 hover:text-[#00897B]">Login</.link>
+          <span class="cursor-pointer border-b-2 border-white text-white pb-1">Register</span>
+          <.link navigate={~p"/users/log_in"} class="text-white/80 hover:text-white">Login</.link>
         </div>
 
         <!-- Form -->
-        <.simple_form
-          for={@form}
+        <form
           id="registration_form"
           phx-submit="save"
           phx-change="validate"
@@ -27,52 +32,52 @@ defmodule UmrahlyWeb.UserRegistrationLive do
           method="post"
           class="space-y-4"
         >
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
           <.error :if={@check_errors}>
             Oops, something went wrong! Please check the errors below.
           </.error>
 
+          <label for="full_name" class="block mb-1 text-sm font-medium text-white/90">Full Name</label>
           <.input
             field={@form[:full_name]}
+            id="full_name"
             type="text"
-            label="Full Name"
             placeholder="Enter your full name"
             required
-            class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+            class="w-full rounded-md border border-white/30 px-3 py-2 bg-white/20 text-white placeholder-white/70 focus:border-white/50 focus:ring-white/40"
           />
-
+          <label for="email" class="block mb-1 text-sm font-medium text-white/90">Email</label>
           <.input
             field={@form[:email]}
+            id="email"
             type="email"
-            label="Email"
             placeholder="Enter your email"
             required
-            class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+            class="w-full rounded-md border border-white/30 px-3 py-2 bg-white/20 text-white placeholder-white/70 focus:border-white/50 focus:ring-white/40"
           />
 
+          <label for="password" class="block mb-1 text-sm font-medium text-white/90">Password</label>
           <.input
             field={@form[:password]}
+            id="password"
             type="password"
-            label="Password"
             placeholder="Enter your Password"
             required
-            class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+            class="w-full rounded-md border border-white/30 px-3 py-2 bg-white/20 text-white placeholder-white/70 focus:border-white/50 focus:ring-white/40"
           />
 
-
-
-          <:actions>
-            <.button phx-disable-with="Registering..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
-              Register
-            </.button>
-          </:actions>
-        </.simple_form>
+          <.button phx-disable-with="Registering..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
+            Register
+          </.button>
+        </form>
 
         <!-- Bottom text -->
-        <p class="mt-4 text-center text-sm text-gray-700">
+        <p class="mt-4 text-center text-sm text-white/80">
           Already have an account?
-          <.link navigate={~p"/users/log_in"} class="text-[#00897B] hover:underline">Login</.link>
+          <.link navigate={~p"/users/log_in"} class="text-white hover:underline">Login</.link>
         </p>
       </div>
+    </div>
     </div>
     """
   end

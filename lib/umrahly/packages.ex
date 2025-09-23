@@ -148,7 +148,7 @@ defmodule Umrahly.Packages do
     })
     |> Repo.all()
     |> Enum.map(fn activity ->
-      formatted_time = Calendar.strftime(activity.timestamp, "%B %d, %Y at %I:%M %p")
+      formatted_time = UmrahlyWeb.Timezone.format_local(activity.timestamp, "%B %d, %Y at %I:%M %p")
 
       %{
         action: activity.action,

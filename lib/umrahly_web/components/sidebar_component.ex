@@ -3,9 +3,9 @@ defmodule UmrahlyWeb.SidebarComponent do
 
   def sidebar(assigns) do
     ~H"""
-    <div class="flex min-h-screen bg-gray-100" style="min-height: calc(100vh - 64px);">
+    <div x-data="{ open: true }" class="flex min-h-screen bg-gray-100" style="min-height: calc(100vh - 64px);">
       <!-- Sidebar -->
-      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between sticky top-0 h-screen">
+      <aside x-cloak x-show="open" x-transition:enter="transition ease-out duration-300 transform" x-transition:enter-start="-translate-x-full opacity-0" x-transition:enter-end="translate-x-0 opacity-100" x-transition:leave="transition ease-in duration-200 transform" x-transition:leave-start="translate-x-0 opacity-100" x-transition:leave-end="-translate-x-full opacity-0" class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between sticky top-0 h-screen">
         <!-- Navigation Menu -->
         <div class="sticky top-0">
           <nav class="mt-0">
@@ -33,14 +33,11 @@ defmodule UmrahlyWeb.SidebarComponent do
                 </svg>
                 Packages
               </a>
-              <div class="ml-8 space-y-1">
-                <a href="/packages/details" class="block px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors duration-200">• View Details</a>
-              </div>
 
               <!-- Payments -->
               <a href="/payments" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200">
                 <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599 1"/>
                 </svg>
                 Payments
               </a>
@@ -56,14 +53,25 @@ defmodule UmrahlyWeb.SidebarComponent do
 
       <!-- Main Content -->
       <div class="flex-1 flex flex-col">
-        <!-- Page Content -->
-        <main class="flex-1 bg-gray-50 p-6 overflow-auto">
+        <!-- Top bar with burger -->
+        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center sticky top-0 z-50">
+          <button type="button" class="mr-3 inline-flex items-center justify-center rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" @click="open = !open" aria-label="Toggle sidebar">
+            <svg x-cloak x-show="!open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <svg x-cloak x-show="open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           <!-- Page Title -->
-          <div class="mb-6">
+          <div class="mb-0">
             <h1 class="text-2xl font-semibold text-gray-900">
               <%= Map.get(assigns, :page_title, "Dashboard") %>
             </h1>
           </div>
+        </div>
+        <!-- Page Content -->
+        <main class="flex-1 bg-gray-50 p-6 overflow-auto">
           <%= render_slot(@inner_block) %>
         </main>
       </div>

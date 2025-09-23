@@ -1,59 +1,45 @@
 defmodule UmrahlyWeb.UserBookingFlowLive do
-  @moduledoc """
-  LiveView for handling the user booking flow.
+@moduledoc """
+LiveView for handling the user booking flow.
 
-  ## Payment Gateway Integration
+## Payment Gateway Integration
 
-  This module includes placeholder implementations for payment gateway integration.
-  To complete the integration, you need to:
+This module includes implementations for payment gateway integration.
+The following payment methods are supported:
 
-  1. **Stripe Integration** (for credit card payments):
-     - Install Stripe library: `mix deps.get stripe`
-     - Set environment variables: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY
-     - Replace `generate_stripe_payment_url/3` with actual Stripe Checkout Session creation
+1. **ToyyibPay Integration** (for FPX and Credit Card payments)
+  - Set environment variables: TOYYIBPAY_USER_SECRET_KEY, TOYYIBPAY_CATEGORY_CODE
+  - Configure redirect and callback URIs
 
-  2. **PayPal Integration** (for online banking/FPX):
-     - Install PayPal library: `mix deps.get pay`
-     - Set environment variables: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET
-     - Replace `generate_paypal_payment_url/3` with actual PayPal payment creation
+2. **Bank Transfer & Cash**
+  - These are handled as offline payment methods
+  - No immediate redirection required
 
-  3. **E-Wallet Integration** (for Boost, Touch 'n Go):
-     - Implement integration with respective e-wallet APIs
-     - Update `generate_payment_gateway_url/2` to handle e-wallet payments
+## Environment Variables Required
 
-  4. **Bank Transfer & Cash**:
-     - These are handled as offline payment methods
-     - No immediate redirection required
+```bash
+# ToyyibPay
+export TOYYIBPAY_USER_SECRET_KEY=your_secret_key
+export TOYYIBPAY_CATEGORY_CODE=your_category_code
+export TOYYIBPAY_REDIRECT_URI=https://yourdomain.com/payment/return
+export TOYYIBPAY_CALLBACK_URI=https://yourdomain.com/payment/callback
+export TOYYIBPAY_SANDBOX=true
 
-  ## Environment Variables Required
+# Generic Payment Gateway
+export PAYMENT_GATEWAY_URL=https://your-gateway.com
+export PAYMENT_MERCHANT_ID=your_merchant_id
+export PAYMENT_API_KEY=your_api_key
+```
+"""
 
-  ```bash
-  # Stripe
-  export STRIPE_PUBLISHABLE_KEY=pk_test_...
-  export STRIPE_SECRET_KEY=sk_test_...
-  export STRIPE_WEBHOOK_SECRET=whsec_...
+use UmrahlyWeb, :live_view
 
-  # PayPal
-  export PAYPAL_CLIENT_ID=client_id_...
-  export PAYPAL_CLIENT_SECRET=client_secret_...
-  export PAYPAL_MODE=sandbox  # or live
+import UmrahlyWeb.SidebarComponent
+alias Umrahly.Bookings
+alias Umrahly.Bookings.Booking
+alias Umrahly.Packages
 
-  # Generic Payment Gateway
-  export PAYMENT_GATEWAY_URL=https://your-gateway.com
-  export PAYMENT_MERCHANT_ID=your_merchant_id
-  export PAYMENT_API_KEY=your_api_key
-  ```
-  """
-
-  use UmrahlyWeb, :live_view
-
-  import UmrahlyWeb.SidebarComponent
-  alias Umrahly.Bookings
-  alias Umrahly.Bookings.Booking
-  alias Umrahly.Packages
-
-  on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
-
+on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
 
   def mount(%{"package_id" => package_id, "schedule_id" => schedule_id} = params, _session, socket) do
@@ -1369,8 +1355,6 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     end
   end
 
-
-
   def handle_event("go_to_next_step", _params, socket) do
     current_step = socket.assigns.current_step
     max_steps = socket.assigns.max_steps
@@ -1508,7 +1492,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
           case Bookings.create_booking(attrs) do
             {:ok, booking} ->
               payment_method = socket.assigns.payment_method
-              requires_online_payment = payment_method in ["credit_card", "online_banking", "e_wallet"]
+              requires_online_payment = payment_method in ["toyyibpay"]
 
               # Update the booking flow progress so Active Bookings reflects completion
               {_ok, progress_after_booking} = Bookings.update_booking_flow_progress(
@@ -1588,42 +1572,31 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
     payment_method = assigns.payment_method
 
     case payment_method do
-      "credit_card" ->
-        generate_stripe_payment_url(booking, assigns, config[:stripe])
-
-      "online_banking" ->
-        generate_paypal_payment_url(booking, assigns, config[:paypal])
-
-      "e_wallet" ->
-        generate_ewallet_payment_url(booking, assigns, config[:ewallet])
+      "toyyibpay" ->
+        generate_toyyibpay_payment_url(booking, assigns, config[:toyyibpay])
 
       _ ->
         generate_generic_payment_url(booking, assigns, config[:generic])
     end
   end
 
-  defp generate_stripe_payment_url(booking, _assigns, _stripe_config) do
-    base_url = "https://checkout.stripe.com"
+  defp generate_toyyibpay_payment_url(booking, assigns, _toyyibpay_config) do
+    case Umrahly.ToyyibPay.create_bill(booking, assigns) do
+      {:ok, %{payment_url: payment_url}} ->
+        payment_url
+      {:error, reason} ->
+        # Log error and fallback to demo URL
+        require Logger
+        Logger.error("ToyyibPay bill creation failed: #{inspect(reason)}")
 
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
+        # Instead of generating a fake bill URL that returns 404,
+        # redirect to ToyyibPay sandbox homepage which actually exists
+        "https://dev.toyyibpay.com"
     end
-
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    session_id = "cs_test_#{id_suffix}_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
-
-    "#{base_url}/pay/#{session_id}"
   end
 
-  defp generate_paypal_payment_url(booking, _assigns, paypal_config) do
-    base_url = if paypal_config && paypal_config[:mode] == "live", do: "https://www.paypal.com", else: "https://www.sandbox.paypal.com"
+  defp generate_generic_payment_url(booking, _assigns, _generic_config) do
+    base_url = "https://demo-generic-gateway.com"
 
     booking_id_str = case booking do
       %{id: id} when is_integer(id) -> Integer.to_string(id)
@@ -1637,52 +1610,9 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
       String.pad_leading(booking_id_str, 8, "0")
     end
 
-    payment_id = "PAY-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
-
-    "#{base_url}/checkoutnow?token=#{payment_id}"
-  end
-
-  defp generate_ewallet_payment_url(booking, _assigns, _ewallet_config) do
-    base_url = "https://demo-ewallet-gateway.com"
-
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    payment_id = "EW-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
+    payment_id = "GEN-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
 
     "#{base_url}/pay/#{payment_id}"
-  end
-
-  defp generate_generic_payment_url(booking, _assigns, generic_config) do
-    base_url = generic_config && generic_config[:base_url] || "https://demo-payment-gateway.com"
-
-
-    booking_id_str = case booking do
-      %{id: id} when is_integer(id) -> Integer.to_string(id)
-      %{id: id} when is_binary(id) -> id
-      _ -> "demo"
-    end
-
-
-    id_suffix = if String.length(booking_id_str) >= 8 do
-      String.slice(booking_id_str, -8..-1)
-    else
-      String.pad_leading(booking_id_str, 8, "0")
-    end
-
-    transaction_id = "TXN-#{id_suffix}-#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :upper)}"
-
-
-    "#{base_url}/payment/#{transaction_id}"
   end
 
   defp error_to_string(:too_large), do: "File is too large"
@@ -2833,9 +2763,7 @@ defmodule UmrahlyWeb.UserBookingFlowLive do
                   phx-debounce="100"
                 >
                   <option value="">Select payment method</option>
-                  <option value="credit_card">Credit Card</option>
-                  <option value="online_banking">Online Banking (FPX)</option>
-                  <option value="e_wallet">E-Wallet (Boost, Touch 'n Go)</option>
+                  <option value="toyyibpay">ToyyibPay (FPX & Credit Card)</option>
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="cash">Cash</option>
                 </select>

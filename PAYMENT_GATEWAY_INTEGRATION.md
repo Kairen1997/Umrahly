@@ -9,9 +9,9 @@ When a user chooses an online payment method during the booking process, they ar
 ## Supported Payment Methods
 
 ### Online Payment Methods (Require Gateway Redirect)
-1. **Credit Card** → Stripe Checkout
-2. **Online Banking (FPX)** → PayPal
-3. **E-Wallet** → Boost, Touch 'n Go, etc.
+1. **ToyyibPay** → FPX (Online Banking) & Credit Card
+2. **Credit Card** → Stripe Checkout
+3. **Online Banking (FPX)** → PayPal
 
 ### Offline Payment Methods (No Redirect)
 1. **Bank Transfer** → Manual payment proof upload
@@ -70,6 +70,7 @@ defp generate_payment_gateway_url(booking, assigns) do
   payment_method = assigns.payment_method
 
   case payment_method do
+    "toyyibpay" -> generate_toyyibpay_payment_url(booking, assigns, config[:toyyibpay])
     "credit_card" -> generate_stripe_payment_url(booking, assigns, config[:stripe])
     "online_banking" -> generate_paypal_payment_url(booking, assigns, config[:paypal])
     "e_wallet" -> generate_ewallet_payment_url(booking, assigns, config[:ewallet])
@@ -104,6 +105,15 @@ Payment gateway configuration is in `config/config.exs`:
 
 ```elixir
 config :umrahly, :payment_gateway,
+  # ToyyibPay configuration
+  toyyibpay: [
+    user_secret_key: System.get_env("TOYYIBPAY_USER_SECRET_KEY") || "toyyibpay_secret_key_example",
+    category_code: System.get_env("TOYYIBPAY_CATEGORY_CODE") || "toyyibpay_category_example",
+    redirect_uri: System.get_env("TOYYIBPAY_REDIRECT_URI") || "https://yourdomain.com/payment/return",
+    callback_uri: System.get_env("TOYYIBPAY_CALLBACK_URI") || "https://yourdomain.com/payment/callback",
+    sandbox: System.get_env("TOYYIBPAY_SANDBOX") == "true" || true,
+    api_url: System.get_env("TOYYIBPAY_API_URL") || "https://dev.toyyibpay.com/index.php/api"
+  ],
   stripe: [
     publishable_key: System.get_env("STRIPE_PUBLISHABLE_KEY") || "pk_test_example",
     secret_key: System.get_env("STRIPE_SECRET_KEY") || "sk_test_example",
@@ -132,21 +142,17 @@ config :umrahly, :payment_gateway,
 Set these environment variables for production:
 
 ```bash
-# Stripe
-export STRIPE_PUBLISHABLE_KEY=pk_live_...
-export STRIPE_SECRET_KEY=sk_live_...
-export STRIPE_WEBHOOK_SECRET=whsec_...
-export STRIPE_MODE=live
+# ToyyibPay
+export TOYYIBPAY_USER_SECRET_KEY=your_user_secret_key
+export TOYYIBPAY_CATEGORY_CODE=your_category_code
+export TOYYIBPAY_REDIRECT_URI=https://yourdomain.com/payment/toyyibpay/return
+export TOYYIBPAY_CALLBACK_URI=https://yourdomain.com/payment/toyyibpay/callback
+export TOYYIBPAY_SANDBOX=false
+export TOYYIBPAY_API_URL=https://toyyibpay.com/index.php/api
 
-# PayPal
-export PAYPAL_CLIENT_ID=client_id_...
-export PAYPAL_CLIENT_SECRET=client_secret_...
-export PAYPAL_MODE=live
 
-# E-Wallet
-export BOOST_API_KEY=boost_api_key_...
-export TOUCHNGO_API_KEY=touchngo_api_key_...
-export EWALLET_MODE=live
+
+
 
 # Generic Payment Gateway
 export PAYMENT_GATEWAY_URL=https://your-gateway.com
@@ -160,9 +166,7 @@ export PAYMENT_API_KEY=your_api_key
 
 The system generates realistic demo URLs for testing:
 
-- **Stripe**: `https://checkout.stripe.com/pay/cs_test_12345678_abcdef1234567890`
-- **PayPal**: `https://www.sandbox.paypal.com/checkoutnow?token=PAY-12345678-ABCD`
-- **E-Wallet**: `https://demo-ewallet-gateway.com/pay/EW-12345678-ABCD`
+- **ToyyibPay**: `https://dev.toyyibpay.com/TP-12345678-ABCD`
 - **Generic**: `https://demo-payment-gateway.com/payment/TXN-12345678-ABCD`
 
 ### Test Page
@@ -173,21 +177,14 @@ Use `test_payment_gateway.html` to test the payment gateway URLs.
 
 To complete the integration for production:
 
-### 1. Stripe
-- Install Stripe library: `mix deps.get stripe`
-- Replace `generate_stripe_payment_url/3` with actual Stripe Checkout Session creation
-- Handle webhooks for payment confirmation
+### 1. ToyyibPay
+- Register for ToyyibPay account
+- Get User Secret Key and Category Code
+- Set up callback and return URLs
+- Test with sandbox mode first
 
-### 2. PayPal
-- Install PayPal library: `mix deps.get pay`
-- Replace `generate_paypal_payment_url/3` with actual PayPal payment creation
-- Handle IPN (Instant Payment Notification) for payment confirmation
 
-### 3. E-Wallet
-- Implement integration with respective e-wallet APIs
-- Replace `generate_ewallet_payment_url/3` with actual e-wallet payment creation
-
-### 4. Generic Gateway
+### 5. Generic Gateway
 - Implement integration with your payment gateway's API
 - Replace `generate_generic_payment_url/3` with actual payment creation
 

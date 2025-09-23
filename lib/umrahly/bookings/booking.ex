@@ -57,7 +57,7 @@ defmodule Umrahly.Bookings.Booking do
     |> cast(attrs, [:deposit_amount, :payment_plan, :payment_method])
     |> validate_required([:deposit_amount, :payment_plan, :payment_method])
     |> validate_inclusion(:payment_plan, ["full_payment", "installment"])
-    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash", "e_wallet"])
+    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash", "toyyibpay"])
     |> validate_number(:deposit_amount, greater_than: 0)
     |> validate_deposit_amount()
   end
@@ -95,7 +95,7 @@ defmodule Umrahly.Bookings.Booking do
     |> validate_required([:status, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :user_id, :package_schedule_id])
     |> validate_inclusion(:status, ["pending", "confirmed", "cancelled", "completed"])
     |> validate_inclusion(:payment_plan, ["full_payment", "installment"])
-    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash", "e_wallet"])
+    |> validate_inclusion(:payment_method, ["credit_card", "bank_transfer", "online_banking", "cash", "toyyibpay"])
     |> validate_inclusion(:payment_proof_status, ["pending", "submitted", "approved", "rejected"])
     |> validate_number(:total_amount, greater_than: 0)
     |> validate_number(:deposit_amount, greater_than: 0)

@@ -15,7 +15,8 @@ defmodule UmrahlyWeb.UserLoginLive do
             <.link navigate={~p"/users/register"} class="text-white/80 hover:text-white">Register</.link>
             <span class="text-white cursor-pointer border-b-2 border-white pb-1">Login</span>
           </div>
-          <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="space-y-4">
+          <form id="login_form" action={~p"/users/log_in"} method="post" phx-update="ignore" class="space-y-4">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
             <div>
               <label for="email" class="block mb-1 text-sm font-medium text-white/90">Email</label>
               <.input
@@ -40,12 +41,10 @@ defmodule UmrahlyWeb.UserLoginLive do
               />
             </div>
 
-            <:actions>
-              <.button phx-disable-with="Logging in..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
-                Login
-              </.button>
-            </:actions>
-          </.simple_form>
+            <.button phx-disable-with="Logging in..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
+              Login
+            </.button>
+          </form>
 
           <p class="mt-4 text-center text-sm text-white/80">
             Don't have an account?

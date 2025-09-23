@@ -23,8 +23,7 @@ defmodule UmrahlyWeb.UserRegistrationLive do
         </div>
 
         <!-- Form -->
-        <.simple_form
-          for={@form}
+        <form
           id="registration_form"
           phx-submit="save"
           phx-change="validate"
@@ -33,45 +32,44 @@ defmodule UmrahlyWeb.UserRegistrationLive do
           method="post"
           class="space-y-4"
         >
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
           <.error :if={@check_errors}>
             Oops, something went wrong! Please check the errors below.
           </.error>
 
+          <label for="full_name" class="block mb-1 text-sm font-medium text-white/90">Full Name</label>
           <.input
             field={@form[:full_name]}
+            id="full_name"
             type="text"
-            label="Full Name"
             placeholder="Enter your full name"
             required
             class="w-full rounded-md border border-white/30 px-3 py-2 bg-white/20 text-white placeholder-white/70 focus:border-white/50 focus:ring-white/40"
           />
-
+          <label for="email" class="block mb-1 text-sm font-medium text-white/90">Email</label>
           <.input
             field={@form[:email]}
+            id="email"
             type="email"
-            label="Email"
             placeholder="Enter your email"
             required
             class="w-full rounded-md border border-white/30 px-3 py-2 bg-white/20 text-white placeholder-white/70 focus:border-white/50 focus:ring-white/40"
           />
 
+          <label for="password" class="block mb-1 text-sm font-medium text-white/90">Password</label>
           <.input
             field={@form[:password]}
+            id="password"
             type="password"
-            label="Password"
             placeholder="Enter your Password"
             required
             class="w-full rounded-md border border-white/30 px-3 py-2 bg-white/20 text-white placeholder-white/70 focus:border-white/50 focus:ring-white/40"
           />
 
-
-
-          <:actions>
-            <.button phx-disable-with="Registering..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
-              Register
-            </.button>
-          </:actions>
-        </.simple_form>
+          <.button phx-disable-with="Registering..." class="w-full bg-[#00897B] text-white py-3 rounded-md hover:bg-[#00796B] font-semibold">
+            Register
+          </.button>
+        </form>
 
         <!-- Bottom text -->
         <p class="mt-4 text-center text-sm text-white/80">

@@ -23,6 +23,11 @@ import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import "./flash_config"
 
+// Initialize Alpine.js for simple UI interactions (e.g., sidebar toggle)
+import Alpine from "alpinejs"
+window.Alpine = Alpine
+Alpine.start()
+
 
 // Custom hook for form validation
 const FormValidationHook = {

@@ -137,13 +137,21 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   def handle_event("view-payment-details", %{"payment_id" => payment_id}, socket) do
-    payment = find_payment_by_id(payment_id, socket.assigns.payment_history)
-    socket =
-      socket
-      |> assign(:selected_payment, payment)
-      |> assign(:show_payment_modal, true)
+    # Try to find in the full list first, fall back to current page items
+    payment =
+      find_payment_by_id(payment_id, socket.assigns.payment_history_all) ||
+        find_payment_by_id(payment_id, socket.assigns.payment_history_items)
 
-    {:noreply, socket}
+    if payment do
+      socket =
+        socket
+        |> assign(:selected_payment, payment)
+        |> assign(:show_payment_modal, true)
+
+      {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Payment not found")}
+    end
   end
 
   def handle_event("close-payment-modal", _params, socket) do

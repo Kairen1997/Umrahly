@@ -13,9 +13,16 @@ defmodule UmrahlyWeb.AdminLayout do
       |> assign_new(:flash, fn -> %{} end)
 
     ~H"""
-    <div class="flex min-h-screen bg-gray-100">
+    <div x-data="{ open: true }" class="flex min-h-screen bg-gray-100">
       <!-- Sidebar -->
-      <aside class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between">
+      <aside x-cloak x-show="open"
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="-translate-x-full opacity-0"
+             x-transition:enter-end="translate-x-0 opacity-100"
+             x-transition:leave="transition ease-in duration-200 transform"
+             x-transition:leave-start="translate-x-0 opacity-100"
+             x-transition:leave-end="-translate-x-full opacity-0"
+             class="w-50 bg-gray-800 shadow-lg h-50 flex flex-col justify-between sticky top-0 h-screen">
         <!-- Navigation Menu -->
         <div>
           <nav class="mt-0">
@@ -110,6 +117,14 @@ defmodule UmrahlyWeb.AdminLayout do
             <div class="flex items-center justify-between">
               <!-- Page Title -->
               <div class="flex items-center">
+                <button type="button" class="mr-3 inline-flex items-center justify-center rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" @click="open = !open" aria-label="Toggle sidebar">
+                  <svg x-cloak x-show="!open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                  <svg x-cloak x-show="open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
                 <h1 class="text-2xl font-bold text-gray-900">
                   <%= case @current_page do %>
                     <% "dashboard" -> %>Admin Dashboard

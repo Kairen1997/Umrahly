@@ -239,9 +239,9 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
   defp format_datetime(datetime) do
     case datetime do
       %DateTime{} ->
-        Calendar.strftime(datetime, "%Y-%m-%d %H:%M")
+        UmrahlyWeb.Timezone.format_local(datetime, "%Y-%m-%d %H:%M")
       %NaiveDateTime{} ->
-        Calendar.strftime(datetime, "%Y-%m-%d %H:%M")
+        UmrahlyWeb.Timezone.format_local(datetime, "%Y-%m-%d %H:%M")
       _ ->
         "Unknown"
     end

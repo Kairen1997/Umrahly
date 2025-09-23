@@ -381,7 +381,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                   </svg>
                   <span class="text-sm font-medium text-blue-900">Selected Departure Date:</span>
                   <span class="ml-2 text-sm font-semibold text-blue-800">
-                    <%= Calendar.strftime(selected_schedule.departure_date, "%B %d, %Y") %>
+                    <%= UmrahlyWeb.Timezone.format_local(selected_schedule.departure_date, "%B %d, %Y") %>
                   </span>
                 </div>
               </div>
@@ -534,7 +534,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
                                   </span>
                                 </div>
                                 <div class="text-base font-semibold text-gray-900">
-                                  <%= Calendar.strftime(alternative.departure_date, "%B %d, %Y") %>
+                                  <%= UmrahlyWeb.Timezone.format_local(alternative.departure_date, "%B %d, %Y") %>
                                 </div>
                                 <div class="text-xs text-gray-500 mt-1">
                                   <%= Calendar.strftime(alternative.departure_date, "%A") %>

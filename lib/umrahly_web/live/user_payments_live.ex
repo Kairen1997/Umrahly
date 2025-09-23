@@ -1053,7 +1053,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                               </td>
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <%= if booking.booking_date do %>
-                                  <%= Calendar.strftime(booking.booking_date, "%b %d, %Y") %>
+                                  <%= UmrahlyWeb.Timezone.format_local(booking.booking_date, "%b %d, %Y") %>
                                 <% else %>
                                   -
                                 <% end %>
@@ -1106,7 +1106,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                         <%= for payment <- @payment_history_items do %>
                           <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              <%= Calendar.strftime(payment.date, "%B %d, %Y") %>
+                              <%= UmrahlyWeb.Timezone.format_local(payment.date, "%B %d, %Y") %>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               RM <%= format_amount(payment.amount) %>
@@ -1202,7 +1202,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                         <%= for receipt <- @receipts_items do %>
                           <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              <%= Calendar.strftime(receipt.date, "%B %d, %Y") %>
+                              <%= UmrahlyWeb.Timezone.format_local(receipt.date, "%B %d, %Y") %>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               <%= format_amount(receipt.amount) %>
@@ -1304,7 +1304,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                   </div>
                   <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-500">Date:</span>
-                    <span class="text-sm text-gray-900"><%= Calendar.strftime(@selected_payment.date, "%B %d, %Y") %></span>
+                    <span class="text-sm text-gray-900"><%= UmrahlyWeb.Timezone.format_local(@selected_payment.date, "%B %d, %Y") %></span>
                   </div>
                   <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-500">Status:</span>
@@ -1460,7 +1460,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                                 </span>
                               </td>
                               <td class="px-4 py-2 text-sm text-gray-900">
-                                <%= Calendar.strftime(installment.due_date, "%B %d, %Y") %>
+                                <%= UmrahlyWeb.Timezone.format_local(installment.due_date, "%B %d, %Y") %>
                               </td>
                               <td class="px-4 py-2 text-sm font-semibold text-gray-900">
                                 <%= format_amount(installment.amount) %>
@@ -1506,7 +1506,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                     <span class="text-sm font-medium text-gray-500">Booking Date:</span>
                     <span class="text-sm text-gray-900">
                       <%= if @selected_booking.booking_date do %>
-                        <%= Calendar.strftime(@selected_booking.booking_date, "%B %d, %Y") %>
+                        <%= UmrahlyWeb.Timezone.format_local(@selected_booking.booking_date, "%B %d, %Y") %>
                       <% else %>
                         -
                       <% end %>

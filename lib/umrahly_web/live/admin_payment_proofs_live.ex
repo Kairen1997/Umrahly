@@ -223,7 +223,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                                 <%= proof.package_schedule.package.name %> - RM <%= proof.total_amount %>
                               </p>
                               <p class="text-xs text-gray-400">
-                                Submitted: <%= Calendar.strftime(proof.payment_proof_submitted_at, "%B %d, %Y at %I:%M %p") %>
+                                Submitted: <%= UmrahlyWeb.Timezone.format_local(proof.payment_proof_submitted_at, "%B %d, %Y at %I:%M %p") %>
                               </p>
                             </div>
                           </div>
@@ -267,7 +267,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                       <p><strong>Package:</strong> <%= @selected_booking.package_schedule.package.name %></p>
                       <p><strong>Amount:</strong> RM <%= @selected_booking.total_amount %></p>
                       <p><strong>Payment Method:</strong> <%= String.replace(@selected_booking.payment_method, "_", " ") |> String.capitalize() %></p>
-                      <p><strong>Booking Date:</strong> <%= Calendar.strftime(@selected_booking.booking_date, "%B %d, %Y") %></p>
+                      <p><strong>Booking Date:</strong> <%= UmrahlyWeb.Timezone.format_local(@selected_booking.booking_date, "%B %d, %Y") %></p>
                     </div>
                   </div>
 

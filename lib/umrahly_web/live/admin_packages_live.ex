@@ -537,10 +537,10 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                         </td>
                         <td class="px-3 py-3">
                           <div class="text-sm text-gray-900">
-                            <%= Calendar.strftime(package.updated_at, "%b %d") %>
+                            <%= UmrahlyWeb.Timezone.format_local(package.updated_at, "%b %d") %>
                           </div>
                           <div class="text-xs text-gray-500">
-                            <%= Calendar.strftime(package.updated_at, "%I:%M %p") %>
+                            <%= UmrahlyWeb.Timezone.format_local(package.updated_at, "%I:%M %p") %>
                           </div>
                         </td>
                         <td class="px-3 py-3 text-sm font-medium">

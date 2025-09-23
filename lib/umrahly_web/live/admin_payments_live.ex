@@ -388,7 +388,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
 
   defp format_date(nil), do: "Unknown"
   defp format_date(datetime) do
-    Calendar.strftime(datetime, "%Y-%m-%d")
+    UmrahlyWeb.Timezone.format_local(datetime, "%Y-%m-%d")
   end
 
   defp booking_to_details(booking) do

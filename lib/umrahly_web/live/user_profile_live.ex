@@ -393,7 +393,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                 </h1>
                 <%= if @last_updated do %>
                   <p class="mt-1 text-sm text-gray-500">
-                    Last updated: <%= Calendar.strftime(@last_updated, "%B %d, %Y at %I:%M %p") %>
+                    Last updated: <%= UmrahlyWeb.Timezone.format_local(@last_updated, "%B %d, %Y at %I:%M %p") %>
                   </p>
                 <% end %>
               </div>

@@ -239,15 +239,15 @@ end
                           </div>
                         </td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <%= Calendar.strftime(flight.departure_time, "%Y-%m-%d %H:%M") %>
+                          <%= UmrahlyWeb.Timezone.format_local(flight.departure_time, "%Y-%m-%d %H:%M") %>
                         </td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <%= Calendar.strftime(flight.arrival_time, "%Y-%m-%d %H:%M") %>
+                          <%= UmrahlyWeb.Timezone.format_local(flight.arrival_time, "%Y-%m-%d %H:%M") %>
                         </td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                           <%= if flight.return_date do %>
-                            <%= Calendar.strftime(flight.return_date, "%Y-%m-%d %H:%M") %>
+                            <%= UmrahlyWeb.Timezone.format_local(flight.return_date, "%Y-%m-%d %H:%M") %>
                           <% else %>
                             <span class="text-gray-500">N/A</span>
                           <% end %>
@@ -406,13 +406,13 @@ end
                   <!-- 3. Departure -->
                   <div>
                     <p class="font-medium">Departure:</p>
-                    <p><%= Calendar.strftime(@selected_flight.departure_time, "%Y-%m-%d %H:%M") %></p>
+                    <p><%= UmrahlyWeb.Timezone.format_local(@selected_flight.departure_time, "%Y-%m-%d %H:%M") %></p>
                   </div>
 
                   <!-- 4. Arrival -->
                   <div>
                     <p class="font-medium">Arrival:</p>
-                    <p><%= Calendar.strftime(@selected_flight.arrival_time, "%Y-%m-%d %H:%M") %></p>
+                    <p><%= UmrahlyWeb.Timezone.format_local(@selected_flight.arrival_time, "%Y-%m-%d %H:%M") %></p>
                   </div>
 
                   <!-- 5. Aircraft -->
@@ -425,7 +425,7 @@ end
                   <div>
                     <p class="font-medium">Return Date:</p>
                     <p><%= if @selected_flight.return_date do %>
-                      <%= Calendar.strftime(@selected_flight.return_date, "%Y-%m-%d %H:%M") %>
+                      <%= UmrahlyWeb.Timezone.format_local(@selected_flight.return_date, "%Y-%m-%d %H:%M") %>
                     <% else %>
                       <span class="text-gray-500">N/A</span>
                     <% end %></p>

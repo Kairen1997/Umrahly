@@ -241,7 +241,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
 
                       <div class="text-xs text-gray-500">
-                        Last updated: <%= Calendar.strftime(booking.last_updated, "%B %d, %Y at %I:%M %p") %>
+                        Last updated: <%= UmrahlyWeb.Timezone.format_local(booking.last_updated, "%B %d, %Y at %I:%M %p") %>
                       </div>
                     </div>
 

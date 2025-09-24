@@ -44,55 +44,140 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Booking Status -->
-          <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Booking Status</div>
-            <div class="mt-1 text-sm"><%= String.capitalize(@latest_booking.status) %></div>
+          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm">
+            <div class="flex items-start gap-3">
+              <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Status</div>
+                <div class="mt-1 text-sm font-medium text-gray-900"><%= String.capitalize(@latest_booking.status) %></div>
+              </div>
+            </div>
+            <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-200/40"></div>
           </div>
           <!-- Selected Package -->
-          <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Selected Package</div>
-            <div class="mt-1 text-sm"><%= @latest_booking.package_name %></div>
+          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200 p-4 shadow-sm">
+            <div class="flex items-start gap-3">
+              <div class="rounded-lg bg-violet-100 p-2 text-violet-700">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 6l9 4 9-4" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-violet-700">Selected Package</div>
+                <div class="mt-1 truncate text-sm font-medium text-gray-900"><%= @latest_booking.package_name %></div>
+              </div>
+            </div>
+            <div class="pointer-events-none absolute -left-6 -bottom-6 h-16 w-16 rounded-full bg-fuchsia-200/40"></div>
           </div>
           <!-- Next Installment -->
-          <a href="/payments/installment" class="block focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-lg">
-            <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4 hover:shadow transition-shadow">
-              <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Next Installment</div>
-              <div class="mt-1 text-sm">
+          <a href="/payments/installment" class="block focus:outline-none focus:ring-2 focus:ring-amber-400 rounded-xl">
+            <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-amber-100 p-2 text-amber-700">
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-amber-700">Next Installment</div>
+                  <div class="mt-1 text-sm font-medium text-gray-900">
+                    <%= if next_due_date do %>
+                      <%= Calendar.strftime(next_due_date, "%d %B %Y") %>
+                    <% else %>
+                      —
+                    <% end %>
+                  </div>
+                  <div class="mt-2 flex items-center gap-1 text-xs text-amber-800">
+                    <span>View details</span>
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div class="pointer-events-none absolute -right-6 -bottom-6 h-16 w-16 rounded-full bg-amber-200/40"></div>
+            </div>
+          </a>
+          <!-- Total Paid -->
+          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 shadow-sm">
+            <div class="flex items-start gap-3">
+              <div class="rounded-lg bg-emerald-100 p-2 text-emerald-700">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-10v10m9-5a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Total Paid</div>
+                <div class="mt-1 text-sm font-medium text-gray-900">RM <%= paid %> <span class="text-gray-500">/ RM <%= total %></span></div>
+                <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-emerald-100">
+                  <div class="h-1.5 rounded-full bg-emerald-500" style={"width: #{percent}%"}></div>
+                </div>
+              </div>
+            </div>
+            <div class="pointer-events-none absolute -left-6 -top-6 h-16 w-16 rounded-full bg-teal-200/40"></div>
+          </div>
+        </div>
+
+        <% remaining =
+          case {total, paid} do
+            {%Decimal{} = t, %Decimal{} = p} -> Decimal.sub(t, p)
+            {%Decimal{} = t, _} -> Decimal.sub(t, Decimal.new(paid || 0))
+            {t, %Decimal{} = p} -> Decimal.sub(Decimal.new(t || 0), p)
+            {t, p} -> (t || 0) - (p || 0)
+          end %>
+        <% remaining =
+          case remaining do
+            %Decimal{} = d -> if Decimal.cmp(d, Decimal.new(0)) == :lt, do: Decimal.new(0), else: d
+            _ -> if remaining < 0, do: 0, else: remaining
+          end %>
+        <!-- Payment Progress -->
+        <div class="mt-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold uppercase tracking-wide text-blue-700">Payment Progress</div>
+              <div class="text-xs">
+                <span class="text-green-700 font-medium">RM <%= paid %></span>
+                <span class="text-gray-500"> of RM <%= total %> paid</span>
+                <span class="text-gray-500"> • </span>
+                <span class="text-red-700 font-medium">
+                  RM <%= case remaining do
+                    %Decimal{} = d -> Decimal.to_string(d)
+                    _ -> to_string(remaining)
+                  end %>
+                </span>
+                <span class="text-gray-500"> unpaid</span>
+              </div>
+            </div>
+            <div class="rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-blue-700 shadow">
+              <%= if is_float(percent) do %>
+                <%= :erlang.float_to_binary(percent, decimals: 0) %>% complete
+              <% else %>
+                <%= percent %>% complete
+              <% end %>
+            </div>
+          </div>
+          <div class="mt-3 w-full rounded-full bg-blue-100 h-3 overflow-hidden">
+            <div class="h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" style={"width: #{percent}%"}></div>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-xs">
+                         <div class="flex items-center gap-2 text-green-700">
+               <span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+               <span>Paid</span>
+             </div>
+            <div class="text-blue-800">
+              Next payment due:
+              <span class="font-medium">
                 <%= if next_due_date do %>
                   <%= Calendar.strftime(next_due_date, "%d %B %Y") %>
                 <% else %>
                   —
                 <% end %>
-              </div>
-              <div class="mt-2 text-xs text-blue-700">View details</div>
+              </span>
             </div>
-          </a>
-          <!-- Total Paid -->
-          <div class="bg-amber-100 text-gray-900 rounded-lg border border-amber-200 p-4">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">Total Paid</div>
-            <div class="mt-1 text-sm">
-              RM <%= paid %> / RM <%= total %>
-            </div>
-          </div>
-        </div>
-
-        <!-- Payment Progress -->
-        <div class="mt-4">
-          <div class="text-sm text-gray-700">Payment Progress</div>
-          <div class="text-xs text-gray-500">RM <%= paid %> of RM <%= total %> Paid</div>
-          <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-blue-600 h-2 rounded-full" style={"width: #{percent}%"}></div>
-          </div>
-          <div class="mt-2 text-xs text-blue-600">
-            <span class="font-medium">Next Payment</span>
-            <span class="text-gray-500">due:</span>
-            <span>
-              <%= if next_due_date do %>
-                <%= Calendar.strftime(next_due_date, "%d %B %Y") %>
-              <% else %>
-                —
-              <% end %>
-            </span>
           </div>
         </div>
       <% else %>
@@ -103,22 +188,44 @@
     </div>
 
     <!-- Stats Section -->
-    <div class="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">Your Stats</h3>
+    <div class="mt-8 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-medium text-gray-900">Your Stats</h3>
+      </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="text-center">
-          <div class="text-2xl font-bold text-blue-600"><%= if @user_stats, do: @user_stats.active_bookings, else: 0 %></div>
-          <div class="text-sm text-gray-500">Active Bookings</div>
-        </div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-purple-600">
-            <% total_paid = if @user_stats, do: @user_stats.total_paid, else: 0 %>
-            <%= case total_paid do
-              %Decimal{} -> Decimal.to_string(total_paid)
-              _ -> to_string(total_paid)
-            end %>
+        <!-- Active Bookings -->
+        <div class="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+          <div class="flex items-center gap-3">
+            <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Active Bookings</div>
+              <div class="text-2xl font-bold text-blue-700"><%= if @user_stats, do: @user_stats.active_bookings, else: 0 %></div>
+            </div>
           </div>
-          <div class="text-sm text-gray-500">Total Payments</div>
+        </div>
+        <!-- Total Payments -->
+        <div class="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 p-4">
+          <div class="flex items-center gap-3">
+            <div class="rounded-lg bg-purple-100 p-2 text-purple-700">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-10v10m9-5a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wide text-purple-700">Total Payments</div>
+              <div class="text-2xl font-bold text-purple-700">
+                <% total_paid = if @user_stats, do: @user_stats.total_paid, else: 0 %>
+                <%= case total_paid do
+                  %Decimal{} -> Decimal.to_string(total_paid)
+                  _ -> to_string(total_paid)
+                end %>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -126,17 +233,28 @@
     <!-- Main Content Area -->
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
       <!-- Recent Activity -->
-      <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 lg:col-span-2">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
-        <div class="space-y-4">
-          <%= if @recent_activities && length(@recent_activities) > 0 do %>
-            <%= for activity <- @recent_activities do %>
-              <div class="flex items-center space-x-3">
-                <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
-                <span class="text-sm text-gray-600"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></span>
-                <span class="text-xs text-gray-400 ml-auto"><%= Calendar.strftime(activity.inserted_at, "%d %b %Y %H:%M") %></span>
+      <div class="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm lg:col-span-2">
+        <div class="mb-2 flex items-center justify-between">
+          <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
+          <span class="text-xs text-gray-500">Latest 5</span>
+        </div>
+        <% recent_5 = if @recent_activities, do: Enum.take(@recent_activities, 5), else: [] %>
+        <div class="mt-2">
+          <%= if recent_5 && length(recent_5) > 0 do %>
+            <div class="relative">
+              <div class="absolute left-2 top-0 bottom-0 w-px bg-slate-200"></div>
+              <div class="space-y-3">
+                <%= for activity <- recent_5 do %>
+                  <div class="relative flex items-start gap-3 rounded-md bg-white/60 p-3">
+                    <div class="relative z-10 mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500"></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm text-gray-700 truncate"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></div>
+                    </div>
+                    <div class="text-xs text-gray-400 whitespace-nowrap"><%= Calendar.strftime(activity.inserted_at, "%d %b %Y %H:%M") %></div>
+                  </div>
+                <% end %>
               </div>
-            <% end %>
+            </div>
           <% else %>
             <div class="text-sm text-gray-500">No recent activity yet.</div>
           <% end %>

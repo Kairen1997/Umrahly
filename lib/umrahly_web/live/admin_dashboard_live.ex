@@ -363,9 +363,9 @@ defmodule UmrahlyWeb.AdminDashboardLive do
                 <tbody>
                   <%= for activity <- @recent_activities do %>
                     <tr class="border-b border-gray-100">
-                      <td class="py-3 px-4 text-sm text-gray-900"><%= activity.title %></td>
+                      <td class="py-3 px-4 text-sm text-gray-900"><%= activity.user_name %></td>
                       <td class="py-3 px-4 text-sm text-gray-900"><%= activity.action %></td>
-                      <td class="py-3 px-4 text-sm text-gray-900"><%= activity.activity_message %></td>
+                      <td class="py-3 px-4 text-sm text-gray-900"><%= activity.details %></td>
                       <td class="py-3 px-4 text-sm text-gray-900"><%= activity.timestamp %></td>
                     </tr>
                   <% end %>

@@ -1219,27 +1219,16 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                               <%= receipt.booking_reference %>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                              <div class="flex items-center gap-2">
-                                <a
-                                  href={~p"/receipts/#{receipt.id}/view"}
-                                  target="_blank"
-                                  class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553 2.276A1 1 0 0120 13.191V18a2 2 0 01-2 2H6a2 2 0 01-2-2v-4.809a1 1 0 01.447-.915L9 10m6 0V6a3 3 0 10-6 0v4"/>
-                                  </svg>
-                                  View
-                                </a>
-                                <a
-                                  href={~p"/receipts/#{receipt.id}/download"}
-                                  class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                  </svg>
-                                  Download
-                                </a>
-                              </div>
+                              <a
+                                href={~p"/receipts/#{receipt.id}/view"}
+                                target="_blank"
+                                class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              >
+                                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553 2.276A1 1 0 0120 13.191V18a2 2 0 01-2 2H6a2 2 0 01-2-2v-4.809a1 1 0 01.447-.915L9 10m6 0V6a3 3 0 10-6 0v4"/>
+                                </svg>
+                                View
+                              </a>
                             </td>
                           </tr>
                         <% end %>

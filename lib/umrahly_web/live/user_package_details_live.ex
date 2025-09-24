@@ -153,11 +153,9 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
     end
   end
 
-  # Calculate total price for a schedule (base price + override)
-  defp calculate_schedule_price(schedule, package) do
-    base_price = package.price
-    override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-    base_price + override_price
+  # Calculate total price for a schedule (base price only)
+  defp calculate_schedule_price(_schedule, package) do
+    package.price
   end
 
   # Calculate affordability score (higher is better)

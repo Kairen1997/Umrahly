@@ -228,13 +228,9 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         <div>
                           <span class="font-semibold text-gray-900">Amounts:</span>
                           <div class="mt-1 space-y-0.5">
-                            <%= if booking.total_amount do %>
-                              <div>Total: RM <%= booking.total_amount %></div>
-                              <%= if booking.deposit_amount && Decimal.compare(booking.deposit_amount, booking.total_amount) != :eq do %>
-                                <div class="text-orange-600">Deposit: RM <%= booking.deposit_amount %></div>
-                              <% end %>
-                            <% else %>
-                              <div class="text-gray-500">Not calculated yet</div>
+                            <div>Total: RM <%= booking.package.price %></div>
+                            <%= if booking.deposit_amount && Decimal.compare(booking.deposit_amount, Decimal.new(booking.package.price)) != :eq do %>
+                              <div class="text-orange-600">Deposit: RM <%= booking.deposit_amount %></div>
                             <% end %>
                           </div>
                         </div>

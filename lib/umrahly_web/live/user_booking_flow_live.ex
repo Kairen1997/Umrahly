@@ -46,7 +46,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
     user_id = socket.assigns.current_user.id
     package = Packages.get_package!(package_id)
     schedule = Packages.get_package_schedule!(schedule_id)
-    has_price_override = schedule.price_override && Decimal.gt?(schedule.price_override, Decimal.new(0))
+    has_price_override = false
     is_resume = Map.get(params, "resume") == "true"
     progress = Bookings.get_or_create_booking_flow_progress(user_id, package_id, schedule_id)
     if schedule.package_id != String.to_integer(package_id) do
@@ -56,8 +56,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
        |> push_navigate(to: ~p"/packages/#{package_id}")}
     else
       base_price = package.price
-      override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-      schedule_price_per_person = base_price + override_price
+      schedule_price_per_person = base_price
       changeset = Bookings.change_booking(%Booking{})
       travelers = cond do
         is_resume && progress.travelers_data && length(progress.travelers_data) > 0 ->
@@ -288,8 +287,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
     package_price = socket.assigns.package.price
     base_price = package_price
-    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-    schedule_price_per_person = base_price + override_price
+    schedule_price_per_person = base_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(number_of_persons))
 
@@ -494,8 +492,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
     package_price = socket.assigns.package.price
     base_price = package_price
-    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-    schedule_price_per_person = base_price + override_price
+    schedule_price_per_person = base_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
 
@@ -555,8 +552,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
     package_price = socket.assigns.package.price
     base_price = package_price
-    override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-    schedule_price_per_person = base_price + override_price
+    schedule_price_per_person = base_price
 
     total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number))
 
@@ -1256,8 +1252,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
       package_price = socket.assigns.package.price
       base_price = package_price
-      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-      schedule_price_per_person = base_price + override_price
+      schedule_price_per_person = base_price
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
 
@@ -1322,8 +1317,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
       package_price = socket.assigns.package.price
       base_price = package_price
-      override_price = if socket.assigns.schedule.price_override, do: Decimal.to_integer(socket.assigns.schedule.price_override), else: 0
-      schedule_price_per_person = base_price + override_price
+      schedule_price_per_person = base_price
 
       total_amount = Decimal.mult(Decimal.new(schedule_price_per_person), Decimal.new(new_number_of_persons))
 

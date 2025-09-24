@@ -414,17 +414,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                     required
                   />
                 </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Price Override (RM)</label>
-                  <input
-                    type="number"
-                    name="package_schedule[price_override]"
-                    value={@schedule_changeset.data.price_override}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    placeholder="Leave empty to use package price"
-                    min="1"
-                  />
-                </div>
+                <!-- Price Override removed: schedules always use package base price -->
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
@@ -563,11 +553,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-bold text-gray-900">
-                        RM <%=
-                          base_price = schedule.package.price
-                          override_price = if schedule.price_override, do: Decimal.to_integer(schedule.price_override), else: 0
-                          base_price + override_price
-                        %>
+                        RM <%= schedule.package.price %>
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">

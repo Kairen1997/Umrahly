@@ -31,7 +31,7 @@ defmodule UmrahlyWeb.AdminDashboardLive do
       pending_verification: pending_verifications_count # Using real pending verification count
     }
 
-    recent_activities = ActivityLogs.recent_activities(10)
+    recent_activities = ActivityLogs.recent_activities(5)
 
     socket =
       socket
@@ -377,9 +377,9 @@ defmodule UmrahlyWeb.AdminDashboardLive do
 
         <!-- View All Activity Logs Button -->
         <div class="mt-8 text-center">
-          <button class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
+          <a href="/admin/activity-log" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg inline-block">
             View All Activity Logs
-          </button>
+          </a>
         </div>
       </div>
     </.admin_layout>

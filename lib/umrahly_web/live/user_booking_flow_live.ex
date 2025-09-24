@@ -1442,6 +1442,32 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
     {:noreply, socket}
   end
 
+  def handle_event("go_to_step", %{"step" => step_str}, socket) do
+    target_step =
+      case Integer.parse(step_str) do
+        {val, _} -> val
+        :error -> socket.assigns.current_step
+      end
+
+    clamped_step =
+      target_step
+      |> max(1)
+      |> min(socket.assigns.max_steps)
+
+    {_ok, updated_progress} =
+      Bookings.update_booking_flow_progress(
+        socket.assigns.booking_flow_progress,
+        %{current_step: clamped_step, last_updated: DateTime.utc_now()}
+      )
+
+    socket =
+      socket
+      |> assign(:current_step, clamped_step)
+      |> assign(:booking_flow_progress, updated_progress)
+
+    {:noreply, socket}
+  end
+
   def handle_event("create_booking", _params, socket) do
     travelers = socket.assigns.travelers
 
@@ -1647,48 +1673,107 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
             </div>
           </div>
 
-          <!-- Progress Restoration Message -->
+          <!-- Progress Status for Step 1 -->
           <!-- Removed progress restoration message since progress saving is disabled -->
 
           <!-- Progress Bar -->
-          <div class="w-full bg-gray-200 rounded-full h-2 mb-6">
-            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style={"width: #{Float.round((@current_step / @max_steps) * 100, 1)}%"}>
+          <div class="w-full bg-gray-200 rounded-full h-2.5 mb-6 overflow-hidden">
+            <% progress_raw = Float.round((min(@current_step, @max_steps) / max(@max_steps, 1)) * 100, 1) %>
+            <% progress_percent = min(progress_raw, 100.0) %>
+            <div class="h-2.5 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-600 via-blue-500 to-green-500" style={"width: #{progress_percent}%"}>
             </div>
           </div>
 
           <!-- Step Indicators -->
-          <div class="flex justify-between mb-8">
-            <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 1, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
-                1
-              </div>
-              <span class="text-xs text-gray-600 mt-1">Package Details</span>
-            </div>
-            <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 2, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
-                2
-              </div>
-              <span class="text-xs text-gray-600 mt-1">Travelers</span>
-            </div>
-            <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 3, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
-                3
-              </div>
-              <span class="text-xs text-gray-600 mt-1">Payment</span>
-            </div>
-            <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 4, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
-                4
-              </div>
-              <span class="text-xs text-gray-600 mt-1">Review & Confirm</span>
-            </div>
-            <div class="flex flex-col items-center">
-              <div class={"w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium #{if @current_step >= 5, do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-600"}"}>
-                5
-              </div>
-              <span class="text-xs text-gray-600 mt-1">Success</span>
-            </div>
-          </div>
+          <nav aria-label="Progress" class="mb-2">
+            <% steps = [
+              {1, "Package Details"},
+              {2, "Travelers"},
+              {3, "Payment"},
+              {4, "Review & Confirm"},
+              {5, "Success"}
+            ] %>
+            <ul class="grid grid-cols-5 items-center">
+              <%= for {num, label} <- steps do %>
+                <li class="flex items-center">
+                  <% completed? = num < @current_step %>
+                  <% current? = num == @current_step %>
+
+                  <div
+                    class="flex flex-col items-center w-24 text-center cursor-pointer select-none"
+                    role="button"
+                    tabindex="0"
+                    phx-click="go_to_step"
+                    phx-value-step={num}
+                    title={"Go to #{label}"}>
+                    <div class={
+                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200 " <>
+                      cond do
+                        completed? -> "bg-green-600 text-white shadow-sm hover:opacity-90"
+                        current? -> "bg-blue-600 text-white ring-2 ring-blue-300 shadow"
+                        true -> "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      end
+                    }>
+                      <%= if completed? do %>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                      <% else %>
+                        <%= case num do %>
+                          <% 1 -> %>
+                            <!-- Package Details: package/box icon -->
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12l-8 4-8-4m16 0l-8-4 8-4m-16 8l8 4m-8-4V8l8-4 8 4v4" />
+                            </svg>
+                          <% 2 -> %>
+                            <!-- Travelers: users/people icon -->
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-5a3 3 0 11-6 0 3 3 0 016 0zM7 9a3 3 0 100-6 3 3 0 000 6z" />
+                            </svg>
+                          <% 3 -> %>
+                            <!-- Payment: wallet/money icon -->
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m3-3h-6a1 1 0 000 2h6a1 1 0 000-2z" />
+                            </svg>
+                          <% 4 -> %>
+                            <!-- Review & Confirm: document check icon -->
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 20h10a2 2 0 002-2V7l-5-5H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          <% 5 -> %>
+                            <!-- Success: trophy icon -->
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 17a5 5 0 005-5V4H7v8a5 5 0 005 5zm8-13h2a3 3 0 01-3 3V4zm-14 0H4a3 3 0 003 3V4z" />
+                            </svg>
+                          <% _ -> %>
+                            <%= num %>
+                        <% end %>
+                      <% end %>
+                    </div>
+                    <span class={
+                      "text-xs mt-1 whitespace-nowrap " <>
+                      if current?, do: "text-gray-900 font-semibold", else: if(completed?, do: "text-gray-700", else: "text-gray-500")
+                    }>
+                      <%= label %>
+                    </span>
+                  </div>
+
+                  <%= unless num == 5 do %>
+                    <div class="flex-1 mx-2">
+                      <div class={
+                        "h-0.5 rounded-full transition-colors duration-200 " <>
+                        cond do
+                          num < @current_step - 0 -> "bg-green-600"
+                          num == @current_step -> "bg-blue-400"
+                          true -> "bg-gray-200"
+                        end
+                      }></div>
+                    </div>
+                  <% end %>
+                </li>
+              <% end %>
+            </ul>
+          </nav>
         </div>
 
         <!-- Step 1: Package Details -->

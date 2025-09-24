@@ -5,19 +5,31 @@
     <!-- Payment Overview -->
     <div class="mt-8">
       <%= if @latest_booking do %>
-        <% total = @latest_booking.total_amount || 0 %>
-        <% paid = @latest_booking.paid_amount || 0 %>
+        <% total_raw = @latest_booking.total_amount %>
+        <% paid_raw = @latest_booking.paid_amount %>
+        <% t_dec = case total_raw do
+             %Decimal{} = d -> d
+             n when is_integer(n) -> Decimal.new(n)
+             n when is_float(n) -> Decimal.from_float(n)
+             nil -> Decimal.new(0)
+             s when is_binary(s) -> Decimal.new(s)
+           end %>
+        <% p_dec = case paid_raw do
+             %Decimal{} = d -> d
+             n when is_integer(n) -> Decimal.new(n)
+             n when is_float(n) -> Decimal.from_float(n)
+             nil -> Decimal.new(0)
+             s when is_binary(s) -> Decimal.new(s)
+           end %>
         <% percent =
-          case total do
-            0 -> 0
-            _ ->
-              if is_struct(total, Decimal) do
-                Decimal.to_float(paid || 0) / Decimal.to_float(total) * 100
-              else
-                (paid || 0) / total * 100
-              end
-          end %>
-        <% percent = if percent < 0, do: 0, else: (if percent > 100, do: 100, else: percent) %>
+             if Decimal.equal?(t_dec, Decimal.new(0)) do
+               0.0
+             else
+               Decimal.div(p_dec, t_dec)
+               |> Decimal.mult(Decimal.new(100))
+               |> Decimal.to_float()
+             end %>
+        <% percent = max(0.0, min(100.0, percent)) %>
         <% next_due_date =
           cond do
             @latest_booking.payment_plan == "installment" and @latest_booking.booking_date ->
@@ -27,7 +39,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Booking Status -->
-          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm">
+          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-start gap-3">
               <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -42,7 +54,7 @@
             <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-200/40"></div>
           </div>
           <!-- Selected Package -->
-          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200 p-4 shadow-sm">
+          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200 p-4 shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-start gap-3">
               <div class="rounded-lg bg-violet-100 p-2 text-violet-700">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -86,7 +98,7 @@
             </div>
           </a>
           <!-- Total Paid -->
-          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 shadow-sm">
+          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-start gap-3">
               <div class="rounded-lg bg-emerald-100 p-2 text-emerald-700">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -95,7 +107,7 @@
               </div>
               <div class="min-w-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Total Paid</div>
-                <div class="mt-1 text-sm font-medium text-gray-900">RM <%= paid %> <span class="text-gray-500">/ RM <%= total %></span></div>
+                <div class="mt-1 text-sm font-medium text-gray-900">RM <%= Decimal.to_string(p_dec) %> <span class="text-gray-500">/ RM <%= Decimal.to_string(t_dec) %></span></div>
                 <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-emerald-100">
                   <div class="h-1.5 rounded-full bg-emerald-500" style={"width: #{percent}%"}></div>
                 </div>
@@ -105,42 +117,23 @@
           </div>
         </div>
 
-        <% remaining =
-          case {total, paid} do
-            {%Decimal{} = t, %Decimal{} = p} -> Decimal.sub(t, p)
-            {%Decimal{} = t, _} -> Decimal.sub(t, Decimal.new(paid || 0))
-            {t, %Decimal{} = p} -> Decimal.sub(Decimal.new(t || 0), p)
-            {t, p} -> (t || 0) - (p || 0)
-          end %>
-        <% remaining =
-          case remaining do
-            %Decimal{} = d -> if Decimal.cmp(d, Decimal.new(0)) == :lt, do: Decimal.new(0), else: d
-            _ -> if remaining < 0, do: 0, else: remaining
-          end %>
+        <% diff = Decimal.sub(t_dec, p_dec) %>
+        <% remaining_dec = if Decimal.compare(diff, Decimal.new(0)) == :lt, do: Decimal.new(0), else: diff %>
         <!-- Payment Progress -->
         <div class="mt-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
           <div class="flex items-center justify-between">
             <div>
               <div class="text-sm font-semibold uppercase tracking-wide text-blue-700">Payment Progress</div>
               <div class="text-xs">
-                <span class="text-green-700 font-medium">RM <%= paid %></span>
-                <span class="text-gray-500"> of RM <%= total %> paid</span>
+                <span class="text-green-700 font-medium">RM <%= Decimal.to_string(p_dec) %></span>
+                <span class="text-gray-500"> of RM <%= Decimal.to_string(t_dec) %> paid</span>
                 <span class="text-gray-500"> • </span>
-                <span class="text-red-700 font-medium">
-                  RM <%= case remaining do
-                    %Decimal{} = d -> Decimal.to_string(d)
-                    _ -> to_string(remaining)
-                  end %>
-                </span>
+                <span class="text-red-700 font-medium">RM <%= Decimal.to_string(remaining_dec) %></span>
                 <span class="text-gray-500"> unpaid</span>
               </div>
             </div>
             <div class="rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-blue-700 shadow">
-              <%= if is_float(percent) do %>
-                <%= :erlang.float_to_binary(percent, decimals: 0) %>% complete
-              <% else %>
-                <%= percent %>% complete
-              <% end %>
+              <%= :erlang.float_to_binary(percent, decimals: 0) %>% complete %>
             </div>
           </div>
           <div class="mt-3 w-full rounded-full bg-blue-100 h-3 overflow-hidden">
@@ -177,7 +170,7 @@
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Active Bookings -->
-        <div class="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+        <div class="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/60 p-4 hover:bg-blue-50 hover:shadow-sm transition-colors transition-shadow">
           <div class="flex items-center gap-3">
             <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
               <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -191,7 +184,7 @@
           </div>
         </div>
         <!-- Total Payments -->
-        <div class="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 p-4">
+        <div class="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 p-4 hover:bg-purple-50 hover:shadow-sm transition-colors transition-shadow">
           <div class="flex items-center gap-3">
             <div class="rounded-lg bg-purple-100 p-2 text-purple-700">
               <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -223,12 +216,12 @@
         </div>
         <% recent_5 = if @recent_activities, do: Enum.take(@recent_activities, 5), else: [] %>
         <div class="mt-2">
-          <%= if recent_5 && length(recent_5) > 0 do %>
+          <%= if Enum.any?(recent_5) do %>
             <div class="relative">
               <div class="absolute left-2 top-0 bottom-0 w-px bg-slate-200"></div>
               <div class="space-y-3">
                 <%= for activity <- recent_5 do %>
-                  <div class="relative flex items-start gap-3 rounded-md bg-white/60 p-3">
+                  <div class="relative flex items-start gap-3 rounded-md bg-white/60 p-3 hover:bg-slate-50 transition-colors">
                     <div class="relative z-10 mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500"></div>
                     <div class="min-w-0 flex-1">
                       <div class="text-sm text-gray-700 truncate"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></div>

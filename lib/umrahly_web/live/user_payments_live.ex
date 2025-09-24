@@ -844,21 +844,21 @@ defmodule UmrahlyWeb.UserPaymentsLive do
             <button
               phx-click="switch-tab"
               phx-value-tab="installment"
-              class={"py-2 px-1 border-b-2 font-medium text-sm #{if @current_tab == "installment", do: "border-blue-500 text-blue-600", else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}"}
+              class={"px-3 py-2 rounded-md text-sm font-medium #{if @current_tab == "installment", do: "bg-blue-100 text-blue-700", else: "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}"}
             >
               Installment Payment
             </button>
             <button
               phx-click="switch-tab"
               phx-value-tab="history"
-              class={"py-2 px-1 border-b-2 font-medium text-sm #{if @current_tab == "history", do: "border-blue-500 text-blue-600", else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}"}
+              class={"px-3 py-2 rounded-md text-sm font-medium #{if @current_tab == "history", do: "bg-blue-100 text-blue-700", else: "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}"}
             >
               Payment History
             </button>
             <button
               phx-click="switch-tab"
               phx-value-tab="receipts"
-              class={"py-2 px-1 border-b-2 font-medium text-sm #{if @current_tab == "receipts", do: "border-blue-500 text-blue-600", else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}"}
+              class={"px-3 py-2 rounded-md text-sm font-medium #{if @current_tab == "receipts", do: "bg-blue-100 text-blue-700", else: "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}"}
             >
               Receipts
             </button>

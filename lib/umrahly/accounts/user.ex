@@ -33,6 +33,8 @@ defmodule Umrahly.Accounts.User do
     timestamps(type: :utc_datetime)
   end
 
+  @type t :: %__MODULE__{}
+
   @doc """
   A user changeset for registration.
 

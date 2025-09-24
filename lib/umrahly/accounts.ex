@@ -177,6 +177,7 @@ defmodule Umrahly.Accounts do
     end
   end
 
+  @spec user_email_multi(User.t(), String.t(), String.t()) :: Ecto.Multi.t()
   defp user_email_multi(user, email, context) do
     changeset =
       user
@@ -332,6 +333,7 @@ defmodule Umrahly.Accounts do
     end
   end
 
+  @spec confirm_user_multi(User.t()) :: Ecto.Multi.t()
   defp confirm_user_multi(user) do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, User.confirm_changeset(user))

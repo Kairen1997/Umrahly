@@ -28,7 +28,8 @@ defmodule UmrahlyWeb.UserProfileLive do
       |> allow_upload(:profile_photo,
         accept: ~w(.jpg .jpeg .png),
         max_entries: 1,
-        max_file_size: 5_000_000
+        max_file_size: 5_000_000,
+        auto_upload: true
       )
 
     {:ok, socket}
@@ -173,23 +174,6 @@ defmodule UmrahlyWeb.UserProfileLive do
     end
   end
 
-  def handle_event("change-password", %{"user" => user_params}, socket) do
-    user = socket.assigns.user
-    current_password = user_params["current_password"]
-    new_password = user_params["password"]
-
-    case Accounts.update_user_password(user, current_password, %{password: new_password}) do
-      {:ok, _updated_user} ->
-        _ = Umrahly.ActivityLogs.log_user_action(user.id, "Password Changed", nil, %{})
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Password changed successfully")}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, password_changeset: changeset)}
-    end
-  end
 
   def handle_event("upload-photo", _params, socket) do
     user = socket.assigns.user
@@ -199,24 +183,30 @@ defmodule UmrahlyWeb.UserProfileLive do
       {:noreply, put_flash(socket, :error, "Profile not found. Please complete your profile first.")}
     else
       uploaded_files =
-        consume_uploaded_entries(socket, :profile_photo, fn entry, _socket ->
-          uploads_dir = Path.join(:code.priv_dir(:umrahly), "static/uploads")
+        consume_uploaded_entries(socket, :profile_photo, fn %{path: path}, entry ->
+          uploads_dir = Path.join(File.cwd!(), "priv/static/images")
           File.mkdir_p!(uploads_dir)
 
           extension = Path.extname(entry.client_name)
-          filename = "#{user.id}_#{System.system_time()}#{extension}"
+          filename = "profile_#{user.id}_#{System.system_time()}#{extension}"
           dest_path = Path.join(uploads_dir, filename)
 
           _ = Umrahly.ActivityLogs.log_user_action(user.id, "Profile Photo Uploaded", filename, %{filename: filename})
 
-          case File.cp(entry.path, dest_path) do
+          case File.cp(path, dest_path) do
             :ok ->
-              {:ok, "/uploads/#{filename}"}
+              {:ok, "/images/#{filename}"}
 
             {:error, reason} ->
               {:error, reason}
           end
         end)
+        |> Enum.map(fn
+          {:ok, path} -> path
+          path when is_binary(path) -> path
+          _ -> nil
+        end)
+        |> Enum.filter(& &1)
 
       case uploaded_files do
         [photo_path | _] ->
@@ -471,33 +461,6 @@ defmodule UmrahlyWeb.UserProfileLive do
                   </form>
                 </div>
 
-                <!-- Change Password -->
-                <div class="bg-white rounded-lg shadow p-6">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
-                  <form id="change-password-form" phx-submit="change-password" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                        <input type="password" name="user[current_password]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter Current password" required />
-                      </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                        <input type="password" name="user[password]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="New Password" required />
-                      </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                        <input type="password" name="user[password_confirmation]" class="w-full border border-gray-300 rounded-lg p-3 bg-teal-50 focus:ring-2 focus:ring-teal-500 focus-border-transparent" placeholder="Confirm Password" required />
-                      </div>
-                    </div>
-                    <div class="pt-4">
-                      <button type="submit" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors phx-submit-loading:opacity-75 phx-submit-loading:cursor-not-allowed">
-                        <span class="phx-submit-loading:hidden">Change Password</span>
-                        <span class="hidden phx-submit-loading:inline">Changing...</span>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
                 <!-- Identity and Contact Information -->
                 <div class="bg-white rounded-lg shadow p-6">
                   <div class="flex items-center justify-between mb-4">
@@ -686,7 +649,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                           </div>
 
                           <%= for entry <- @uploads.profile_photo.entries do %>
-                            <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
                               <div class="flex-shrink-0">
                                 <div class="w-8 h-8 bg-teal-100 rounded flex items-center justify-center">
                                   <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -696,18 +659,23 @@ defmodule UmrahlyWeb.UserProfileLive do
                               </div>
                               <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 truncate"><%= entry.client_name %></p>
-                                <p class="text-sm text-gray-500">
-                                  <%= case entry.upload_state do %>
-                                    <% :uploading -> %>
-                                      Uploading...
-                                    <% :complete -> %>
-                                      Ready to save
-                                    <% :error -> %>
-                                      Error: <%= entry.errors |> Enum.map(&elem(&1, 1)) |> Enum.join(", ") %>
-                                    <% _ -> %>
-                                      Ready
-                                  <% end %>
-                                </p>
+                                <div class="mt-1">
+                                  <div class="h-2 bg-gray-200 rounded">
+                                    <div class={"h-2 bg-teal-500 rounded transition-all"} style={"width: #{entry.progress}%;"}></div>
+                                  </div>
+                                  <p class="text-xs text-gray-500 mt-1">
+                                    <%= case entry.upload_state do %>
+                                      <% :uploading -> %>
+                                        Uploading...
+                                      <% :complete -> %>
+                                        Ready to save
+                                      <% :error -> %>
+                                        Error: <%= entry.errors |> Enum.map(&elem(&1, 1)) |> Enum.join(", ") %>
+                                      <% _ -> %>
+                                        Ready
+                                    <% end %>
+                                  </p>
+                                </div>
                               </div>
                               <button type="button" phx-click="cancel-upload" phx-value-ref={entry.ref} class="text-red-500 hover:text-red-700">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

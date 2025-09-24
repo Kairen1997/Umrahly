@@ -54,20 +54,33 @@ defmodule UmrahlyWeb.SidebarComponent do
       <!-- Main Content -->
       <div class="flex-1 flex flex-col">
         <!-- Top bar with burger -->
-        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center sticky top-0 z-40">
-          <button type="button" class="mr-3 inline-flex items-center justify-center rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" @click="open = !open" aria-label="Toggle sidebar">
-            <svg x-cloak x-show="!open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            <svg x-cloak x-show="open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <!-- Page Title -->
-          <div class="mb-0">
-            <h1 class="text-2xl font-semibold text-gray-900">
-              <%= Map.get(assigns, :page_title, "Dashboard") %>
-            </h1>
+        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between sticky top-0 z-40">
+          <div class="flex items-center">
+            <button type="button" class="mr-3 inline-flex items-center justify-center rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" @click="open = !open" aria-label="Toggle sidebar">
+              <svg x-cloak x-show="!open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <svg x-cloak x-show="open" x-transition.opacity class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <!-- Page Title -->
+            <div class="mb-0">
+              <h1 class="text-2xl font-semibold text-gray-900">
+                <%= Map.get(assigns, :page_title, "Dashboard") %>
+              </h1>
+            </div>
+          </div>
+          <div class="inline-flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 shadow-sm">
+            <div class="rounded-md bg-green-100 p-1.5 text-green-700">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-green-800">Profile Complete</div>
+              <div class="text-xs text-green-700">Ready to book your Umrah</div>
+            </div>
           </div>
         </div>
         <!-- Page Content -->

@@ -626,18 +626,19 @@ defmodule UmrahlyWeb.CoreComponents do
               <div class="flex items-center gap-3">
                 <!-- Profile Photo -->
                 <div class="relative">
+                  <% display_name = @current_user.full_name || @current_user.email %>
                   <%= if @has_profile do %>
                     <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
+                      <%= String.first(display_name) |> String.upcase() %>
                     </div>
                   <% else %>
                     <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
+                      <%= String.first(display_name) |> String.upcase() %>
                     </div>
                   <% end %>
                 </div>
 
-                <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+                <span class="text-zinc-900 font-semibold"><%= display_name %></span>
                 <%= if @has_profile do %>
                   <a href="/dashboard" class="hover:text-zinc-900">Dashboard</a>
                 <% else %>

@@ -268,7 +268,7 @@ defmodule UmrahlyWeb.AdminBookingsLive do
                   </tr>
                 <% else %>
                   <%= for booking <- @bookings do %>
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-teal-50 transition-colors">
                       <td class="px-6 py-4 text-sm font-medium text-gray-900">#<%= booking.id %></td>
                       <td class="px-6 py-4 text-sm text-gray-900"><%= booking.user_name %></td>
                       <td class="px-6 py-4 text-sm text-gray-900"><%= booking.package %></td>

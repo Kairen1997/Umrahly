@@ -3008,7 +3008,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                   <%= for {traveler, index} <- Enum.with_index(@travelers) do %>
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-teal-50 transition-colors">
                           <td class="px-3 py-4 text-sm font-medium text-gray-900 border-r border-gray-200">
                             <div class="flex items-center">
                               <%= if @number_of_persons == 1 and @is_booking_for_self do %>

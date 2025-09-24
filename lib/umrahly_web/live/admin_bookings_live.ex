@@ -55,6 +55,17 @@ defmodule UmrahlyWeb.AdminBookingsLive do
     {:noreply, socket}
   end
 
+  def handle_event("first_page", _params, socket) do
+    socket = socket |> assign(:page, 1) |> load_bookings()
+    {:noreply, socket}
+  end
+
+  def handle_event("last_page", _params, socket) do
+    last_page = max(socket.assigns.total_pages, 1)
+    socket = socket |> assign(:page, last_page) |> load_bookings()
+    {:noreply, socket}
+  end
+
   def handle_event("go_to_page", %{"page" => page_str}, socket) do
     page =
       case Integer.parse(to_string(page_str)) do
@@ -185,6 +196,15 @@ defmodule UmrahlyWeb.AdminBookingsLive do
             <div class="flex items-center space-x-2">
               <button
                 type="button"
+                phx-click="first_page"
+                class={[
+                  "px-3 py-1 rounded border text-sm",
+                  (if(@page <= 1, do: "opacity-50 cursor-not-allowed", else: "hover:bg-gray-50"))
+                ]}
+                disabled={@page <= 1}
+              >First</button>
+              <button
+                type="button"
                 phx-click="prev_page"
                 class={[
                   "px-3 py-1 rounded border text-sm",
@@ -202,6 +222,15 @@ defmodule UmrahlyWeb.AdminBookingsLive do
                 ]}
                 disabled={@page >= @total_pages}
               >Next</button>
+              <button
+                type="button"
+                phx-click="last_page"
+                class={[
+                  "px-3 py-1 rounded border text-sm",
+                  (if(@page >= @total_pages, do: "opacity-50 cursor-not-allowed", else: "hover:bg-gray-50"))
+                ]}
+                disabled={@page >= @total_pages}
+              >Last</button>
             </div>
           </div>
 
@@ -288,6 +317,15 @@ defmodule UmrahlyWeb.AdminBookingsLive do
             <div class="flex items-center space-x-2">
               <button
                 type="button"
+                phx-click="first_page"
+                class={[
+                  "px-3 py-1 rounded border text-sm",
+                  (if(@page <= 1, do: "opacity-50 cursor-not-allowed", else: "hover:bg-gray-50"))
+                ]}
+                disabled={@page <= 1}
+              >First</button>
+              <button
+                type="button"
                 phx-click="prev_page"
                 class={[
                   "px-3 py-1 rounded border text-sm",
@@ -304,6 +342,15 @@ defmodule UmrahlyWeb.AdminBookingsLive do
                 ]}
                 disabled={@page >= @total_pages}
               >Next</button>
+              <button
+                type="button"
+                phx-click="last_page"
+                class={[
+                  "px-3 py-1 rounded border text-sm",
+                  (if(@page >= @total_pages, do: "opacity-50 cursor-not-allowed", else: "hover:bg-gray-50"))
+                ]}
+                disabled={@page >= @total_pages}
+              >Last</button>
             </div>
           </div>
         </div>

@@ -22,23 +22,40 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       |> assign(:search_term, "")
       |> assign(:show_payment_modal, false)
       |> assign(:selected_payment, nil)
+      |> assign(:page_size, 10)
+      |> assign(:page, 1)
 
-    {:ok, socket}
+    {:ok, socket |> assign_pagination(payments)}
   end
 
   def handle_event("refresh_payments", _params, socket) do
     payments = get_payments_data(socket.assigns.filter_status)
-    {:noreply, assign(socket, :payments, payments)}
+    {:noreply, socket |> assign(:page, 1) |> assign_pagination(payments)}
   end
 
   def handle_event("filter_by_status", %{"status" => status}, socket) do
     payments = get_payments_data(status)
-    {:noreply, socket |> assign(:payments, payments) |> assign(:filter_status, status)}
+    {:noreply, socket |> assign(:filter_status, status) |> assign(:page, 1) |> assign_pagination(payments)}
   end
 
   def handle_event("search_payments", %{"search" => search_term}, socket) do
     payments = search_payments(search_term, socket.assigns.filter_status)
-    {:noreply, socket |> assign(:payments, payments) |> assign(:search_term, search_term)}
+    {:noreply, socket |> assign(:search_term, search_term) |> assign(:page, 1) |> assign_pagination(payments)}
+  end
+
+  def handle_event("paginate", %{"action" => action}, socket) do
+    total_pages = socket.assigns.total_pages
+    current = socket.assigns.page
+    new_page =
+      case action do
+        "first" -> 1
+        "prev" -> max(1, current - 1)
+        "next" -> min(total_pages, current + 1)
+        "last" -> total_pages
+        _ -> current
+      end
+
+    {:noreply, socket |> assign(:page, new_page) |> assign_pagination()}
   end
 
   def handle_event("view_payment", %{"id" => id, "source" => source}, socket) do
@@ -304,7 +321,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     case booking.travelers_data do
       nil ->
         # If no travelers data, create a single entry with user info
-        [%{booking |
+        [Map.merge(booking, %{
           traveler_name: booking.user_name || "Unknown",
           traveler_identity: "No ID",
           traveler_phone: "No phone",
@@ -312,10 +329,10 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           traveler_city: "No city",
           traveler_state: "No state",
           traveler_citizenship: "No citizenship"
-        }]
+        })]
       travelers when is_list(travelers) ->
         Enum.map(travelers, fn traveler ->
-          %{booking |
+          Map.merge(booking, %{
             traveler_name: traveler["full_name"] || "Unknown Traveler",
             traveler_identity: traveler["identity_card_number"] || traveler["passport_number"] || "No ID",
             traveler_phone: traveler["phone"] || "No phone",
@@ -323,11 +340,11 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
             traveler_city: traveler["city"] || "No city",
             traveler_state: traveler["state"] || "No state",
             traveler_citizenship: traveler["citizenship"] || traveler["nationality"] || "No citizenship"
-          }
+          })
         end)
       _ ->
         # Fallback for unexpected data types
-        [%{booking |
+        [Map.merge(booking, %{
           traveler_name: booking.user_name || "Unknown",
           traveler_identity: "No ID",
           traveler_phone: "No phone",
@@ -335,7 +352,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           traveler_city: "No city",
           traveler_state: "No state",
           traveler_citizenship: "No citizenship"
-        }]
+        })]
     end
   end
 
@@ -389,6 +406,34 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   defp format_date(nil), do: "Unknown"
   defp format_date(datetime) do
     UmrahlyWeb.Timezone.format_local(datetime, "%Y-%m-%d")
+  end
+
+  # --- Pagination helpers ---
+  defp assign_pagination(socket, payments \\ nil) do
+    payments = payments || socket.assigns.payments
+    page_size = socket.assigns.page_size
+    total_count = length(payments)
+    total_pages = calc_total_pages(total_count, page_size)
+    # Ensure current page is within bounds
+    page = socket.assigns.page |> min(total_pages) |> max(1)
+    visible_payments = paginate_list(payments, page, page_size)
+
+    socket
+    |> assign(:payments, payments)
+    |> assign(:total_count, total_count)
+    |> assign(:total_pages, total_pages)
+    |> assign(:page, page)
+    |> assign(:visible_payments, visible_payments)
+  end
+
+  defp calc_total_pages(0, _page_size), do: 1
+  defp calc_total_pages(total_count, page_size) when page_size > 0 do
+    div(total_count + page_size - 1, page_size)
+  end
+
+  defp paginate_list(list, page, page_size) do
+    start_index = (page - 1) * page_size
+    Enum.slice(list, start_index, page_size)
   end
 
   defp booking_to_details(booking) do
@@ -545,7 +590,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                     </td>
                   </tr>
                 <% else %>
-                  <%= for payment <- @payments do %>
+                  <%= for payment <- @visible_payments do %>
                     <tr class="hover:bg-gray-50">
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#<%= payment.id %></td>
                       <td class="px-6 py-4 whitespace-nowrap">
@@ -621,6 +666,38 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                 <% end %>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              <%= if @total_count > 0 do %>
+                <%= start_idx = ((@page - 1) * @page_size) + 1 %>
+                <%= end_idx = min(@total_count, @page * @page_size) %>
+                Showing <%= start_idx %>–<%= end_idx %> of <%= @total_count %>
+              <% else %>
+                Showing 0–0 of 0
+              <% end %>
+            </div>
+            <div class="flex gap-2">
+              <button phx-click="paginate" phx-value-action="first" class={[
+                "px-3 py-1 rounded border",
+                if(@page == 1, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+              ]} disabled={@page == 1}>&laquo; First</button>
+              <button phx-click="paginate" phx-value-action="prev" class={[
+                "px-3 py-1 rounded border",
+                if(@page == 1, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+              ]} disabled={@page == 1}>&lsaquo; Prev</button>
+              <span class="px-3 py-1 text-sm text-gray-600">Page <%= @page %> of <%= @total_pages %></span>
+              <button phx-click="paginate" phx-value-action="next" class={[
+                "px-3 py-1 rounded border",
+                if(@page >= @total_pages, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+              ]} disabled={@page >= @total_pages}>Next &rsaquo;</button>
+              <button phx-click="paginate" phx-value-action="last" class={[
+                "px-3 py-1 rounded border",
+                if(@page >= @total_pages, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+              ]} disabled={@page >= @total_pages}>Last &raquo;</button>
+            </div>
           </div>
 
           <!-- Summary Stats -->

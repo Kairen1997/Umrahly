@@ -10,9 +10,22 @@ defmodule UmrahlyWeb.AdminFlightsLive do
     flights = Flights.list_flights()
     changeset = Flights.change_flight(%Flight{})
 
+    per_page = 10
+    page = 1
+    filtered = flights
+    total_pages = calc_total_pages(length(filtered), per_page)
+    paged = paginate(filtered, page, per_page)
+
     socket =
       socket
       |> assign(:flights, flights)
+      |> assign(:filtered_flights, filtered)
+      |> assign(:paged_flights, paged)
+      |> assign(:page, page)
+      |> assign(:per_page, per_page)
+      |> assign(:total_pages, total_pages)
+      |> assign(:search_query, "")
+      |> assign(:status_filter, "All")
       |> assign(:current_page, "flights")
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
@@ -49,9 +62,18 @@ defmodule UmrahlyWeb.AdminFlightsLive do
 
         case Flights.create_flight(flight_params) do
           {:ok, flight} ->
+            new_flights = [flight | socket.assigns.flights]
+            new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
+            total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
+            page = clamp_page(socket.assigns.page, total_pages)
+            paged = paginate(new_filtered, page, socket.assigns.per_page)
             {:noreply,
               socket
-              |> update(:flights, fn flights -> [flight | flights] end)
+              |> assign(:flights, new_flights)
+              |> assign(:filtered_flights, new_filtered)
+              |> assign(:paged_flights, paged)
+              |> assign(:total_pages, total_pages)
+              |> assign(:page, page)
               |> assign(:show_new_flight_form, false)
               |> assign(:editing_flight_id, nil)
               |> put_flash(:info, "Flight created successfully")
@@ -73,11 +95,18 @@ defmodule UmrahlyWeb.AdminFlightsLive do
 
         case Flights.update_flight(flight, flight_params_with_duration) do
           {:ok, updated_flight} ->
+            new_flights = Enum.map(socket.assigns.flights, fn f -> if f.id == updated_flight.id, do: updated_flight, else: f end)
+            new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
+            total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
+            page = clamp_page(socket.assigns.page, total_pages)
+            paged = paginate(new_filtered, page, socket.assigns.per_page)
             {:noreply,
               socket
-              |> update(:flights, fn flights ->
-                Enum.map(flights, fn f -> if f.id == updated_flight.id, do: updated_flight, else: f end)
-              end)
+              |> assign(:flights, new_flights)
+              |> assign(:filtered_flights, new_filtered)
+              |> assign(:paged_flights, paged)
+              |> assign(:total_pages, total_pages)
+              |> assign(:page, page)
               |> assign(:show_new_flight_form, false)
               |> assign(:editing_flight_id, nil)
               |> put_flash(:info, "Flight updated successfully")}
@@ -164,11 +193,90 @@ def handle_event("delete_flight", %{"id" => id}, socket) do
   flight = Flights.get_flight!(id)
   {:ok, _} = Flights.delete_flight(flight)
 
+  new_flights = Enum.reject(socket.assigns.flights, &(&1.id == flight.id))
+  new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
+  total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
+  page = clamp_page(socket.assigns.page, total_pages)
+  paged = paginate(new_filtered, page, socket.assigns.per_page)
   {:noreply,
     socket
-    |> update(:flights, fn flights -> Enum.reject(flights, &(&1.id == flight.id)) end)
+    |> assign(:flights, new_flights)
+    |> assign(:filtered_flights, new_filtered)
+    |> assign(:paged_flights, paged)
+    |> assign(:total_pages, total_pages)
+    |> assign(:page, page)
     |> put_flash(:info, "Flight deleted successfully")}
 end
+
+  def handle_event("search", params, socket) do
+    q =
+      cond do
+        Map.has_key?(params, "q") -> params["q"]
+        Map.has_key?(params, "value") -> params["value"]
+        true -> socket.assigns.search_query || ""
+      end
+
+    status =
+      cond do
+        Map.has_key?(params, "status") -> params["status"]
+        Map.has_key?(params, "_target") and params["_target"] == ["status"] -> params["status"] || socket.assigns.status_filter
+        true -> socket.assigns.status_filter || "All"
+      end
+
+    filtered = apply_filters(socket.assigns.flights, q, status)
+    total_pages = calc_total_pages(length(filtered), socket.assigns.per_page)
+    page = 1
+    paged = paginate(filtered, page, socket.assigns.per_page)
+
+    {:noreply,
+      socket
+      |> assign(:search_query, q)
+      |> assign(:status_filter, status)
+      |> assign(:filtered_flights, filtered)
+      |> assign(:paged_flights, paged)
+      |> assign(:total_pages, total_pages)
+      |> assign(:page, page)}
+  end
+
+  def handle_event("filter_status", params, socket) do
+    status =
+      cond do
+        Map.has_key?(params, "status") -> params["status"]
+        Map.has_key?(params, "value") -> params["value"]
+        true -> "All"
+      end
+
+    filtered = apply_filters(socket.assigns.flights, socket.assigns.search_query, status)
+    total_pages = calc_total_pages(length(filtered), socket.assigns.per_page)
+    page = 1
+    paged = paginate(filtered, page, socket.assigns.per_page)
+    {:noreply, socket
+      |> assign(:status_filter, status)
+      |> assign(:filtered_flights, filtered)
+      |> assign(:paged_flights, paged)
+      |> assign(:total_pages, total_pages)
+      |> assign(:page, page)}
+  end
+
+  def handle_event("paginate", %{"action" => action}, socket) do
+    page = socket.assigns.page
+    total_pages = socket.assigns.total_pages
+
+    new_page = case action do
+      "first" -> 1
+      "prev" -> max(page - 1, 1)
+      "next" -> min(page + 1, total_pages)
+      "last" -> max(total_pages, 1)
+      _ -> page
+    end
+
+    paged = paginate(socket.assigns.filtered_flights, new_page, socket.assigns.per_page)
+
+    {:noreply,
+      socket
+      |> assign(:page, new_page)
+      |> assign(:paged_flights, paged)}
+  end
 
 defp calculate_duration_days(flight_params) do
   case {flight_params["departure_time"], flight_params["return_date"]} do
@@ -199,10 +307,46 @@ defp format_datetime_for_input(datetime) do
   |> NaiveDateTime.to_string()
   |> String.slice(0, 16)  # Keep only "YYYY-MM-DDTHH:MM"
 end
+
+  defp apply_filters(flights, query, status) do
+    normalized_query = String.downcase(String.trim(query || ""))
+
+    flights
+    |> Enum.filter(fn flight ->
+      matches_query =
+        normalized_query == "" or
+        String.contains?(String.downcase(flight.flight_number || ""), normalized_query) or
+        String.contains?(String.downcase(flight.origin || ""), normalized_query) or
+        String.contains?(String.downcase(flight.destination || ""), normalized_query) or
+        String.contains?(String.downcase(flight.aircraft || ""), normalized_query)
+
+      matches_status =
+        status == "All" or (flight.status || "") == status
+
+      matches_query and matches_status
+    end)
+  end
+
+  defp paginate(list, page, per_page) do
+    start_index = (page - 1) * per_page
+    Enum.slice(list, start_index, per_page)
+  end
+
+  defp calc_total_pages(total_items, per_page) do
+    case total_items do
+      0 -> 1
+      n -> div(n + per_page - 1, per_page)
+    end
+  end
+
+  defp clamp_page(page, total_pages) do
+    page |> max(1) |> min(max(total_pages, 1))
+  end
+
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
-      <div class="max-w-6xl mx-auto">
+      <div class="max-w-screen-2xl mx-auto px-4">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold text-gray-900">Flights Management</h1>
@@ -211,7 +355,24 @@ end
             </button>
           </div>
 
-          <div class="overflow-x-auto">
+          <div class="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-3 md:space-y-0 mb-4">
+            <form phx-change="search" phx-submit="search" class="flex w-full md:w-auto md:items-center md:space-x-4 space-y-3 md:space-y-0">
+              <div class="relative w-full md:w-96">
+                <input type="text" name="q" value={@search_query} phx-debounce="300"
+                       class="w-full border rounded-md px-3 py-2 pr-8" placeholder="Search flights (number, route, aircraft)" />
+                <span class="absolute right-2 top-2.5 text-gray-400">🔍</span>
+              </div>
+              <select name="status" value={@status_filter} class="border rounded-md px-3 py-2 w-full md:w-auto">
+                <option value="All">All</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Boarding">Boarding</option>
+                <option value="Delayed">Delayed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </form>
+          </div>
+
+          <div>
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
@@ -228,7 +389,7 @@ end
                   </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
-                    <%= for flight <- @flights do %>
+                    <%= for flight <- @paged_flights do %>
                       <tr class="hover:bg-gray-50">
                         <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= flight.flight_number %></td>
                         <td class="px-3 py-3 whitespace-nowrap">
@@ -302,6 +463,24 @@ end
               </tbody>
             </table>
           </div>
+
+          <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">
+              <%= if @filtered_flights != [] do %>
+                <%= ((@page - 1) * @per_page) + 1 %> - <%= min(@page * @per_page, length(@filtered_flights)) %> of <%= length(@filtered_flights) %>
+              <% else %>
+                0 of 0
+              <% end %>
+            </div>
+            <div class="space-x-2">
+              <button phx-click="paginate" phx-value-action="first" class={[("px-3 py-1 border rounded"), @page == 1 && "opacity-50 cursor-not-allowed"]} disabled={@page == 1}>First</button>
+              <button phx-click="paginate" phx-value-action="prev" class={["px-3 py-1 border rounded", @page == 1 && "opacity-50 cursor-not-allowed"]} disabled={@page == 1}>Prev</button>
+              <span class="px-2 text-sm text-gray-700">Page <%= @page %> / <%= @total_pages %></span>
+              <button phx-click="paginate" phx-value-action="next" class={["px-3 py-1 border rounded", @page >= @total_pages && "opacity-50 cursor-not-allowed"]} disabled={@page >= @total_pages}>Next</button>
+              <button phx-click="paginate" phx-value-action="last" class={["px-3 py-1 border rounded", @page >= @total_pages && "opacity-50 cursor-not-allowed"]} disabled={@page >= @total_pages}>Last</button>
+            </div>
+          </div>
+
           <%= if @show_new_flight_form do %>
             <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
               <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6">

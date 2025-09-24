@@ -45,39 +45,6 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
      |> assign(:page_size, page_size)}
   end
 
-  def handle_event("export_logs", _params, socket) do
-    csv = build_csv(ActivityLogs.list_all_detailed_activities())
-    filename = "activity_logs_" <> (Date.utc_today() |> Date.to_iso8601()) <> ".csv"
-
-    {:noreply,
-     Phoenix.LiveView.send_download(socket, {:binary, csv}, filename: filename, content_type: "text/csv")}
-  end
-
-  defp build_csv(rows) do
-    header = ["Timestamp","User","Action","Details","Status","IP Address","User Agent"]
-
-    data_lines =
-      rows
-      |> Enum.map(fn r ->
-        [r.timestamp, r.user_name, r.action, r.details, r.status, r.ip_address, r.user_agent]
-        |> Enum.map(&escape_csv/1)
-        |> Enum.join(",")
-      end)
-
-    Enum.join([Enum.join(header, ",") | data_lines], "\n")
-  end
-
-  defp escape_csv(nil), do: ""
-  defp escape_csv(value) when is_binary(value) do
-    escaped = String.replace(value, "\"", "\"\"")
-    if String.contains?(escaped, [",", "\n", "\r", "\""]) do
-      "\"" <> escaped <> "\""
-    else
-      escaped
-    end
-  end
-  defp escape_csv(value), do: to_string(value)
-
   defp total_pages(total, page_size) do
     case {total, page_size} do
       {0, _} -> 1
@@ -93,9 +60,6 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold text-gray-900">Activity Log</h1>
             <div class="flex space-x-2">
-              <button phx-click="export_logs" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                Export Logs
-              </button>
               <button class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                 Clear Old Logs
               </button>

@@ -1055,8 +1055,9 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-green-700"> <%= format_amount(booking.paid_amount || 0) %> </td>
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-red-700"> <%= format_amount(remaining_decimal) %> </td>
                               <td class="px-6 py-4 whitespace-nowrap">
-                                <span class={["inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", if(booking.status == "completed", do: "bg-green-100 text-green-800", else: "bg-blue-100 text-blue-800")]}>
-                                  <%= String.upcase(booking.status) %>
+                                <% display_status = if booking.payment_plan == "installment" and Decimal.compare(remaining_decimal, 0) == :gt, do: "in progress", else: String.upcase(booking.status) %>
+                                <span class={["inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", if(String.downcase(display_status) == "completed", do: "bg-green-100 text-green-800", else: "bg-blue-100 text-blue-800")]}>
+                                  <%= String.upcase(display_status) %>
                                 </span>
                               </td>
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

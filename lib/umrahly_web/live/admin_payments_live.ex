@@ -109,13 +109,20 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   # --- Data loading (bookings + in-progress flows) ---
   defp get_payments_data(status_filter \\ "all") do
     try do
-      bookings = get_payments_from_bookings(status_filter)
-      progresses = get_payments_from_progress(status_filter)
+      # Always fetch all, then filter after computing derived status
+      bookings = get_payments_from_bookings("all")
+      progresses = get_payments_from_progress("all")
 
-      (bookings ++ progresses)
-      |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
-      |> Enum.flat_map(&expand_traveler_data/1)
-      |> Enum.map(&format_payment_data/1)
+      combined =
+        (bookings ++ progresses)
+        |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+        |> Enum.flat_map(&expand_traveler_data/1)
+        |> Enum.map(&format_payment_data/1)
+
+      case status_filter do
+        "all" -> combined
+        other -> Enum.filter(combined, fn p -> p.status == other end)
+      end
     rescue e ->
       require Logger
       Logger.error(Exception.format(:error, e, __STACKTRACE__))
@@ -225,16 +232,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           ilike(p.name, ^search_pattern)
         )
 
-      bookings_query =
-        case status_filter do
-          "all" -> bookings_query |> where([b, u, ps, p], b.status != "cancelled")
-          "completed" -> bookings_query |> where([b, u, ps, p], b.status in ["completed", "confirmed"])
-          "in_progress" -> bookings_query |> where([b, u, ps, p], b.status == "pending")
-          "abandoned" -> bookings_query |> where([b, u, ps, p], b.status == "cancelled")
-          "canceled" -> bookings_query |> where([b, u, ps, p], b.status == "cancelled")
-          _ -> bookings_query
-        end
-
       bookings_results =
         bookings_query
         |> select([b, u, ps, p], %{
@@ -259,20 +256,29 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
         |> Repo.all()
 
       progress_results =
-        get_payments_from_progress_for_search(search_pattern, status_filter)
+        get_payments_from_progress_for_search(search_pattern, "all")
 
-      (bookings_results ++ progress_results)
-      |> Enum.flat_map(&expand_traveler_data/1)
+      combined =
+        (bookings_results ++ progress_results)
+        |> Enum.flat_map(&expand_traveler_data/1)
+        |> Enum.map(&format_payment_data/1)
+
+      filtered =
+        case status_filter do
+          "all" -> combined
+          other -> Enum.filter(combined, fn p -> p.status == other end)
+        end
+
+      # Final text filter safeguard
+      filtered
       |> Enum.filter(fn payment ->
         search_lc = String.downcase(search_term)
-
         String.contains?(String.downcase(payment.user_name || ""), search_lc) or
         String.contains?(String.downcase(payment.user_email || ""), search_lc) or
         String.contains?(String.downcase(payment.package_name || ""), search_lc) or
         String.contains?(String.downcase(payment.traveler_name || ""), search_lc) or
         String.contains?(String.downcase(payment.traveler_identity || ""), search_lc)
       end)
-      |> Enum.map(&format_payment_data/1)
     rescue e ->
       require Logger
       Logger.error(Exception.format(:error, e, __STACKTRACE__))
@@ -399,6 +405,18 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           format_amount(total_decimal)
       end
 
+    # Derive status: installments remain in_progress until fully paid
+    computed_status =
+      case payment.payment_plan do
+        "installment" ->
+          if Decimal.compare(unpaid_decimal, Decimal.new("0")) == :gt do
+            "in_progress"
+          else
+            normalize_status(payment.status)
+          end
+        _ -> normalize_status(payment.status)
+      end
+
     %{
       id: payment.id,
       source: payment[:source],
@@ -409,7 +427,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       raw_amount: payment.total_amount,
       payment_method: payment.payment_method || "Not specified",
       payment_plan: payment.payment_plan || "Not specified",
-      status: normalize_status(payment.status),
+      status: computed_status,
       is_booking_for_self: payment.is_booking_for_self,
       transaction_id: "TXN-#{String.pad_leading("#{payment.id}", 6, "0")}",
       payment_date: format_date(payment.inserted_at),

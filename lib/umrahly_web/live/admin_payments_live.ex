@@ -94,9 +94,9 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     end
   end
 
-  def handle_event("refund_payment", %{"id" => _id}, socket) do
-    # TODO: Implement payment refund
-    {:noreply, socket}
+
+  def handle_event("go_to_payment_proofs", _params, socket) do
+    {:noreply, push_navigate(socket, to: "/admin/payment-proofs")}
   end
 
   def handle_info({:payments_changed}, socket) do
@@ -104,10 +104,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     {:noreply, socket |> assign(:search_term, "") |> assign(:page, 1) |> assign_pagination(payments)}
   end
 
-  # NEW: Navigate to admin payment proofs index from header button
-  def handle_event("go_to_payment_proofs", _params, socket) do
-    {:noreply, push_navigate(socket, to: "/admin/payment-proofs")}
-  end
+
 
   # --- Data loading (bookings + in-progress flows) ---
   defp get_payments_data(status_filter \\ "all") do

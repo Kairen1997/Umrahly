@@ -54,11 +54,6 @@ defmodule UmrahlyWeb.AdminPaymentDetailsLive do
     end
   end
 
-  def handle_event("refund_payment", %{"id" => _id}, socket) do
-    # TODO: Implement payment refund
-    {:noreply, socket |> put_flash(:info, "Refund functionality coming soon")}
-  end
-
   defp load_payment_details(id, source) do
     case source do
       "booking" ->
@@ -161,12 +156,6 @@ defmodule UmrahlyWeb.AdminPaymentDetailsLive do
               ]}>
                 <%= String.replace(@payment_details.status, "_", " ") |> String.capitalize() %>
               </span>
-              <button
-                phx-click="refund_payment"
-                phx-value-id={@payment_details.id}
-                class="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 transition-colors">
-                Refund
-              </button>
             </div>
           </div>
 
@@ -377,21 +366,11 @@ defmodule UmrahlyWeb.AdminPaymentDetailsLive do
             </div>
           <% end %>
 
-          <!-- Actions -->
-          <div class="mt-6 flex justify-end gap-3">
-            <.link navigate="/admin/payments" class="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">
-              Back to Payments
-            </.link>
-            <%= if @payment_details.status not in ["completed", "confirmed"] do %>
-              <button
-                phx-click="process_payment"
-                phx-value-id={@payment_details.id}
-                phx-value-source={@payment_details.source}
-                class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                Process Payment
-              </button>
-            <% end %>
-          </div>
+         <.link
+          navigate={"/admin/payments/#{@payment_details.id}/#{@payment_details.source}/refund"}
+          class="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 transition-colors">
+          Refund
+        </.link>
         </div>
       </div>
     </.admin_layout>

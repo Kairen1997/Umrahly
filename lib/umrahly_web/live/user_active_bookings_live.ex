@@ -228,8 +228,18 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         <div>
                           <span class="font-semibold text-gray-900">Amounts:</span>
                           <div class="mt-1 space-y-0.5">
-                            <div>Total: RM <%= booking.package.price %></div>
-                            <%= if booking.deposit_amount && Decimal.compare(booking.deposit_amount, Decimal.new(booking.package.price)) != :eq do %>
+                            <% traveler_count = if booking.travelers_data && length(booking.travelers_data) > 0 do
+                              length(booking.travelers_data)
+                            else
+                              if booking.is_booking_for_self, do: 1, else: 0
+                            end %>
+                            <% total_amount = if traveler_count > 0 do
+                              booking.package.price * traveler_count
+                            else
+                              booking.package.price
+                            end %>
+                            <div>Total: RM <%= total_amount %></div>
+                            <%= if booking.deposit_amount && traveler_count > 0 && Decimal.compare(booking.deposit_amount, Decimal.new(total_amount)) != :eq do %>
                               <div class="text-orange-600">Deposit: RM <%= booking.deposit_amount %></div>
                             <% end %>
                           </div>

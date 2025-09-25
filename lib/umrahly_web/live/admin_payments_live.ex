@@ -452,11 +452,15 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   end
 
   defp normalize_status(nil), do: "unknown"
-  defp normalize_status("confirmed"), do: "completed"
-  defp normalize_status("pending"), do: "in_progress"
-  defp normalize_status("cancelled"), do: "canceled"
-  defp normalize_status("abandoned"), do: "canceled"
-  defp normalize_status(status), do: status
+  defp normalize_status(status) do
+    case to_string(status) do
+      "confirmed" -> "completed"
+      "pending" -> "in_progress"
+      "cancelled" -> "canceled"
+      "abandoned" -> "canceled"
+      other -> other
+    end
+  end
 
   defp format_amount(nil), do: "RM 0"
   defp format_amount(%Decimal{} = amount) do

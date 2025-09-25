@@ -3,6 +3,7 @@ defmodule UmrahlyWeb.AdminBookingsLive do
 
     import UmrahlyWeb.AdminLayout
   alias Umrahly.Bookings
+  alias Umrahly.Packages
 
   def mount(_params, _session, socket) do
     socket =
@@ -18,6 +19,10 @@ defmodule UmrahlyWeb.AdminBookingsLive do
       |> assign(:total_pages, 0)
       |> assign(:show_view_modal, false)
       |> assign(:selected_booking, nil)
+      |> assign(:status_filter, "all")
+      |> assign(:package_filter, "all")
+      |> assign(:status_options, ["all" | Bookings.get_booking_status()])
+      |> assign(:package_options, Packages.list_packages() |> Enum.map(&%{id: &1.id, name: &1.name}))
       |> load_bookings()
 
     {:ok, socket}
@@ -131,6 +136,34 @@ defmodule UmrahlyWeb.AdminBookingsLive do
     {:noreply, socket |> assign(:show_view_modal, false) |> assign(:selected_booking, nil)}
   end
 
+  def handle_event("filter_change", params, socket) do
+    status = Map.get(params, "status", socket.assigns.status_filter) |> to_string()
+    package_id = Map.get(params, "package_id", socket.assigns.package_filter) |> to_string()
+
+    status = if status == "" do "all" else status end
+    package_id = if package_id == "" do "all" else package_id end
+
+    socket =
+      socket
+      |> assign(:status_filter, status)
+      |> assign(:package_filter, package_id)
+      |> assign(:page, 1)
+      |> load_bookings()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("clear_filters", _params, socket) do
+    socket =
+      socket
+      |> assign(:status_filter, "all")
+      |> assign(:package_filter, "all")
+      |> assign(:page, 1)
+      |> load_bookings()
+
+    {:noreply, socket}
+  end
+
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
@@ -172,6 +205,30 @@ defmodule UmrahlyWeb.AdminBookingsLive do
               >
                 Clear Search
               </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="w-full lg:w-auto">
+              <form phx-change="filter_change" class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <div>
+                  <label for="status" class="sr-only">Status</label>
+                  <select name="status" id="status" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500">
+                    <%= for status <- @status_options do %>
+                      <option value={status} selected={to_string(@status_filter) == to_string(status)}><%= String.capitalize(to_string(status)) %></option>
+                    <% end %>
+                  </select>
+                </div>
+                <div>
+                  <label for="package_id" class="sr-only">Package</label>
+                  <select name="package_id" id="package_id" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500">
+                    <option value="all" selected={@package_filter == "all"}>All packages</option>
+                    <%= for p <- @package_options do %>
+                      <option value={p.id} selected={to_string(@package_filter) == to_string(p.id)}><%= p.name %></option>
+                    <% end %>
+                  </select>
+                </div>
+                <button type="button" phx-click="clear_filters" class="px-3 py-2 border rounded-lg hover:bg-gray-50">Clear Filters</button>
+              </form>
             </div>
           </div>
 
@@ -421,10 +478,21 @@ defmodule UmrahlyWeb.AdminBookingsLive do
   end
 
   defp load_bookings(socket) do
+    status_param =
+      case socket.assigns.status_filter do
+        :all -> :all
+        "all" -> :all
+        "" -> :all
+        other when is_binary(other) -> other
+        _ -> :all
+      end
+
     search_opts = [
       search: socket.assigns.search_term,
       page: socket.assigns.page,
-      page_size: socket.assigns.page_size
+      page_size: socket.assigns.page_size,
+      status: status_param,
+      package_id: socket.assigns.package_filter
     ]
 
     total_count = Bookings.count_bookings_with_details(search_opts)

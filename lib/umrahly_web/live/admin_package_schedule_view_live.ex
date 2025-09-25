@@ -136,27 +136,19 @@ defmodule UmrahlyWeb.AdminPackageScheduleViewLive do
 
                 <div class="space-y-3">
                   <div class="flex justify-between">
-                    <span class="text-sm text-gray-500">Base Price:</span>
+                    <span class="text-sm text-gray-500">Package Price:</span>
                     <span class="text-sm font-medium text-gray-900">RM <%= @current_schedule.package.price %></span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-sm text-gray-500">Schedule Price:</span>
                     <span class="text-sm font-medium text-gray-900">
-                      <%= if @current_schedule.price_override do %>
-                        RM <%= @current_schedule.price_override %>
-                      <% else %>
-                        RM <%= @current_schedule.package.price %> (base price)
-                      <% end %>
+                      RM <%= @current_schedule.package.price %> (base price)
                     </span>
                   </div>
                   <div class="flex justify-between border-t border-gray-200 pt-2">
                     <span class="text-sm font-semibold text-gray-700">Total Price:</span>
                     <span class="text-sm font-bold text-gray-900">
-                      RM <%=
-                        base_price = @current_schedule.package.price
-                        override_price = if @current_schedule.price_override, do: Decimal.to_integer(@current_schedule.price_override), else: 0
-                        base_price + override_price
-                      %>
+                      RM <%= @current_schedule.package.price %>
                     </span>
                   </div>
                   <div class="flex justify-between">

@@ -11,28 +11,7 @@
 # and so on) as they will fail if something goes wrong.
 
 alias Umrahly.Accounts
-alias Umrahly.Packages
 
-# Create a sample package (quota and dates are now managed through package schedules)
-{:ok, package} = Packages.create_package(%{
-  name: "Standard Package",
-  price: 2500,
-  duration_days: 7,
-  duration_nights: 6,
-  status: "active",
-  description: "A comprehensive Umrah package with accommodation and transport included",
-  accommodation_type: "4 Star Hotel",
-  transport_type: "Flight"
-})
-
-# Create a package schedule for this package
-Packages.create_package_schedule(%{
-  package_id: package.id,
-  departure_date: ~D[2025-12-01],
-  return_date: ~D[2025-12-07],
-  quota: 50,
-  status: "active"
-})
 
 # Create admin users
 admin_users = [

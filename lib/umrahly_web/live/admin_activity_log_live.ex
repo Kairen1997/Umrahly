@@ -2,61 +2,54 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
   use UmrahlyWeb, :live_view
 
   import UmrahlyWeb.AdminLayout
+  alias Umrahly.ActivityLogs
+
+  @page_size 10
 
   def mount(_params, _session, socket) do
-    # Mock data for activity logs - in a real app, this would come from your database
-    activities = [
-      %{
-        id: 1,
-        user_name: "John Doe",
-        action: "Payment Submitted",
-        details: "Submitted payment of RM 2,500 for Standard Package",
-        timestamp: "2024-08-15 09:40:00",
-        ip_address: "192.168.1.100",
-        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        status: "Success"
-      },
-      %{
-        id: 2,
-        user_name: "Sarah Smith",
-        action: "Profile Updated",
-        details: "Updated contact information and address",
-        timestamp: "2024-08-15 08:15:00",
-        ip_address: "192.168.1.101",
-        user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1)",
-        status: "Success"
-      },
-      %{
-        id: 3,
-        user_name: "Ahmed Hassan",
-        action: "Login Attempt",
-        details: "Failed login attempt with incorrect password",
-        timestamp: "2024-08-15 07:30:00",
-        ip_address: "192.168.1.102",
-        user_agent: "Mozilla/5.0 (Android 11; Mobile)",
-        status: "Failed"
-      },
-      %{
-        id: 4,
-        user_name: "Admin User",
-        action: "User Management",
-        details: "Created new user account for jane@example.com",
-        timestamp: "2024-08-15 06:45:00",
-        ip_address: "192.168.1.50",
-        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        status: "Success"
-      }
-    ]
-
     socket =
       socket
-      |> assign(:activities, activities)
+      |> assign(:activities, [])
+      |> assign(:page, 1)
+      |> assign(:page_size, @page_size)
+      |> assign(:total, 0)
       |> assign(:current_page, "activity-log")
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
 
-    {:ok, socket}
+    {:ok, socket, temporary_assigns: [activities: []]}
+  end
+
+  def handle_params(params, _uri, socket) do
+    page =
+      case Map.get(params, "page") do
+        nil -> 1
+        p when is_binary(p) ->
+          case Integer.parse(p) do
+            {n, _} when n > 0 -> n
+            _ -> 1
+          end
+        p when is_integer(p) and p > 0 -> p
+        _ -> 1
+      end
+
+    %{entries: entries, total: total, page: page, page_size: page_size} =
+      ActivityLogs.list_detailed_activities_paginated(page, @page_size)
+
+    {:noreply,
+     socket
+     |> assign(:activities, entries)
+     |> assign(:total, total)
+     |> assign(:page, page)
+     |> assign(:page_size, page_size)}
+  end
+
+  defp total_pages(total, page_size) do
+    case {total, page_size} do
+      {0, _} -> 1
+      {t, ps} -> div(t + ps - 1, ps)
+    end
   end
 
   def render(assigns) do
@@ -67,9 +60,6 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold text-gray-900">Activity Log</h1>
             <div class="flex space-x-2">
-              <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                Export Logs
-              </button>
               <button class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                 Clear Old Logs
               </button>
@@ -91,7 +81,7 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <%= for activity <- @activities do %>
-                  <tr class="hover:bg-gray-50">
+                  <tr class="hover:bg-teal-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.timestamp %></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><%= activity.user_name %></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.action %></td>
@@ -99,17 +89,19 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
                       <%= activity.details %>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <span class={[
-                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                        case activity.status do
-                          "Success" -> "bg-green-100 text-green-800"
-                          "Failed" -> "bg-red-100 text-red-800"
-                          "Warning" -> "bg-yellow-100 text-yellow-800"
-                          _ -> "bg-gray-100 text-gray-800"
-                        end
-                      ]}>
-                        <%= activity.status %>
-                      </span>
+                      <%= if activity.status do %>
+                        <span class={[
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          case activity.status do
+                            "Success" -> "bg-green-100 text-green-800"
+                            "Failed" -> "bg-red-100 text-red-800"
+                            "Warning" -> "bg-yellow-100 text-yellow-800"
+                            _ -> "bg-gray-100 text-gray-800"
+                          end
+                        ]}>
+                          <%= activity.status %>
+                        </span>
+                      <% end %>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.ip_address %></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -125,15 +117,19 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
           <!-- Pagination -->
           <div class="mt-6 flex items-center justify-between">
             <div class="text-sm text-gray-700">
-              Showing <span class="font-medium">1</span> to <span class="font-medium">4</span> of <span class="font-medium">4</span> results
+              <%=
+                first_item = if @total == 0, do: 0, else: ((@page - 1) * @page_size) + 1
+                last_item = min(@page * @page_size, @total)
+              %>
+              Showing <span class="font-medium"><%= first_item %></span> to <span class="font-medium"><%= last_item %></span> of <span class="font-medium"><%= @total %></span> results
             </div>
             <div class="flex space-x-2">
-              <button class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+              <.link navigate={~p"/admin/activity-log?page=#{@page - 1}"} class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" aria-disabled={@page <= 1}>
                 Previous
-              </button>
-              <button class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+              </.link>
+              <.link navigate={~p"/admin/activity-log?page=#{@page + 1}"} class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" aria-disabled={@page >= total_pages(@total, @page_size)}>
                 Next
-              </button>
+              </.link>
             </div>
           </div>
         </div>

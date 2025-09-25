@@ -67,7 +67,7 @@ defmodule UmrahlyWeb.UserAuth do
   end
 
   defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
-    put_resp_cookie(conn, :user_remember_me, token, max_age: 60 * 60 * 24 * 30)
+    put_resp_cookie(conn, "user_remember_me", token, max_age: 60 * 60 * 24 * 30)
   end
 
   defp maybe_write_remember_me_cookie(conn, _token, _params) do

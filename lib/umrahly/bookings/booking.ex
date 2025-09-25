@@ -16,7 +16,7 @@ defmodule Umrahly.Bookings.Booking do
     field :payment_proof_notes, :string
     field :payment_proof_submitted_at, :utc_datetime
     field :payment_proof_status, :string, default: "pending"
-
+    field :is_booking_for_self, :boolean, default: true
     belongs_to :user, Umrahly.Accounts.User
     belongs_to :package_schedule, Umrahly.Packages.PackageSchedule
 
@@ -29,7 +29,7 @@ defmodule Umrahly.Bookings.Booking do
   """
   def changeset_step1(booking, attrs) do
     booking
-    |> cast(attrs, [:user_id, :package_schedule_id, :number_of_persons])
+    |> cast(attrs, [:user_id, :package_schedule_id, :number_of_persons, :is_booking_for_self])
     |> validate_required([:user_id, :package_schedule_id, :number_of_persons])
     |> validate_number(:number_of_persons, greater_than: 0, less_than_or_equal_to: 10)
     |> foreign_key_constraint(:user_id)
@@ -91,7 +91,7 @@ defmodule Umrahly.Bookings.Booking do
   """
   def changeset_final(booking, attrs) do
     booking
-    |> cast(attrs, [:status, :amount, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :notes, :payment_proof_file, :payment_proof_notes, :payment_proof_submitted_at, :payment_proof_status, :user_id, :package_schedule_id])
+    |> cast(attrs, [:status, :amount, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :notes, :payment_proof_file, :payment_proof_notes, :payment_proof_submitted_at, :payment_proof_status, :user_id, :package_schedule_id, :is_booking_for_self])
     |> validate_required([:status, :total_amount, :deposit_amount, :number_of_persons, :payment_method, :payment_plan, :booking_date, :user_id, :package_schedule_id])
     |> validate_inclusion(:status, ["pending", "confirmed", "cancelled", "completed"])
     |> validate_inclusion(:payment_plan, ["full_payment", "installment"])

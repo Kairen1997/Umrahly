@@ -499,14 +499,14 @@ defmodule UmrahlyWeb.CoreComponents do
           phx-update={match?(%Phoenix.LiveView.LiveStream{}, @rows) && "stream"}
           class="relative divide-y divide-zinc-100 border-t border-zinc-200 text-sm leading-6 text-zinc-700"
         >
-          <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="group hover:bg-zinc-50">
+          <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="group hover:bg-teal-50 transition-colors">
             <td
               :for={{col, i} <- Enum.with_index(@col)}
               phx-click={@row_click && @row_click.(row)}
               class={["relative p-0", @row_click && "hover:cursor-pointer"]}
             >
               <div class="block py-4 pr-6">
-                <span class="absolute -inset-y-px right-0 -left-4 group-hover:bg-zinc-50 sm:rounded-l-xl" />
+                <span class="absolute -inset-y-px right-0 -left-4 group-hover:bg-teal-50 sm:rounded-l-xl" />
                 <span class={["relative", i == 0 && "font-semibold text-zinc-900"]}>
                   {render_slot(col, @row_item.(row))}
                 </span>
@@ -514,7 +514,7 @@ defmodule UmrahlyWeb.CoreComponents do
             </td>
             <td :if={@action != []} class="relative w-14 p-0">
               <div class="relative whitespace-nowrap py-4 text-right text-sm font-medium">
-                <span class="absolute -inset-y-px -right-4 left-0 group-hover:bg-zinc-50 sm:rounded-r-xl" />
+                <span class="absolute -inset-y-px -right-4 left-0 group-hover:bg-teal-50 sm:rounded-r-xl" />
                 <span
                   :for={action <- @action}
                   class="relative ml-4 font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
@@ -626,18 +626,19 @@ defmodule UmrahlyWeb.CoreComponents do
               <div class="flex items-center gap-3">
                 <!-- Profile Photo -->
                 <div class="relative">
+                  <% display_name = @current_user.full_name || @current_user.email %>
                   <%= if @has_profile do %>
                     <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
+                      <%= String.first(display_name) |> String.upcase() %>
                     </div>
                   <% else %>
                     <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
+                      <%= String.first(display_name) |> String.upcase() %>
                     </div>
                   <% end %>
                 </div>
 
-                <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+                <span class="text-zinc-900 font-semibold"><%= display_name %></span>
                 <%= if @has_profile do %>
                   <a href="/dashboard" class="hover:text-zinc-900">Dashboard</a>
                 <% else %>

@@ -239,25 +239,38 @@
       <!-- Package Grid -->
       <div class="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <%= for package <- @packages do %>
-          <div class="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100">
-            <%= if package.picture do %>
-              <img src={package.picture} alt={package.name} class="h-44 w-full object-cover bg-zinc-200">
-            <% else %>
-              <div class="h-44 w-full bg-zinc-200 flex items-center justify-center">
-                <svg class="w-12 h-12 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
-                </svg>
+          <div class="group relative overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-zinc-100 transition-all duration-200 hover:shadow-lg hover:ring-teal-300 focus-within:ring-2 focus-within:ring-teal-400">
+            <a href={~p"/packages/#{package.id}"} aria-label={"View details for #{package.name}"} title={"View #{package.name} details"} class="absolute inset-0 z-10"></a>
+
+            <div class="relative h-44 bg-zinc-200 overflow-hidden">
+              <%= if package.picture do %>
+                <img src={package.picture} alt={package.name} class="w-full h-full object-cover transform transition-transform duration-300 ease-out group-hover:scale-105">
+              <% else %>
+                <div class="w-full h-full flex items-center justify-center">
+                  <svg class="w-12 h-12 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              <% end %>
+
+              <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-t from-teal-600/20 via-teal-500/10 to-transparent"></div>
+
+              <div class="pointer-events-none absolute bottom-2 right-2 flex justify-end opacity-0 translate-y-1 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
+                <span class="pointer-events-auto inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium rounded-md bg-white/90 text-teal-800 ring-1 ring-teal-200 shadow-sm">
+                  View details
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </span>
               </div>
-            <% end %>
-            
-            <div class="p-5">
+            </div>
+
+            <div class="p-5 transition-colors duration-200 group-hover:bg-teal-50/30">
               <p class="text-sm text-zinc-700"><%= package.name %></p>
               <p class="mt-1 font-bold text-emerald-600">RM <%= package.price %></p>
-              
+
               <%= if package.description && package.description != "" do %>
                 <p class="mt-2 text-xs text-zinc-600 line-clamp-2"><%= package.description %></p>
               <% end %>
-              
+
               <ul class="mt-2 text-xs text-zinc-600 space-y-1">
                 <li><%= package.duration_days %> Days / <%= package.duration_nights %> Nights</li>
                 <%= if package.accommodation_type && package.accommodation_type != "" do %>
@@ -267,8 +280,8 @@
                   <li><%= package.transport_type %></li>
                 <% end %>
               </ul>
-              
-              <a href={~p"/packages/#{package.id}"} class="mt-3 inline-block rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700">
+
+              <a href={~p"/packages/#{package.id}"} class="relative z-20 mt-3 inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors">
                 View Details
               </a>
             </div>

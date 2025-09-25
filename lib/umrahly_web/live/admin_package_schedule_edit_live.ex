@@ -35,7 +35,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
   def handle_event("save", %{"package_schedule" => schedule_params}, socket) do
     schedule_params = schedule_params
       |> Map.update("quota", nil, &if(is_binary(&1) && &1 != "", do: String.to_integer(&1), else: &1))
-      |> Map.update("price_override", nil, &if(is_binary(&1) && &1 != "", do: String.to_float(&1), else: &1))
+              # price_override removed: schedules use package base price
 
 
     case Packages.update_package_schedule(socket.assigns.schedule, schedule_params) do
@@ -131,21 +131,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleEditLive do
                   <% end %>
                 </div>
 
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Price Override (RM)</label>
-                  <input
-                    type="number"
-                    name="package_schedule[price_override]"
-                    value={@changeset.changes[:price_override] || @changeset.data.price_override}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    placeholder="Leave empty to use package price"
-                    min="1"
-                    step="0.01"
-                  />
-                  <%= if @changeset.errors[:price_override] do %>
-                    <p class="mt-1 text-sm text-red-600"><%= elem(@changeset.errors[:price_override], 0) %></p>
-                  <% end %>
-                </div>
+                <!-- Price Override removed: schedules always use package base price -->
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Departure Date</label>

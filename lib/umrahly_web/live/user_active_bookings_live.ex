@@ -57,7 +57,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
 
   def handle_event("view_proof", %{"progress_id" => id}, socket) do
     case Enum.find(socket.assigns.active_bookings, &(&1.id == String.to_integer(id))) do
-      nil -> {:noreply, put_flash(socket, :error, "Booking flow not found")}
+      nil -> {:noreply, put_flash(socket, :error, "No proof uploaded yet")}
       booking_flow ->
         case booking_flow._latest_booking do
           nil -> {:noreply, put_flash(socket, :error, "No proof uploaded yet")}
@@ -101,15 +101,15 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
     <.sidebar page_title={@page_title}>
       <div class="max-w-6xl mx-auto space-y-6">
         <!-- Header -->
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-white/80 backdrop-blur rounded-xl shadow-sm ring-1 ring-gray-200 p-6">
           <div class="flex items-center justify-between">
             <div>
-              <h1 class="text-2xl font-bold text-gray-900">Active Bookings</h1>
+              <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Active Bookings</h1>
               <p class="text-gray-600 mt-1">Resume your incomplete booking flows or start a new one</p>
             </div>
             <a
               href="/packages"
-              class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              class="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 shadow-sm transition-colors font-medium"
             >
               Browse Packages
             </a>
@@ -118,17 +118,17 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
 
         <%= if Enum.empty?(@active_bookings) do %>
           <!-- No Active Bookings -->
-          <div class="bg-white rounded-lg shadow p-8 text-center">
+          <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200 p-10 text-center">
             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
             </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">No Active Bookings</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No Active Bookings</h3>
             <p class="text-gray-600 mb-6">You don't have any incomplete booking flows. Start booking a package to get started!</p>
             <a
               href="/packages"
-              class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              class="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 shadow-sm transition-colors font-medium"
             >
               Browse Packages
             </a>
@@ -137,35 +137,35 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
           <!-- Active Bookings List -->
           <div class="space-y-6">
             <%= for booking <- @active_bookings do %>
-              <div class="bg-white rounded-lg shadow overflow-hidden">
+              <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200 overflow-hidden hover:shadow-md transition-shadow">
                 <!-- Main Booking Header -->
                 <div class="p-6 border-b border-gray-200">
                   <div class="flex items-start justify-between">
                     <div class="flex-1">
-                      <div class="flex items-center space-x-3 mb-3">
-                        <h3 class="text-xl font-semibold text-gray-900"><%= booking.package.name %></h3>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                      <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <h3 class="text-xl font-semibold text-gray-900 mr-2"><%= booking.package.name %></h3>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200">
                           Step <%= booking.current_step %> of <%= booking.max_steps %>
                         </span>
                         <span class={[
-                          "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
+                          "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ring-1",
                           case booking.status do
-                            "in_progress" -> "bg-yellow-100 text-yellow-800"
-                            "completed" -> "bg-green-100 text-green-800"
-                            "abandoned" -> "bg-red-100 text-red-800"
-                            _ -> "bg-gray-100 text-gray-800"
+                            "in_progress" -> "bg-yellow-50 text-yellow-800 ring-yellow-200"
+                            "completed" -> "bg-green-50 text-green-800 ring-green-200"
+                            "abandoned" -> "bg-red-50 text-red-800 ring-red-200"
+                            _ -> "bg-gray-50 text-gray-800 ring-gray-200"
                           end
                         ]}>
                           <%= String.upcase(String.replace(booking.status, "_", " ")) %>
                         </span>
                         <%= if booking._latest_booking && booking._latest_booking.payment_proof_status do %>
                           <span class={[
-                            "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
+                            "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ring-1",
                             case booking._latest_booking.payment_proof_status do
-                              "approved" -> "bg-green-100 text-green-800"
-                              "submitted" -> "bg-yellow-100 text-yellow-800"
-                              "rejected" -> "bg-red-100 text-red-800"
-                              _ -> "bg-gray-100 text-gray-800"
+                              "approved" -> "bg-green-50 text-green-800 ring-green-200"
+                              "submitted" -> "bg-amber-50 text-amber-800 ring-amber-200"
+                              "rejected" -> "bg-red-50 text-red-800 ring-red-200"
+                              _ -> "bg-gray-50 text-gray-800 ring-gray-200"
                             end
                           ]}>
                             PROOF: <%= String.upcase(booking._latest_booking.payment_proof_status) %>
@@ -174,17 +174,17 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
 
                       <!-- Package and Schedule Details -->
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700 mb-4">
                         <div>
-                          <span class="font-medium text-gray-900">Travel Dates:</span>
-                          <div class="mt-1">
+                          <span class="font-semibold text-gray-900">Travel Dates:</span>
+                          <div class="mt-1 space-y-0.5">
                             <div>Departure: <%= Calendar.strftime(booking.package_schedule.departure_date, "%B %d, %Y") %></div>
                             <div>Return: <%= Calendar.strftime(booking.package_schedule.return_date, "%B %d, %Y") %></div>
                           </div>
                         </div>
                         <div>
-                          <span class="font-medium text-gray-900">Package Details:</span>
-                          <div class="mt-1">
+                          <span class="font-semibold text-gray-900">Package Details:</span>
+                          <div class="mt-1 space-y-0.5">
                             <div>Type: <%= String.upcase(String.replace(booking.package.accommodation_type || "standard", "_", " ")) %></div>
                             <div>Price: RM <%= booking.package.price %></div>
                           </div>
@@ -192,18 +192,18 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
 
                       <!-- Payment Information -->
-                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-4">
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-700 mb-4">
                         <div>
-                          <span class="font-medium text-gray-900">Payment Method:</span>
+                          <span class="font-semibold text-gray-900">Payment Method:</span>
                           <div class="mt-1">
                             <span class={[
-                              "inline-flex items-center px-2 py-1 rounded text-xs font-medium",
+                              "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ring-1",
                               case booking.payment_method do
-                                "credit_card" -> "bg-purple-100 text-purple-800"
-                                "bank_transfer" -> "bg-blue-100 text-blue-800"
-                                "online_banking" -> "bg-green-100 text-green-800"
-                                "cash" -> "bg-yellow-100 text-yellow-800"
-                                _ -> "bg-gray-100 text-gray-800"
+                                "credit_card" -> "bg-purple-50 text-purple-700 ring-purple-200"
+                                "bank_transfer" -> "bg-blue-50 text-blue-700 ring-blue-200"
+                                "online_banking" -> "bg-green-50 text-green-700 ring-green-200"
+                                "cash" -> "bg-yellow-50 text-yellow-800 ring-yellow-200"
+                                _ -> "bg-gray-50 text-gray-700 ring-gray-200"
                               end
                             ]}>
                               <%= String.upcase(String.replace(booking.payment_method || "Not selected", "_", " ")) %>
@@ -211,14 +211,14 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                           </div>
                         </div>
                         <div>
-                          <span class="font-medium text-gray-900">Payment Plan:</span>
+                          <span class="font-semibold text-gray-900">Payment Plan:</span>
                           <div class="mt-1">
                             <span class={[
-                              "inline-flex items-center px-2 py-1 rounded text-xs font-medium",
+                              "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ring-1",
                               case booking.payment_plan do
-                                "full_payment" -> "bg-green-100 text-green-800"
-                                "installment" -> "bg-blue-100 text-blue-800"
-                                _ -> "bg-gray-100 text-gray-800"
+                                "full_payment" -> "bg-green-50 text-green-700 ring-green-200"
+                                "installment" -> "bg-blue-50 text-blue-700 ring-blue-200"
+                                _ -> "bg-gray-50 text-gray-700 ring-gray-200"
                               end
                             ]}>
                               <%= String.upcase(String.replace(booking.payment_plan || "Not selected", "_", " ")) %>
@@ -226,15 +226,11 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                           </div>
                         </div>
                         <div>
-                          <span class="font-medium text-gray-900">Amounts:</span>
-                          <div class="mt-1">
-                            <%= if booking.total_amount do %>
-                              <div>Total: RM <%= booking.total_amount %></div>
-                              <%= if booking.deposit_amount && Decimal.compare(booking.deposit_amount, booking.total_amount) != :eq do %>
-                                <div class="text-orange-600">Deposit: RM <%= booking.deposit_amount %></div>
-                              <% end %>
-                            <% else %>
-                              <div class="text-gray-500">Not calculated yet</div>
+                          <span class="font-semibold text-gray-900">Amounts:</span>
+                          <div class="mt-1 space-y-0.5">
+                            <div>Total: RM <%= booking.package.price %></div>
+                            <%= if booking.deposit_amount && Decimal.compare(booking.deposit_amount, Decimal.new(booking.package.price)) != :eq do %>
+                              <div class="text-orange-600">Deposit: RM <%= booking.deposit_amount %></div>
                             <% end %>
                           </div>
                         </div>
@@ -245,16 +241,16 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       </div>
                     </div>
 
-                    <div class="flex flex-col space-y-2 ml-4">
+                    <div class="flex flex-col space-y-2 ml-4 w-40">
                       <%= if booking._latest_booking && booking._latest_booking.payment_proof_status == "approved" && booking.payment_plan == "full_payment" do %>
-                        <div class="bg-green-50 text-green-800 px-4 py-2 rounded-lg border border-green-200 text-sm">
+                        <div class="bg-green-50 text-green-800 px-4 py-2 rounded-lg border border-green-200 text-sm text-center">
                           Payment approved. Please wait for your flight schedule.
                         </div>
                       <% else %>
                         <button
                           phx-click="resume_booking"
                           phx-value-id={booking.id}
-                          class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                          class="inline-flex justify-center items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 shadow-sm transition-colors font-medium text-sm"
                         >
                           Resume Booking
                         </button>
@@ -264,7 +260,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                           <button
                             phx-click="upload_or_resubmit_proof"
                             phx-value-progress_id={booking.id}
-                            class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm"
+                            class="inline-flex justify-center items-center bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 active:bg-orange-800 shadow-sm transition-colors font-medium text-sm"
                           >
                             Resubmit Proof
                           </button>
@@ -272,7 +268,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                             <a
                               href={"/uploads/payment_proof/" <> booking._latest_booking.payment_proof_file}
                               target="_blank"
-                              class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm text-center"
+                              class="inline-flex justify-center items-center bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 active:bg-gray-300 shadow-sm transition-colors font-medium text-sm text-center"
                             >
                               View Proof
                             </a>
@@ -282,7 +278,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                             <a
                               href={"/uploads/payment_proof/" <> booking._latest_booking.payment_proof_file}
                               target="_blank"
-                              class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm text-center"
+                              class="inline-flex justify-center items-center bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 active:bg-gray-300 shadow-sm transition-colors font-medium text-sm text-center"
                             >
                               View Proof
                             </a>
@@ -292,7 +288,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         <button
                           phx-click="upload_or_resubmit_proof"
                           phx-value-progress_id={booking.id}
-                          class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
+                          class="inline-flex justify-center items-center bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 active:bg-green-800 shadow-sm transition-colors font-medium text-sm"
                         >
                           Upload Proof
                         </button>
@@ -300,7 +296,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                       <button
                         phx-click="cancel_booking"
                         phx-value-id={booking.id}
-                        class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
+                        class="inline-flex justify-center items-center bg-white text-red-600 px-4 py-2 rounded-lg ring-1 ring-red-300 hover:bg-red-50 active:bg-red-100 transition-colors font-medium text-sm"
                       >
                         Cancel Booking
                       </button>
@@ -309,11 +305,11 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
 
                   <!-- Progress Bar -->
                   <div class="mt-4">
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                      <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style={"width: #{Float.round((booking.current_step / booking.max_steps) * 100, 1)}%"}>
+                    <div class="w-full bg-gray-200/80 rounded-full h-2">
+                      <div class="bg-gradient-to-r from-blue-500 to-teal-500 h-2 rounded-full transition-all duration-300" style={"width: #{Float.round((booking.current_step / booking.max_steps) * 100, 1)}%"}>
                       </div>
                     </div>
-                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <div class="flex justify-between text-[11px] text-gray-500 mt-1 font-medium">
                       <span>Package Details</span>
                       <span>Travelers</span>
                       <span>Payment</span>
@@ -342,14 +338,14 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                     <!-- Booking Type Indicator -->
                     <div class="flex items-center space-x-2">
                       <%= if booking.is_booking_for_self do %>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 ring-1 ring-green-200">
                           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                           </svg>
                           Booking for Self
                         </span>
                       <% else %>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200">
                           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                           </svg>
@@ -364,7 +360,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         data-show-text="View Travelers"
                         data-hide-text="Hide Travelers"
                         phx-hook="ToggleSection"
-                        class="bg-gray-100 text-gray-800 px-3 py-1 rounded hover:bg-gray-200 transition-colors text-sm"
+                        class="bg-white text-gray-800 px-3 py-1 rounded-lg ring-1 ring-gray-300 hover:bg-gray-50 transition-colors text-sm"
                       >
                         View Travelers
                       </button>

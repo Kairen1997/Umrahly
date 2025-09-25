@@ -35,31 +35,95 @@ defmodule Umrahly.ActivityLogs do
     |> limit(^limit)
     |> preload(:user)
     |> Repo.all()
-    |> Enum.map(fn activity ->
-      user = Map.get(activity, :user)
-      user_name =
-        cond do
-          match?(%{full_name: name} when is_binary(name), user) and String.trim(user.full_name) != "" -> user.full_name
-          match?(%{email: email} when is_binary(email), user) -> user.email
-          true -> "User #{activity.user_id}"
-        end
+    |> Enum.map(&format_activity/1)
+  end
 
-      formatted_time =
-        case activity.inserted_at do
-          %NaiveDateTime{} = ndt ->
-            ndt |> UmrahlyWeb.Timezone.to_local() |> Calendar.strftime("%B %d, %Y at %I:%M %p")
-          %DateTime{} = dt ->
-            UmrahlyWeb.Timezone.format_local(dt, "%B %d, %Y at %I:%M %p")
-          _ ->
-            ""
-        end
+  # Added: Detailed list for admin activity log page
+  @doc """
+  Fetch detailed activity logs for the admin activity log page.
+  Pulls metadata fields like status, ip_address, and user_agent when available.
+  """
+  @spec list_detailed_activities(pos_integer()) :: [map()]
+  def list_detailed_activities(limit \\ 100) do
+    ActivityLog
+    |> order_by([a], desc: a.inserted_at)
+    |> limit(^limit)
+    |> preload(:user)
+    |> Repo.all()
+    |> Enum.map(&format_activity/1)
+  end
 
-      %{
-        title: user_name,
-        activity_message: activity.details || activity.action,
-        timestamp: formatted_time,
-        action: activity.action
-      }
-    end)
+  @doc """
+  Paginated detailed activity logs with total count for table pagination.
+  Returns a map: %{entries: [...], total: integer, page: integer, page_size: integer}
+  """
+  @spec list_detailed_activities_paginated(pos_integer(), pos_integer()) :: %{entries: [map()], total: non_neg_integer(), page: pos_integer(), page_size: pos_integer()}
+  def list_detailed_activities_paginated(page \\ 1, page_size \\ 10) do
+    safe_page = max(page, 1)
+    safe_page_size = max(page_size, 1)
+    offset_val = (safe_page - 1) * safe_page_size
+
+    total = Repo.aggregate(ActivityLog, :count, :id)
+
+    entries =
+      ActivityLog
+      |> order_by([a], desc: a.inserted_at)
+      |> limit(^safe_page_size)
+      |> offset(^offset_val)
+      |> preload(:user)
+      |> Repo.all()
+      |> Enum.map(&format_activity/1)
+
+    %{
+      entries: entries,
+      total: total,
+      page: safe_page,
+      page_size: safe_page_size
+    }
+  end
+
+  @doc """
+  Fetch all detailed activities (not paginated), newest first. Intended for exports.
+  """
+  @spec list_all_detailed_activities() :: [map()]
+  def list_all_detailed_activities do
+    ActivityLog
+    |> order_by([a], desc: a.inserted_at)
+    |> preload(:user)
+    |> Repo.all()
+    |> Enum.map(&format_activity/1)
+  end
+
+  defp format_activity(activity) do
+    user = Map.get(activity, :user)
+    user_name =
+      cond do
+        match?(%{full_name: name} when is_binary(name), user) and String.trim(user.full_name) != "" -> user.full_name
+        match?(%{email: email} when is_binary(email), user) -> user.email
+        true -> "User #{activity.user_id}"
+      end
+
+    formatted_time =
+      case activity.inserted_at do
+        %NaiveDateTime{} = ndt ->
+          ndt |> UmrahlyWeb.Timezone.to_local() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+        %DateTime{} = dt ->
+          UmrahlyWeb.Timezone.format_local(dt, "%Y-%m-%d %H:%M:%S")
+        _ ->
+          ""
+      end
+
+    metadata = activity.metadata || %{}
+
+    %{
+      id: activity.id,
+      user_name: user_name,
+      action: activity.action,
+      details: activity.details || "",
+      timestamp: formatted_time,
+      ip_address: Map.get(metadata, "ip_address") || Map.get(metadata, :ip_address),
+      user_agent: Map.get(metadata, "user_agent") || Map.get(metadata, :user_agent),
+      status: Map.get(metadata, "status") || Map.get(metadata, :status)
+    }
   end
 end

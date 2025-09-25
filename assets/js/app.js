@@ -785,7 +785,7 @@ const TravelersForm = {
       if (errorDiv) {
         errorDiv.remove();
       }
-    }, 5000);
+    }, 3000);
   },
 
   showSuccessMessage() {
@@ -796,7 +796,7 @@ const TravelersForm = {
       // Auto-hide after 10 seconds
       setTimeout(() => {
         successMessage.classList.add('hidden');
-      }, 10000);
+      }, 3000);
     }
   }
 };

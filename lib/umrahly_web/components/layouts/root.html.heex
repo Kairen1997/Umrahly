@@ -32,10 +32,11 @@
                 <!-- Profile Dropdown -->
                 <div class="relative" id="profile-dropdown">
                   <button id="profile-toggle" class="flex items-center gap-2 hover:text-zinc-900 focus:outline-none">
+                    <% display_name = @current_user.full_name || @current_user.email %>
                     <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(@current_user.email) |> String.upcase() %>
+                      <%= String.first(display_name) |> String.upcase() %>
                     </div>
-                    <span class="text-zinc-900 font-semibold"><%= @current_user.email %></span>
+                    <span class="text-zinc-900 font-semibold"><%= display_name %></span>
                     <svg id="dropdown-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>

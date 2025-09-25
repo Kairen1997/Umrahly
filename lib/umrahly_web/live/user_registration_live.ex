@@ -8,7 +8,7 @@ defmodule UmrahlyWeb.UserRegistrationLive do
     ~H"""
     <div class="relative min-h-screen">
     <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover">
-        <source src={~p"/images/login.video.mp4"} type="video/mp4" />
+        <source src={~p"/images/tawaf.mp4"} type="video/mp4" />
       </video>
       <div class="absolute inset-0 bg-black/40"></div>
 

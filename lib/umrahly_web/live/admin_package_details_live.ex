@@ -229,11 +229,7 @@ defmodule UmrahlyWeb.AdminPackageDetailsLive do
                           <div>
                             <span class="text-sm font-medium text-gray-500">Total Price:</span>
                             <span class="text-lg font-bold text-green-600 ml-2">
-                              RM <%=
-                                base_price = Decimal.new(@package.price)
-                                override_price = if schedule.price_override, do: schedule.price_override, else: Decimal.new(0)
-                                Decimal.add(base_price, override_price) |> Decimal.to_integer()
-                              %>
+                              RM <%= @package.price %>
                             </span>
                           </div>
                           <div>

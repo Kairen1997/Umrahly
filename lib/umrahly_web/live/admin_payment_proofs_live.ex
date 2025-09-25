@@ -202,7 +202,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                   </div>
                 <% else %>
                   <%= for proof <- @pending_proofs do %>
-                    <div class="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                    <div class="px-6 py-4 hover:bg-teal-50 cursor-pointer transition-colors"
                          phx-click="select_booking"
                          phx-value-id={proof.id}>
                       <div class="flex items-center justify-between">

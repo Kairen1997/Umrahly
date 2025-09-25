@@ -420,7 +420,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
                     <%= for package <- @filtered_packages do %>
-                      <tr class="hover:bg-gray-50 transition-colors">
+                      <tr class="hover:bg-teal-50 transition-colors">
                         <td class="px-4 py-3">
                           <div class="flex items-center">
                             <div class="flex-shrink-0 h-10 w-10">

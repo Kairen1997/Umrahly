@@ -52,7 +52,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
       package_id: params["package_schedule"]["package_id"],
       status: params["package_schedule"]["status"] || "active",
       quota: params["package_schedule"]["quota"],
-      price_override: params["package_schedule"]["price_override"],
+      # price_override removed: schedules use package base price
       departure_date: departure_date,
       return_date: return_date,
       notes: params["package_schedule"]["notes"]
@@ -316,21 +316,7 @@ defmodule UmrahlyWeb.AdminPackageScheduleNewLive do
                 <% end %>
               </div>
 
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Price Override (RM)</label>
-                <input
-                  type="number"
-                  name="package_schedule[price_override]"
-                  value={get_field_value(@schedule_changeset, :price_override)}
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  placeholder="Leave empty to use package price"
-                  min="1"
-                  step="0.01"
-                />
-                <%= if @schedule_changeset.errors[:price_override] do %>
-                  <p class="mt-1 text-sm text-red-600"><%= elem(@schedule_changeset.errors[:price_override], 0) %></p>
-                <% end %>
-              </div>
+              <!-- Price Override removed: schedules always use package base price -->
             </div>
                         <!-- Enhanced departure date dropdown with custom option -->
             <div>

@@ -137,13 +137,21 @@ defmodule UmrahlyWeb.UserPaymentsLive do
   end
 
   def handle_event("view-payment-details", %{"payment_id" => payment_id}, socket) do
-    payment = find_payment_by_id(payment_id, socket.assigns.payment_history)
-    socket =
-      socket
-      |> assign(:selected_payment, payment)
-      |> assign(:show_payment_modal, true)
+    # Try to find in the full list first, fall back to current page items
+    payment =
+      find_payment_by_id(payment_id, socket.assigns.payment_history_all) ||
+        find_payment_by_id(payment_id, socket.assigns.payment_history_items)
 
-    {:noreply, socket}
+    if payment do
+      socket =
+        socket
+        |> assign(:selected_payment, payment)
+        |> assign(:show_payment_modal, true)
+
+      {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Payment not found")}
+    end
   end
 
   def handle_event("close-payment-modal", _params, socket) do
@@ -836,21 +844,21 @@ defmodule UmrahlyWeb.UserPaymentsLive do
             <button
               phx-click="switch-tab"
               phx-value-tab="installment"
-              class={"py-2 px-1 border-b-2 font-medium text-sm #{if @current_tab == "installment", do: "border-blue-500 text-blue-600", else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}"}
+              class={"px-3 py-2 rounded-md text-sm font-medium #{if @current_tab == "installment", do: "bg-blue-100 text-blue-700", else: "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}"}
             >
               Installment Payment
             </button>
             <button
               phx-click="switch-tab"
               phx-value-tab="history"
-              class={"py-2 px-1 border-b-2 font-medium text-sm #{if @current_tab == "history", do: "border-blue-500 text-blue-600", else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}"}
+              class={"px-3 py-2 rounded-md text-sm font-medium #{if @current_tab == "history", do: "bg-blue-100 text-blue-700", else: "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}"}
             >
               Payment History
             </button>
             <button
               phx-click="switch-tab"
               phx-value-tab="receipts"
-              class={"py-2 px-1 border-b-2 font-medium text-sm #{if @current_tab == "receipts", do: "border-blue-500 text-blue-600", else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}"}
+              class={"px-3 py-2 rounded-md text-sm font-medium #{if @current_tab == "receipts", do: "bg-blue-100 text-blue-700", else: "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}"}
             >
               Receipts
             </button>
@@ -1047,8 +1055,9 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-green-700"> <%= format_amount(booking.paid_amount || 0) %> </td>
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-red-700"> <%= format_amount(remaining_decimal) %> </td>
                               <td class="px-6 py-4 whitespace-nowrap">
-                                <span class={["inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", if(booking.status == "completed", do: "bg-green-100 text-green-800", else: "bg-blue-100 text-blue-800")]}>
-                                  <%= String.upcase(booking.status) %>
+                                <% display_status = if booking.payment_plan == "installment" and Decimal.compare(remaining_decimal, 0) == :gt, do: "in progress", else: String.upcase(booking.status) %>
+                                <span class={["inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", if(String.downcase(display_status) == "completed", do: "bg-green-100 text-green-800", else: "bg-blue-100 text-blue-800")]}>
+                                  <%= String.upcase(display_status) %>
                                 </span>
                               </td>
                               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1211,27 +1220,16 @@ defmodule UmrahlyWeb.UserPaymentsLive do
                               <%= receipt.booking_reference %>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                              <div class="flex items-center gap-2">
-                                <a
-                                  href={~p"/receipts/#{receipt.id}/view"}
-                                  target="_blank"
-                                  class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553 2.276A1 1 0 0120 13.191V18a2 2 0 01-2 2H6a2 2 0 01-2-2v-4.809a1 1 0 01.447-.915L9 10m6 0V6a3 3 0 10-6 0v4"/>
-                                  </svg>
-                                  View
-                                </a>
-                                <a
-                                  href={~p"/receipts/#{receipt.id}/download"}
-                                  class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                  </svg>
-                                  Download
-                                </a>
-                              </div>
+                              <a
+                                href={~p"/receipts/#{receipt.id}/view"}
+                                target="_blank"
+                                class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              >
+                                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553 2.276A1 1 0 0120 13.191V18a2 2 0 01-2 2H6a2 2 0 01-2-2v-4.809a1 1 0 01.447-.915L9 10m6 0V6a3 3 0 10-6 0v4"/>
+                                </svg>
+                                View
+                              </a>
                             </td>
                           </tr>
                         <% end %>

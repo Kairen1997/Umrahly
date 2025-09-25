@@ -291,32 +291,32 @@ defmodule UmrahlyWeb.AdminBookingsLive do
             </div>
           </div>
 
-          <div class="max-h-[70vh] overflow-y-auto">
-            <table class="w-full table-fixed divide-y divide-gray-200">
-              <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
+          <!-- Table (mirrors Payments table format) -->
+          <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+              <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booking ID</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Package</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Persons</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Plan</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deposit</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proof Status</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booking Date</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Travel Date</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Booking ID</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Customer</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Package</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Booking Type</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">No. of Persons</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Amount</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Payment Method</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Payment Type</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Status</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Booking Date</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Travel Date</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Actions</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <%= if length(@bookings) == 0 do %>
                   <tr>
-                    <td colspan="13" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="12" class="px-4 py-8 text-center text-gray-500">
                       <div class="flex flex-col items-center">
-                        <svg class="h-12 w-12 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <p class="text-lg font-medium">No bookings found</p>
                         <p class="text-sm">Try adjusting your search or filter criteria</p>
@@ -326,24 +326,38 @@ defmodule UmrahlyWeb.AdminBookingsLive do
                 <% else %>
                   <%= for booking <- @bookings do %>
                     <tr class="hover:bg-teal-50 transition-colors">
-                      <td class="px-6 py-4 text-sm font-medium text-gray-900">#<%= booking.id %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.user_name %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.package %></td>
-                      <td class="px-6 py-4">
-                        <span class={[
-                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
-                          case booking.status do
-                            "Confirmed" -> "bg-green-100 text-green-800"
-                            "Pending" -> "bg-yellow-100 text-yellow-800"
-                            "Cancelled" -> "bg-red-100 text-red-800"
-                            "Completed" -> "bg-teal-100 text-teal-800"
-                            _ -> "bg-gray-100 text-gray-800"
-                          end
-                        ]}>
-                          <%= booking.status %>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">#<%= booking.id %></td>
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="text-sm text-gray-900"><%= booking.user_name %></div>
+                        <div class="text-xs text-gray-500"><%= booking.user_email %></div>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= booking.package %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <%= if booking.is_booking_for_self do %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                            Myself
+                          </span>
+                        <% else %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            Else
+                          </span>
+                        <% end %>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                          </svg>
+                          <%= booking.number_of_persons %>
                         </span>
                       </td>
-                      <td class="px-6 py-4 text-sm text-gray-900">
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                         <%= if booking.payment_plan == "Installment" do %>
                           <span class="text-green-700 font-semibold"><%= format_amount(booking.paid_amount) %></span>
                           /
@@ -352,20 +366,50 @@ defmodule UmrahlyWeb.AdminBookingsLive do
                           <%= booking.amount %>
                         <% end %>
                       </td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.number_of_persons %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.payment_plan %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.payment_method %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.deposit_amount %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.payment_proof_status %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.booking_date %></td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.travel_date %></td>
-                      <td class="px-6 py-4 text-sm font-medium">
-                        <a href="#" phx-click="view_booking" phx-value-id={booking.id} class="text-teal-600 hover:text-teal-900">View</a>
-                        <span class="mx-2 text-gray-300">|</span>
-                        <a href="#"
-                                                      onclick={"return confirm('Are you sure you want to delete booking ###{booking.id}? This cannot be undone.')"}
-                           phx-click="delete_booking" phx-value-id={booking.id}
-                            class="text-red-600 hover:text-red-900">Delete</a>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <span class="capitalize"><%= booking.payment_method %></span>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <%= if booking.payment_plan == "Installment" do %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            </svg>
+                            Installment
+                          </span>
+                        <% else %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Full Payment
+                          </span>
+                        <% end %>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <span class={[
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          case booking.status do
+                            "Confirmed" -> "bg-green-100 text-green-800"
+                            "Pending" -> "bg-blue-100 text-blue-800"
+                            "Cancelled" -> "bg-red-100 text-red-800"
+                            "Completed" -> "bg-teal-100 text-teal-800"
+                            _ -> "bg-gray-100 text-gray-800"
+                          end
+                        ]}>
+                          <%= booking.status %>
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= booking.booking_date %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= booking.travel_date %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                        <div class="flex items-center gap-2 flex-nowrap">
+                          <a href="#" phx-click="view_booking" phx-value-id={booking.id} class="text-teal-600 hover:text-teal-900 px-2 py-1 border rounded">View</a>
+                          <a href="#"
+                             onclick={"return confirm('Are you sure you want to delete booking ###{booking.id}? This cannot be undone.')"}
+                             phx-click="delete_booking" phx-value-id={booking.id}
+                             class="text-red-600 hover:text-red-900 px-2 py-1 border rounded">Delete</a>
+                        </div>
                       </td>
                     </tr>
                   <% end %>
@@ -505,6 +549,7 @@ defmodule UmrahlyWeb.AdminBookingsLive do
 
     total_count = Bookings.count_bookings_with_details(search_opts)
     total_pages = if socket.assigns.page_size > 0, do: div(total_count + socket.assigns.page_size - 1, socket.assigns.page_size), else: 1
+
     current_page =
       socket.assigns.page
       |> max(1)
@@ -528,6 +573,7 @@ defmodule UmrahlyWeb.AdminBookingsLive do
         %{
           id: b.id,
           user_name: b.user_name,
+          user_email: Map.get(b, :user_email, ""),
           package: b.package_name,
           status: b.status |> to_string() |> String.capitalize(),
           amount: amount_display,
@@ -539,7 +585,8 @@ defmodule UmrahlyWeb.AdminBookingsLive do
           deposit_amount: format_amount(b.deposit_amount),
           payment_proof_status: (b.payment_proof_status || "pending") |> String.capitalize(),
           booking_date: format_date(b.booking_date),
-          travel_date: format_date(b.travel_date)
+          travel_date: format_date(b.travel_date),
+          is_booking_for_self: Map.get(b, :is_booking_for_self, true)
         }
       end)
 

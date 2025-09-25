@@ -104,6 +104,11 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     {:noreply, socket |> assign(:search_term, "") |> assign(:page, 1) |> assign_pagination(payments)}
   end
 
+  # NEW: Navigate to admin payment proofs index from header button
+  def handle_event("go_to_payment_proofs", _params, socket) do
+    {:noreply, push_navigate(socket, to: "/admin/payment-proofs")}
+  end
+
   # --- Data loading (bookings + in-progress flows) ---
   defp get_payments_data(status_filter \\ "all") do
     try do
@@ -499,7 +504,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
               <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                 Export Report
               </button>
-              <button class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+              <button phx-click="go_to_payment_proofs" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
                 Process Payment
               </button>
             </div>

@@ -150,9 +150,26 @@ defmodule Umrahly.Bookings do
 
   @doc """
   Deletes a booking.
+  Also removes any related booking_flow_progress rows for the same user and schedule so it no longer appears in Manage Payments.
   """
   def delete_booking(%Booking{} = booking) do
-    Repo.delete(booking)
+    Repo.transaction(fn ->
+      from(bfp in BookingFlowProgress,
+        where: bfp.user_id == ^booking.user_id and bfp.package_schedule_id == ^booking.package_schedule_id
+      )
+      |> Repo.delete_all()
+
+      case Repo.delete(booking) do
+        {:ok, deleted} -> deleted
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+    |> case do
+      {:ok, deleted} ->
+        Phoenix.PubSub.broadcast(Umrahly.PubSub, "admin:payments", {:payments_changed})
+        {:ok, deleted}
+      {:error, changeset} -> {:error, changeset}
+    end
   end
 
   @doc """

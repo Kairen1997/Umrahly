@@ -10,6 +10,10 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   alias Umrahly.Packages.Package
 
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Umrahly.PubSub, "admin:payments")
+    end
+
     payments = get_payments_data()
 
     socket =
@@ -93,6 +97,11 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   def handle_event("refund_payment", %{"id" => _id}, socket) do
     # TODO: Implement payment refund
     {:noreply, socket}
+  end
+
+  def handle_info({:payments_changed}, socket) do
+    payments = get_payments_data(socket.assigns.filter_status)
+    {:noreply, socket |> assign(:search_term, "") |> assign(:page, 1) |> assign_pagination(payments)}
   end
 
   # --- Data loading (bookings + in-progress flows) ---

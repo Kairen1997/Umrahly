@@ -149,6 +149,30 @@ defmodule UmrahlyWeb.UserProfileLive do
   end
 
 
+  def handle_event("validate", _params, socket) do
+    # Check if there are any uploads in progress
+    upload_status = if length(socket.assigns.uploads.profile_photo.entries) > 0 do
+      :uploading
+    else
+      :idle
+    end
+
+    # If there are entries, also trigger the upload processing
+    socket = if length(socket.assigns.uploads.profile_photo.entries) > 0 do
+      # Process the upload immediately
+      handle_event("upload-photo", %{}, assign(socket, upload_status: :uploading))
+    else
+      assign(socket, upload_status: upload_status)
+    end
+
+    socket
+  end
+
+  def handle_event("phx:file-upload", %{"ref" => _ref}, socket) do
+    # This gets called when auto_upload completes
+    {:noreply, put_flash(socket, :info, "File uploaded, processing...")}
+  end
+
   def handle_event("upload-photo", _params, socket) do
     user = socket.assigns.user
     profile = socket.assigns.profile
@@ -194,14 +218,18 @@ defmodule UmrahlyWeb.UserProfileLive do
               {:noreply,
                socket
                |> assign(profile: updated_profile)
-               |> put_flash(:info, "Profile photo uploaded successfully")}
+               |> put_flash(:info, "Profile photo uploaded successfully!")}
 
             {:error, changeset} ->
-              {:noreply, put_flash(socket, :error, "Failed to save profile: #{inspect(changeset.errors)}")}
+              {:noreply,
+               socket
+               |> put_flash(:error, "Failed to save profile: #{inspect(changeset.errors)}")}
           end
 
         [] ->
-          {:noreply, put_flash(socket, :error, "No file uploaded")}
+          {:noreply,
+           socket
+           |> put_flash(:error, "No file uploaded")}
       end
     end
   end
@@ -387,6 +415,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                 </label>
               </div>
 
+              <!-- File progress display -->
               <%= for entry <- @uploads.profile_photo.entries do %>
                 <div class="bg-white bg-opacity-20 rounded-lg p-2 text-xs">
                   <div class="flex items-center justify-between">
@@ -403,6 +432,7 @@ defmodule UmrahlyWeb.UserProfileLive do
                 </div>
               <% end %>
 
+              <!-- Error messages -->
               <%= for err <- upload_errors(@uploads.profile_photo) do %>
                 <p class="text-red-200 text-xs"><%= Phoenix.Naming.humanize(err) %></p>
               <% end %>

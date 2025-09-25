@@ -338,17 +338,31 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           traveler_citizenship: "No citizenship"
         })]
       travelers when is_list(travelers) ->
-        Enum.map(travelers, fn traveler ->
-          Map.merge(booking, %{
-            traveler_name: traveler["full_name"] || "Unknown Traveler",
-            traveler_identity: traveler["identity_card_number"] || traveler["passport_number"] || "No ID",
-            traveler_phone: traveler["phone"] || "No phone",
-            traveler_address: traveler["address"] || "No address",
-            traveler_city: traveler["city"] || "No city",
-            traveler_state: traveler["state"] || "No state",
-            traveler_citizenship: traveler["citizenship"] || traveler["nationality"] || "No citizenship"
-          })
-        end)
+        case length(travelers) do
+          n when n > 1 ->
+            # For more than one traveler, display only the user (do not list travelers individually)
+            [Map.merge(booking, %{
+              traveler_name: booking.user_name || "Unknown",
+              traveler_identity: "No ID",
+              traveler_phone: "No phone",
+              traveler_address: "No address",
+              traveler_city: "No city",
+              traveler_state: "No state",
+              traveler_citizenship: "No citizenship"
+            })]
+          _ ->
+            Enum.map(travelers, fn traveler ->
+              Map.merge(booking, %{
+                traveler_name: traveler["full_name"] || "Unknown Traveler",
+                traveler_identity: traveler["identity_card_number"] || traveler["passport_number"] || "No ID",
+                traveler_phone: traveler["phone"] || "No phone",
+                traveler_address: traveler["address"] || "No address",
+                traveler_city: traveler["city"] || "No city",
+                traveler_state: traveler["state"] || "No state",
+                traveler_citizenship: traveler["citizenship"] || traveler["nationality"] || "No citizenship"
+              })
+            end)
+        end
       _ ->
         # Fallback for unexpected data types
         [Map.merge(booking, %{

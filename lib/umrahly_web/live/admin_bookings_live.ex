@@ -343,7 +343,15 @@ defmodule UmrahlyWeb.AdminBookingsLive do
                           <%= booking.status %>
                         </span>
                       </td>
-                      <td class="px-6 py-4 text-sm text-gray-900"><%= booking.amount %></td>
+                      <td class="px-6 py-4 text-sm text-gray-900">
+                        <%= if booking.payment_plan == "Installment" do %>
+                          <span class="text-green-700 font-semibold"><%= format_amount(booking.paid_amount) %></span>
+                          /
+                          <span class="text-red-700 font-semibold"><%= format_amount(booking.unpaid_amount) %></span>
+                        <% else %>
+                          <%= booking.amount %>
+                        <% end %>
+                      </td>
                       <td class="px-6 py-4 text-sm text-gray-900"><%= booking.number_of_persons %></td>
                       <td class="px-6 py-4 text-sm text-gray-900"><%= booking.payment_plan %></td>
                       <td class="px-6 py-4 text-sm text-gray-900"><%= booking.payment_method %></td>
@@ -509,12 +517,22 @@ defmodule UmrahlyWeb.AdminBookingsLive do
     bookings =
       raw_bookings
       |> Enum.map(fn b ->
+        paid_decimal = b.deposit_amount || Decimal.new("0")
+        total_decimal = b.total_amount || Decimal.new("0")
+        total_minus_paid = Decimal.sub(total_decimal, paid_decimal)
+        unpaid_decimal = if Decimal.compare(total_minus_paid, Decimal.new("0")) == :lt, do: Decimal.new("0"), else: total_minus_paid
+        amount_display = case b.payment_plan do
+          "installment" -> "#{format_amount(paid_decimal)}/#{format_amount(unpaid_decimal)}"
+          _ -> format_amount(total_decimal)
+        end
         %{
           id: b.id,
           user_name: b.user_name,
           package: b.package_name,
           status: b.status |> to_string() |> String.capitalize(),
-          amount: format_amount(b.total_amount),
+          amount: amount_display,
+          paid_amount: paid_decimal,
+          unpaid_amount: unpaid_decimal,
           number_of_persons: b.number_of_persons,
           payment_method: b.payment_method |> format_nil("—"),
           payment_plan: b.payment_plan |> format_nil("—") |> format_plan_label(),
@@ -532,10 +550,10 @@ defmodule UmrahlyWeb.AdminBookingsLive do
     |> assign(:page, current_page)
   end
 
-  defp format_amount(nil), do: "RM 0.00"
-  defp format_amount(%Decimal{} = amount), do: "RM " <> Decimal.to_string(amount)
-  defp format_amount(amount) when is_number(amount), do: "RM " <> :erlang.float_to_binary(amount, decimals: 2)
-  defp format_amount(amount) when is_binary(amount), do: amount
+  defp format_amount(nil), do: "RM 0"
+  defp format_amount(%Decimal{} = amount), do: "RM #{Decimal.round(amount, 0)}"
+  defp format_amount(amount) when is_number(amount), do: "RM #{amount}"
+  defp format_amount(amount) when is_binary(amount), do: "RM #{amount}"
 
   defp format_date(nil), do: "—"
   defp format_date(%Date{} = date), do: Calendar.strftime(date, "%Y-%m-%d")

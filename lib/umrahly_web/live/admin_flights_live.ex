@@ -390,7 +390,7 @@ end
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
                     <%= for flight <- @paged_flights do %>
-                      <tr class="hover:bg-gray-50">
+                      <tr class="hover:bg-teal-50">
                         <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= flight.flight_number %></td>
                         <td class="px-3 py-3 whitespace-nowrap">
                           <div class="text-sm text-gray-900">

@@ -533,7 +533,7 @@ defmodule UmrahlyWeb.AdminPackageSchedulesLive do
                 </tr>
               <% else %>
                 <%= for schedule <- get_paginated_schedules(@filtered_schedules, @page, @per_page) do %>
-                  <tr class="hover:bg-gray-50 transition-colors">
+                  <tr class="hover:bg-teal-50 transition-colors">
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium text-gray-900"><%= schedule.package.name %></div>
                     </td>

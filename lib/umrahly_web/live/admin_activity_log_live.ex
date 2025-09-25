@@ -81,7 +81,7 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <%= for activity <- @activities do %>
-                  <tr class="hover:bg-gray-50">
+                  <tr class="hover:bg-teal-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.timestamp %></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><%= activity.user_name %></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.action %></td>

@@ -141,6 +141,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       user_email: u.email,
       package_name: p.name,
       total_amount: b.total_amount,
+      deposit_amount: b.deposit_amount,
       payment_method: b.payment_method,
       payment_plan: b.payment_plan,
       status: b.status,
@@ -178,6 +179,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       user_email: u.email,
       package_name: p.name,
       total_amount: bfp.total_amount,
+      deposit_amount: bfp.deposit_amount,
       payment_method: bfp.payment_method,
       payment_plan: bfp.payment_plan,
       status: bfp.status,
@@ -231,6 +233,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           user_email: u.email,
           package_name: p.name,
           total_amount: b.total_amount,
+          deposit_amount: b.deposit_amount,
           payment_method: b.payment_method,
           payment_plan: b.payment_plan,
           status: b.status,
@@ -296,6 +299,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       user_email: u.email,
       package_name: p.name,
       total_amount: bfp.total_amount,
+      deposit_amount: bfp.deposit_amount,
       payment_method: bfp.payment_method,
       payment_plan: bfp.payment_plan,
       status: bfp.status,
@@ -351,13 +355,32 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   end
 
   defp format_payment_data(payment) do
+    paid_decimal = payment[:deposit_amount] || Decimal.new("0")
+    total_decimal = payment.total_amount || Decimal.new("0")
+
+    total_minus_paid = Decimal.sub(total_decimal, paid_decimal)
+    unpaid_decimal =
+      if Decimal.compare(total_minus_paid, Decimal.new("0")) == :lt do
+        Decimal.new("0")
+      else
+        total_minus_paid
+      end
+
+    amount_display =
+      case payment.payment_plan do
+        "installment" ->
+          "#{format_amount(paid_decimal)}/#{format_amount(unpaid_decimal)}"
+        _ ->
+          format_amount(total_decimal)
+      end
+
     %{
       id: payment.id,
       source: payment[:source],
       user_name: payment.user_name || "Unknown",
       user_email: payment.user_email || "No email",
       package_name: payment.package_name || "Unknown Package",
-      amount: format_amount(payment.total_amount),
+      amount: amount_display,
       raw_amount: payment.total_amount,
       payment_method: payment.payment_method || "Not specified",
       payment_plan: payment.payment_plan || "Not specified",
@@ -378,7 +401,10 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       traveler_address: payment.traveler_address || "No address",
       traveler_city: payment.traveler_city || "No city",
       traveler_state: payment.traveler_state || "No state",
-      traveler_citizenship: payment.traveler_citizenship || "No citizenship"
+      traveler_citizenship: payment.traveler_citizenship || "No citizenship",
+      # Payment breakdown
+      paid_amount: paid_decimal,
+      unpaid_amount: unpaid_decimal
     }
   end
 
@@ -618,7 +644,15 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                           <%= payment.number_of_persons %>
                         </span>
                       </td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= payment.amount %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <%= if payment.payment_plan == "installment" do %>
+                          <span class="text-green-700 font-semibold"><%= format_amount(payment.paid_amount) %></span>
+                          /
+                          <span class="text-red-700 font-semibold"><%= format_amount(payment.unpaid_amount) %></span>
+                        <% else %>
+                          <%= payment.amount %>
+                        <% end %>
+                      </td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         <span class="capitalize"><%= String.replace(payment.payment_method, "_", " ") %></span>
                       </td>

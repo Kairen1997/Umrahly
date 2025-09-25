@@ -115,7 +115,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
 
       combined =
         (bookings ++ progresses)
-        |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+        |> Enum.sort_by(&DateTime.to_unix(&1.inserted_at), :desc)
         |> Enum.flat_map(&expand_traveler_data/1)
         |> Enum.map(&format_payment_data/1)
 
@@ -145,7 +145,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       case status_filter do
         "all" -> base_query |> where([b, u, ps, p], b.status != "cancelled")
         # Map UI statuses to booking statuses where sensible
-        "completed" -> base_query |> where([b, u, ps, p], b.status == "completed" or b.status == "confirmed")
+        "completed" -> base_query |> where([b, u, ps, p], b.status in ["completed", "confirmed"])
         "in_progress" -> base_query |> where([b, u, ps, p], b.status == "pending")
         "canceled" -> base_query |> where([b, u, ps, p], b.status == "cancelled")
         _ -> base_query

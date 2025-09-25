@@ -180,6 +180,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       payment_plan: b.payment_plan,
       status: b.status,
       number_of_persons: b.number_of_persons,
+      is_booking_for_self: b.is_booking_for_self,
       current_step: 4,
       max_steps: 4,
       inserted_at: b.inserted_at,
@@ -216,6 +217,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       payment_plan: bfp.payment_plan,
       status: bfp.status,
       number_of_persons: bfp.number_of_persons,
+      is_booking_for_self: bfp.is_booking_for_self,
       current_step: bfp.current_step,
       max_steps: bfp.max_steps,
       inserted_at: bfp.inserted_at,
@@ -268,6 +270,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           payment_plan: b.payment_plan,
           status: b.status,
           number_of_persons: b.number_of_persons,
+          is_booking_for_self: b.is_booking_for_self,
           current_step: 4,
           max_steps: 4,
           inserted_at: b.inserted_at,
@@ -332,6 +335,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       payment_plan: bfp.payment_plan,
       status: bfp.status,
       number_of_persons: bfp.number_of_persons,
+      is_booking_for_self: bfp.is_booking_for_self,
       current_step: bfp.current_step,
       max_steps: bfp.max_steps,
       inserted_at: bfp.inserted_at,
@@ -393,6 +397,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       payment_method: payment.payment_method || "Not specified",
       payment_plan: payment.payment_plan || "Not specified",
       status: normalize_status(payment.status),
+      is_booking_for_self: payment.is_booking_for_self,
       transaction_id: "TXN-#{String.pad_leading("#{payment.id}", 6, "0")}",
       payment_date: format_date(payment.inserted_at),
       booking_reference: "BK-#{String.pad_leading("#{payment.id}", 6, "0")}",
@@ -611,27 +616,41 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
             </div>
           </div>
 
-          <div class="overflow-x-hidden">
-            <table class="w-full divide-y divide-gray-200 text-sm">
+          <!-- Scroll indicator (shows after 10th row) -->
+          <%= if length(@visible_payments) > 10 do %>
+            <div class="mb-2 flex items-center justify-center text-sm text-gray-500 bg-blue-50 py-2 rounded">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18"></path>
+              </svg>
+              Scroll horizontally to view all columns
+              <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
+              </svg>
+            </div>
+          <% end %>
+
+          <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment ID</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Traveler</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Booked By</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Package</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">Payment Method</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">Transaction ID</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Payment Date</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Payment ID</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Traveler</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Booked By</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Package</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Booking Type</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Amount</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Payment Method</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Status</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Progress</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Transaction ID</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Payment Date</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Actions</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <%= if Enum.empty?(@payments) do %>
                   <tr>
-                    <td colspan="11" class="px-4 py-8 text-center text-gray-500">
+                    <td colspan="12" class="px-4 py-8 text-center text-gray-500">
                       <div class="flex flex-col items-center">
                         <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -652,19 +671,36 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                             ID: <%= payment.traveler_identity %>
                           <% end %>
                         </div>
-                        <div class="text-xs text-gray-400 hidden lg:block">
+                        <div class="text-xs text-gray-400">
                           <%= if payment.traveler_phone != "No phone" do %>
                             📞 <%= payment.traveler_phone %>
                           <% end %>
                         </div>
                       </td>
-                      <td class="px-4 py-3 whitespace-nowrap hidden lg:table-cell">
+                      <td class="px-4 py-3 whitespace-nowrap">
                         <div class="text-sm text-gray-900"><%= payment.user_name %></div>
                         <div class="text-xs text-gray-500"><%= payment.user_email %></div>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= payment.package_name %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <%= if payment.is_booking_for_self do %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                            Myself
+                          </span>
+                        <% else %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            Else
+                          </span>
+                        <% end %>
+                      </td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= payment.amount %></td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 hidden xl:table-cell">
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         <span class="capitalize"><%= String.replace(payment.payment_method, "_", " ") %></span>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap">
@@ -673,7 +709,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                           case payment.status do
                             "completed" -> "bg-green-100 text-green-800"
                             "in_progress" -> "bg-blue-100 text-blue-800"
-                            # removed abandoned
                             "canceled" -> "bg-red-100 text-red-800"
                             _ -> "bg-gray-100 text-gray-800"
                           end
@@ -690,11 +725,10 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                           </div>
                         </div>
                       </td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 hidden xl:table-cell"><%= payment.transaction_id %></td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 hidden lg:table-cell"><%= payment.payment_date %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= payment.transaction_id %></td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= payment.payment_date %></td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                                                <div class="flex items-center gap-2 flex-nowrap">
-
+                        <div class="flex items-center gap-2 flex-nowrap">
                           <button
                             phx-click="view_payment"
                             phx-value-id={payment.id}
@@ -702,8 +736,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                             class="text-teal-600 hover:text-teal-900 px-2 py-1 border rounded">
                             View
                           </button>
-                          </div>
-                        </td>
+                        </div>
+                      </td>
                      </tr>
                    <% end %>
                  <% end %>

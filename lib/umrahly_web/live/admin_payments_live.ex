@@ -21,8 +21,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       |> assign(:profile, socket.assigns.current_user)
       |> assign(:filter_status, "all")
       |> assign(:search_term, "")
-      |> assign(:show_payment_modal, false)
-      |> assign(:selected_payment, nil)
       |> assign(:page_size, 10)
       |> assign(:page, 1)
 
@@ -60,31 +58,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   end
 
   def handle_event("view_payment", %{"id" => id, "source" => source}, socket) do
-    details =
-      case source do
-        "booking" ->
-          alias Umrahly.Bookings.Booking
-          Booking
-          |> Repo.get!(id)
-          |> Repo.preload([:user, package_schedule: :package])
-          |> booking_to_details()
-        "progress" ->
-          BookingFlowProgress
-          |> Repo.get!(id)
-          |> Repo.preload([:user, :package, :package_schedule])
-          |> progress_to_details()
-        _ ->
-          nil
-      end
-
-    {:noreply, socket |> assign(:selected_payment, details) |> assign(:show_payment_modal, true)}
-  rescue
-    _e ->
-      {:noreply, socket |> put_flash(:error, "Failed to load payment details")}
-  end
-
-  def handle_event("close_payment_modal", _params, socket) do
-    {:noreply, socket |> assign(:show_payment_modal, false) |> assign(:selected_payment, nil)}
+    {:noreply, push_navigate(socket, to: "/admin/payments/#{id}/#{source}")}
   end
 
   def handle_event("process_payment", %{"id" => id, "source" => source}, socket) do
@@ -119,15 +93,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   def handle_event("refund_payment", %{"id" => _id}, socket) do
     # TODO: Implement payment refund
     {:noreply, socket}
-  end
-
-  defp calculate_progress_percentage(current_step, max_steps) do
-    case {current_step, max_steps} do
-      {current, max} when is_integer(current) and is_integer(max) and max > 0 ->
-        min(100, max(0, round(current / max * 100)))
-      _ ->
-        0
-    end
   end
 
   # --- Data loading (bookings + in-progress flows) ---
@@ -466,47 +431,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
     Enum.slice(list, start_index, page_size)
   end
 
-  defp booking_to_details(booking) do
-    %{
-      id: booking.id,
-      source: "booking",
-      user: booking.user,
-      package: booking.package_schedule && booking.package_schedule.package,
-      package_schedule: booking.package_schedule,
-      status: booking.status,
-      total_amount: booking.total_amount,
-      deposit_amount: booking.deposit_amount,
-      payment_plan: booking.payment_plan,
-      payment_method: booking.payment_method,
-      number_of_persons: booking.number_of_persons,
-      booking_date: booking.booking_date,
-      payment_proof_file: booking.payment_proof_file,
-      payment_proof_status: booking.payment_proof_status,
-      payment_proof_notes: booking.payment_proof_notes,
-      inserted_at: booking.inserted_at
-    }
-  end
-
-  defp progress_to_details(bfp) do
-    %{
-      id: bfp.id,
-      source: "progress",
-      user: bfp.user,
-      package: bfp.package,
-      package_schedule: bfp.package_schedule,
-      status: bfp.status,
-      total_amount: bfp.total_amount,
-      deposit_amount: bfp.deposit_amount,
-      payment_plan: bfp.payment_plan,
-      payment_method: bfp.payment_method,
-      number_of_persons: bfp.number_of_persons,
-      travelers_data: bfp.travelers_data,
-      current_step: bfp.current_step,
-      max_steps: bfp.max_steps,
-      inserted_at: bfp.inserted_at
-    }
-  end
-
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
@@ -634,14 +558,14 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
               <thead class="bg-gray-50">
                 <tr>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Payment ID</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Traveler</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Booked By</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Package</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Booking Type</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">No. of Persons</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Amount</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Payment Method</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Payment Type</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Status</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Progress</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Transaction ID</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Payment Date</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Actions</th>
@@ -665,19 +589,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                     <tr class="hover:bg-teal-50 transition-colors">
                       <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">#<%= payment.id %></td>
                       <td class="px-4 py-3 whitespace-nowrap">
-                        <div class="text-sm text-gray-900 font-medium"><%= payment.traveler_name %></div>
-                        <div class="text-xs text-gray-500">
-                          <%= if payment.traveler_identity != "No ID" do %>
-                            ID: <%= payment.traveler_identity %>
-                          <% end %>
-                        </div>
-                        <div class="text-xs text-gray-400">
-                          <%= if payment.traveler_phone != "No phone" do %>
-                            📞 <%= payment.traveler_phone %>
-                          <% end %>
-                        </div>
-                      </td>
-                      <td class="px-4 py-3 whitespace-nowrap">
                         <div class="text-sm text-gray-900"><%= payment.user_name %></div>
                         <div class="text-xs text-gray-500"><%= payment.user_email %></div>
                       </td>
@@ -699,9 +610,34 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                           </span>
                         <% end %>
                       </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                          </svg>
+                          <%= payment.number_of_persons %>
+                        </span>
+                      </td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= payment.amount %></td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         <span class="capitalize"><%= String.replace(payment.payment_method, "_", " ") %></span>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <%= if payment.payment_plan == "installment" do %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            </svg>
+                            Installment
+                          </span>
+                        <% else %>
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Full Payment
+                          </span>
+                        <% end %>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap">
                         <span class={[
@@ -715,15 +651,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
                         ]}>
                           <%= String.replace(payment.status, "_", " ") |> String.capitalize() %>
                         </span>
-                      </td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        <div class="flex items-center">
-                          <span class="text-xs text-gray-500 mr-2"><%= payment.current_step %>/<%= payment.max_steps %></span>
-                          <div class="w-16 bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style={"width: #{calculate_progress_percentage(payment.current_step, payment.max_steps)}%"}>
-                            </div>
-                          </div>
-                        </div>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= payment.transaction_id %></td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= payment.payment_date %></td>
@@ -779,94 +706,6 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
 
 
         </div>
-
-        <%= if @show_payment_modal and @selected_payment do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center">
-            <div class="absolute inset-0 bg-black opacity-30" phx-click="close_payment_modal"></div>
-            <div class="relative bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 p-6">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-semibold">Payment Details</h2>
-                <button class="text-gray-500 hover:text-gray-700" phx-click="close_payment_modal">✕</button>
-              </div>
-
-              <div class="space-y-3 text-sm">
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-gray-500">Type</div>
-                    <div class="font-medium capitalize"><%= @selected_payment.source %></div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">Status</div>
-                    <div class="font-medium capitalize"><%= @selected_payment.status %></div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">User</div>
-                    <div class="font-medium"><%= @selected_payment.user && @selected_payment.user.full_name %> (<%= @selected_payment.user && @selected_payment.user.email %>)</div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">Package</div>
-                    <div class="font-medium"><%= @selected_payment.package && @selected_payment.package.name %></div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">Payment Method</div>
-                    <div class="font-medium capitalize"><%= @selected_payment.payment_method %></div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">Payment Plan</div>
-                    <div class="font-medium capitalize"><%= @selected_payment.payment_plan %></div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">Total Amount</div>
-                    <div class="font-medium"><%= format_amount(@selected_payment.total_amount) %></div>
-                  </div>
-                  <div>
-                    <div class="text-gray-500">Deposit</div>
-                    <div class="font-medium"><%= format_amount(@selected_payment[:deposit_amount]) %></div>
-                  </div>
-                </div>
-
-                <%= if @selected_payment.source == "progress" and is_list(@selected_payment[:travelers_data]) do %>
-                  <div class="mt-4">
-                    <div class="text-gray-700 font-semibold mb-2">Travelers</div>
-                    <div class="space-y-2">
-                      <%= for t <- @selected_payment[:travelers_data] do %>
-                        <div class="border rounded p-2">
-                          <div class="font-medium"><%= t["full_name"] || t[:full_name] %></div>
-                          <div class="text-gray-600 text-xs">ID: <%= t["identity_card_number"] || t[:identity_card_number] || t["passport_number"] || t[:passport_number] || "N/A" %></div>
-                        </div>
-                      <% end %>
-                    </div>
-                  </div>
-                <% end %>
-
-                <%= if @selected_payment.source == "booking" do %>
-                  <div class="mt-4">
-                    <div class="text-gray-700 font-semibold mb-2">Payment Proof</div>
-                    <div class="text-sm">
-                      <div>Status: <span class="capitalize font-medium"><%= @selected_payment.payment_proof_status %></span></div>
-                      <%= if @selected_payment.payment_proof_file do %>
-                        <div class="mt-1">
-                          <a class="text-blue-600 hover:underline" href={"/uploads/payment_proof/#{@selected_payment.payment_proof_file}"} target="_blank">View Proof</a>
-                        </div>
-                      <% else %>
-                        <div class="text-gray-500">No file uploaded</div>
-                      <% end %>
-                      <%= if @selected_payment.payment_proof_notes do %>
-                        <div class="mt-1 text-gray-700">Notes: <%= @selected_payment.payment_proof_notes %></div>
-                      <% end %>
-                    </div>
-                  </div>
-                <% end %>
-              </div>
-
-              <div class="mt-6 flex justify-end gap-2">
-                <button class="px-4 py-2 rounded bg-gray-200 text-gray-700" phx-click="close_payment_modal">Close</button>
-                <button class="px-4 py-2 rounded bg-blue-600 text-white">Process</button>
-                <button class="px-4 py-2 rounded bg-red-600 text-white">Refund</button>
-              </div>
-            </div>
-          </div>
-        <% end %>
       </div>
     </.admin_layout>
     """

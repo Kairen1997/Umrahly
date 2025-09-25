@@ -147,7 +147,7 @@ defmodule UmrahlyWeb.AdminPaymentRefundLive do
             <div class="space-y-6">
               <div class="bg-gray-50 p-4 rounded-lg">
                 <h3 class="text-lg font-semibold mb-4">Refund Form</h3>
-                <.simple_form for={:refund} phx-submit="submit_refund">
+                <.simple_form for={%{}} phx-submit="submit_refund">
                   <div class="space-y-4">
                     <div>
                       <label class="block text-sm text-gray-600 mb-1">Amount</label>

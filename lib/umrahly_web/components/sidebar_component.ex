@@ -71,17 +71,19 @@ defmodule UmrahlyWeb.SidebarComponent do
               </h1>
             </div>
           </div>
-          <div class="inline-flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 shadow-sm">
-            <div class="rounded-md bg-green-100 p-1.5 text-green-700">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          <%= if profile_complete?(assigns) do %>
+            <div class="inline-flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 shadow-sm">
+              <div class="rounded-md bg-green-100 p-1.5 text-green-700">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div class="text-sm font-medium text-green-800">Profile Complete</div>
+                <div class="text-xs text-green-700">Ready to book your Umrah</div>
+              </div>
             </div>
-            <div>
-              <div class="text-sm font-medium text-green-800">Profile Complete</div>
-              <div class="text-xs text-green-700">Ready to book your Umrah</div>
-            </div>
-          </div>
+          <% end %>
         </div>
         <!-- Page Content -->
         <main class="flex-1 bg-gray-50 p-6 overflow-auto">
@@ -90,5 +92,46 @@ defmodule UmrahlyWeb.SidebarComponent do
       </div>
     </div>
     """
+  end
+
+  # Determines if the user's profile is considered complete.
+  # Priority: explicit :profile_complete assign -> derive from :profile -> derive from :user or :current_user -> false
+  defp profile_complete?(assigns) do
+    explicit = Map.get(assigns, :profile_complete)
+    profile = Map.get(assigns, :profile)
+    user = Map.get(assigns, :user) || Map.get(assigns, :current_user)
+
+    cond do
+      is_boolean(explicit) -> explicit
+      profile_complete_from_profile?(profile) -> true
+      profile_complete_from_user?(user) -> true
+      true -> false
+    end
+  end
+
+  defp present?(value) do
+    not is_nil(value) and to_string(value) != ""
+  end
+
+  # Consider profile complete when key fields are present
+  defp profile_complete_from_profile?(nil), do: false
+  defp profile_complete_from_profile?(profile) do
+    present?(Map.get(profile, :identity_card_number)) and
+    present?(Map.get(profile, :phone_number)) and
+    present?(Map.get(profile, :address)) and
+    present?(Map.get(profile, :gender)) and
+    present?(Map.get(profile, :birthdate)) and
+    present?(Map.get(profile, :citizenship))
+  end
+
+  # Backward compatibility: consider complete from user record (older flow)
+  defp profile_complete_from_user?(nil), do: false
+  defp profile_complete_from_user?(user) do
+    not is_nil(user.address) or
+    not is_nil(user.identity_card_number) or
+    not is_nil(user.phone_number) or
+    not is_nil(user.monthly_income) or
+    not is_nil(user.birthdate) or
+    not is_nil(user.gender)
   end
 end

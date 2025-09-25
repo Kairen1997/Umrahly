@@ -326,7 +326,7 @@ defmodule UmrahlyWeb.UserProfileLive do
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title="Profile">
+    <.sidebar page_title="Profile" profile={@profile}>
       <!-- Profile Completion Guidance -->
       <%= if is_nil(@profile) do %>
         <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">

@@ -190,20 +190,8 @@ defmodule UmrahlyWeb.UserPackagesLive do
 
   # Determine if a package is recommended based on user's monthly income
   defp is_package_recommended_for_income?(package, monthly_income) do
-    # Calculate affordability ratio: package price / monthly income
-    affordability_ratio = package.price / monthly_income
-
-    # Package is recommended if:
-    # 1. Price is less than 50% of monthly income (very affordable)
-    # 2. Price is less than 80% of monthly income (affordable)
-    # 3. Price is less than 120% of monthly income (manageable with savings)
-
-    cond do
-      affordability_ratio <= 0.5 -> true    # Very affordable
-      affordability_ratio <= 0.8 -> true    # Affordable
-      affordability_ratio <= 1.2 -> true    # Manageable with savings
-      true -> false                          # May be too expensive
-    end
+    # Recommend only if the package price does not exceed the user's monthly income
+    package.price <= monthly_income
   end
 
     # Get paginated packages for the current page

@@ -43,16 +43,19 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
 
   def handle_event("save_package", %{"package" => package_params}, socket) do
     # Process picture upload if any
-    picture_path = case consume_uploaded_entries(socket, :package_picture, fn entry, _socket ->
+    picture_path = case consume_uploaded_entries(socket, :package_picture, fn %{path: source_path}, _socket ->
       # Use a more reliable path for uploads
       uploads_dir = Path.join(File.cwd!(), "priv/static/images")
       File.mkdir_p!(uploads_dir)
 
-      extension = Path.extname(entry.client_name)
+      # Get the original filename from the upload entry
+      upload_entry = socket.assigns.uploads.package_picture.entries |> List.first()
+      original_filename = if upload_entry, do: upload_entry.client_name, else: "upload"
+      extension = Path.extname(original_filename)
       filename = "package_#{System.system_time()}#{extension}"
       dest_path = Path.join(uploads_dir, filename)
 
-      case File.cp(entry.path, dest_path) do
+      case File.cp(source_path, dest_path) do
         :ok ->
           {:ok, "/images/#{filename}"}
         {:error, reason} ->
@@ -135,6 +138,11 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, :package_changeset, changeset)}
+  end
+
+  # Handle upload validation separately to prevent form reset
+  def handle_event("validate", %{"_target" => ["package_picture"]}, socket) do
+    {:noreply, socket}
   end
 
   def render(assigns) do
@@ -331,8 +339,12 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                     <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg">
                       <div class="flex-shrink-0">
                         <div class="w-20 h-20 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                          <%= if entry.upload_state == :complete do %>
-                            <img src={entry.url} alt="Preview" class="w-full h-full object-cover" />
+                          <%= if entry.done? do %>
+                            <div class="w-full h-full flex items-center justify-center bg-gray-100">
+                              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                              </svg>
+                            </div>
                           <% else %>
                             <span class="text-xs text-gray-500">Preview</span>
                           <% end %>
@@ -341,14 +353,14 @@ defmodule UmrahlyWeb.AdminPackageNewLive do
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-900 truncate"><%= entry.client_name %></p>
                         <p class="text-sm text-gray-500">
-                          <%= case entry.upload_state do %>
-                            <% :uploading -> %>
-                              Uploading...
-                            <% :complete -> %>
+                          <%= cond do %>
+                            <% entry.done? -> %>
                               Ready to save
-                            <% :error -> %>
-                              Error: <%= entry.errors |> Enum.map(&elem(&1, 1)) |> Enum.join(", ") %>
-                            <% _ -> %>
+                            <% entry.cancelled? -> %>
+                              Cancelled
+                            <% !entry.valid? -> %>
+                              Invalid file
+                            <% true -> %>
                               Ready
                           <% end %>
                         </p>

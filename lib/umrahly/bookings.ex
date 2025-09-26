@@ -497,4 +497,15 @@ defmodule Umrahly.Bookings do
     |> Repo.delete_all()
   end
 
+  @doc """
+  Deletes all booking flow progress rows for a given user and package schedule.
+  Returns {count, nil}.
+  """
+  def delete_booking_progress_for_user_and_schedule(user_id, package_schedule_id) do
+    from(bfp in BookingFlowProgress,
+      where: bfp.user_id == ^user_id and bfp.package_schedule_id == ^package_schedule_id
+    )
+    |> Repo.delete_all()
+  end
+
 end

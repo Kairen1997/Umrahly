@@ -179,18 +179,23 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       BookingFlowProgress
       |> join(:inner, [bfp], u in User, on: bfp.user_id == u.id)
       |> join(:inner, [bfp, u], p in Package, on: bfp.package_id == p.id)
+      # Exclude progresses that already have a booking for same user & schedule
+      |> join(:left, [bfp, u, p], b in Booking,
+        on: b.user_id == bfp.user_id and b.package_schedule_id == bfp.package_schedule_id
+      )
+      |> where([bfp, u, p, b], is_nil(b.id))
 
     filtered_query =
       case status_filter do
         "all" -> base_query
-        "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
-        "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
+        "completed" -> base_query |> where([bfp, u, p, b], bfp.status == "completed")
+        "in_progress" -> base_query |> where([bfp, u, p, b], bfp.status == "in_progress")
+        "canceled" -> base_query |> where([bfp, u, p, b], bfp.status == "abandoned")
         _ -> base_query
       end
 
     filtered_query
-    |> select([bfp, u, p], %{
+    |> select([bfp, u, p, b], %{
       id: bfp.id,
       source: "progress",
       user_name: u.full_name,
@@ -209,7 +214,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       updated_at: bfp.updated_at,
       travelers_data: bfp.travelers_data
     })
-    |> order_by([bfp, u, p], [desc: bfp.inserted_at])
+    |> order_by([bfp, u, p, b], [desc: bfp.inserted_at])
     |> Repo.all()
   end
 
@@ -298,18 +303,23 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
         ilike(u.email, ^search_pattern) or
         ilike(p.name, ^search_pattern)
       )
+      # Exclude progresses that already have a booking for same user & schedule
+      |> join(:left, [bfp, u, p], b in Booking,
+        on: b.user_id == bfp.user_id and b.package_schedule_id == bfp.package_schedule_id
+      )
+      |> where([bfp, u, p, b], is_nil(b.id))
 
     filtered_query =
       case status_filter do
         "all" -> base_query
-        "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
-        "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
+        "completed" -> base_query |> where([bfp, u, p, b], bfp.status == "completed")
+        "in_progress" -> base_query |> where([bfp, u, p, b], bfp.status == "in_progress")
+        "canceled" -> base_query |> where([bfp, u, p, b], bfp.status == "abandoned")
         _ -> base_query
       end
 
     filtered_query
-    |> select([bfp, u, p], %{
+    |> select([bfp, u, p, b], %{
       id: bfp.id,
       source: "progress",
       user_name: u.full_name,

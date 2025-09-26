@@ -313,7 +313,8 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
       user_id: socket.assigns.current_user.id,
       package_schedule_id: socket.assigns.schedule.id,
       status: "pending",
-      booking_date: Date.utc_today()
+      booking_date: Date.utc_today(),
+      is_booking_for_self: socket.assigns.is_booking_for_self
     }
 
     changeset =
@@ -1505,7 +1506,8 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
           user_id: socket.assigns.current_user.id,
           package_schedule_id: socket.assigns.schedule.id,
           status: "pending",
-          booking_date: Date.utc_today()
+          booking_date: Date.utc_today(),
+          is_booking_for_self: socket.assigns.is_booking_for_self
         }
 
         try do
@@ -1514,19 +1516,10 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
               payment_method = socket.assigns.payment_method
               requires_online_payment = payment_method in ["toyyibpay"]
 
-              # Update the booking flow progress so Active Bookings reflects completion
-              {_ok, progress_after_booking} = Bookings.update_booking_flow_progress(
-                socket.assigns.booking_flow_progress,
-                %{
-                  # Keep within validation limits in booking_flow_progress schema
-                  current_step: 4,
-                  max_steps: 4,
-                  status: "completed",
-                  # Only update safe fields to avoid inclusion validation failures
-                  deposit_amount: socket.assigns.deposit_amount,
-                  total_amount: socket.assigns.total_amount,
-                  last_updated: DateTime.utc_now()
-                }
+              # Hard delete the in-progress flow once a booking is created
+              _ = Bookings.delete_booking_progress_for_user_and_schedule(
+                socket.assigns.current_user.id,
+                socket.assigns.schedule.id
               )
 
               _ = Umrahly.ActivityLogs.log_user_action(socket.assigns.current_user.id, "Booking Created", socket.assigns.package.name, %{booking_id: booking.id, total_amount: booking.total_amount})
@@ -1540,14 +1533,14 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                   |> assign(:payment_gateway_url, payment_url)
                   |> assign(:requires_online_payment, true)
                   |> assign(:current_booking_id, booking.id)
-                  |> assign(:booking_flow_progress, progress_after_booking)
+                  |> assign(:booking_flow_progress, nil)
               else
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
                   |> assign(:current_step, 5)
                   |> assign(:requires_online_payment, false)
                   |> assign(:current_booking_id, booking.id)
-                  |> assign(:booking_flow_progress, progress_after_booking)
+                  |> assign(:booking_flow_progress, nil)
               end
 
               {:noreply, socket}

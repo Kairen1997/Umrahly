@@ -226,7 +226,7 @@
                     <div class="min-w-0 flex-1">
                       <div class="text-sm text-gray-700 truncate"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></div>
                     </div>
-                    <div class="text-xs text-gray-400 whitespace-nowrap"><%= Calendar.strftime(activity.inserted_at, "%d %b %Y %H:%M") %></div>
+                    <div class="text-xs text-gray-400 whitespace-nowrap"><%= UmrahlyWeb.Timezone.format_local(activity.inserted_at, "%d %b %Y %H:%M") %></div>
                   </div>
                 <% end %>
               </div>

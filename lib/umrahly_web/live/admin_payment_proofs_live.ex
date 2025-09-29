@@ -5,24 +5,32 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
   alias Umrahly.Bookings
   alias Umrahly.Repo
   alias Phoenix.LiveView.JS
+  import Ecto.Query
 
   on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
   def mount(_params, _session, socket) do
     # Ensure user is admin
     if socket.assigns.current_user.is_admin do
-      # Get all bookings with submitted payment proofs
-      pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
+      # Defaults
+      page_size = 10
+      page = 1
+      status_filter = "submitted" # Pending review by default
+      search_query = ""
+
+      proofs = fetch_payment_proofs(search_query, status_filter)
 
       socket =
         socket
         |> assign(:page_title, "Payment Proof Management")
         |> assign(:current_page, :admin_payment_proofs)
-        |> assign(:pending_proofs, pending_proofs)
+        |> assign(:pending_proofs, proofs)
         |> assign(:selected_booking, nil)
         |> assign(:admin_notes, "")
-        |> assign(:page_size, 10)
-        |> assign(:page, 1)
+        |> assign(:page_size, page_size)
+        |> assign(:page, page)
+        |> assign(:status_filter, status_filter)
+        |> assign(:search_query, search_query)
         |> assign_pagination()
 
       {:ok, socket}
@@ -79,6 +87,33 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     {:noreply, socket}
   end
 
+  # Search submit
+  def handle_event("search_payment_proofs", %{"search" => term}, socket) do
+    status = socket.assigns.status_filter
+    proofs = fetch_payment_proofs(term, status)
+
+    {:noreply,
+      socket
+      |> assign(:search_query, term)
+      |> assign(:pending_proofs, proofs)
+      |> assign(:page, 1)
+      |> assign_pagination()}
+  end
+
+  # Status filter click
+  def handle_event("filter_payment_proofs_status", %{"status" => status}, socket) do
+    term = socket.assigns.search_query
+    proofs = fetch_payment_proofs(status == "all" && term == "" && false, status)
+    proofs = if is_list(proofs), do: proofs, else: fetch_payment_proofs(term, status)
+
+    {:noreply,
+      socket
+      |> assign(:status_filter, status)
+      |> assign(:pending_proofs, fetch_payment_proofs(socket.assigns.search_query, status))
+      |> assign(:page, 1)
+      |> assign_pagination()}
+  end
+
   def handle_event("approve_payment", %{"id" => booking_id}, socket) do
     try do
       booking =
@@ -91,13 +126,13 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
           # Update the booking status to confirmed
           {:ok, _final_booking} = Bookings.update_booking(updated_booking, %{"status" => "confirmed"})
 
-          # Refresh the pending proofs list
-          pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
+          # Refresh with current filters
+          proofs = fetch_payment_proofs(socket.assigns.search_query, socket.assigns.status_filter)
 
           socket =
             socket
             |> put_flash(:info, "Payment proof approved and booking confirmed successfully!")
-            |> assign(:pending_proofs, pending_proofs)
+            |> assign(:pending_proofs, proofs)
             |> assign(:selected_booking, nil)
             |> assign(:admin_notes, "")
             |> assign_pagination()
@@ -127,13 +162,13 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
 
       case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
         {:ok, _updated_booking} ->
-          # Refresh the pending proofs list
-          pending_proofs = Bookings.get_bookings_flow_progress_pending_payment_proof_approval()
+          # Refresh with current filters
+          proofs = fetch_payment_proofs(socket.assigns.search_query, socket.assigns.status_filter)
 
           socket =
             socket
             |> put_flash(:info, "Payment proof rejected successfully!")
-            |> assign(:pending_proofs, pending_proofs)
+            |> assign(:pending_proofs, proofs)
             |> assign(:selected_booking, nil)
             |> assign(:admin_notes, "")
             |> assign_pagination()
@@ -212,6 +247,36 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     "/uploads/payment_proof/#{filename}"
   end
 
+  # --- Data fetch with filters and search ---
+  defp fetch_payment_proofs(search_term, status_filter) do
+    status_clause =
+      case status_filter do
+        "all" -> ["submitted", "approved", "rejected"]
+        s when is_binary(s) -> [s]
+        _ -> ["submitted"]
+      end
+
+    base = Umrahly.Bookings.Booking
+      |> join(:inner, [b], u in Umrahly.Accounts.User, on: b.user_id == u.id)
+      |> join(:inner, [b, u], ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id)
+      |> join(:inner, [b, u, ps], p in Umrahly.Packages.Package, on: ps.package_id == p.id)
+      |> where([b, _u, _ps, _p], b.payment_proof_status in ^status_clause)
+      |> preload([b, u, ps, p], user: u, package_schedule: {ps, package: p})
+
+    base =
+      case String.trim(to_string(search_term)) do
+        "" -> base
+        term ->
+          pattern = "%#{term}%"
+          base
+          |> where([_b, u, _ps, p], ilike(u.full_name, ^pattern) or ilike(p.name, ^pattern))
+      end
+
+    base
+    |> order_by([b], desc: b.payment_proof_submitted_at)
+    |> Repo.all()
+  end
+
   # --- Pagination helpers ---
   defp assign_pagination(socket, proofs \\ nil) do
     proofs = proofs || socket.assigns.pending_proofs
@@ -278,20 +343,78 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
           <div class="bg-white shadow rounded-lg">
             <div class="px-6 py-4 border-b border-gray-200">
               <h2 class="text-lg font-medium text-gray-900">
-                Pending Payment Proofs (<%= @total_count %>)
+                Payment Proofs (<%= @total_count %>)
               </h2>
             </div>
 
-            <!-- Table view for pending proofs -->
-            <div class="px-6 py-4">
+            <!-- Search and Filters -->
+            <div class="px-6 pt-4">
+              <div class="mb-6 flex flex-col sm:flex-row gap-4">
+                <div class="flex-1">
+                  <form phx-submit="search_payment_proofs" class="flex">
+                    <input
+                      type="text"
+                      name="search"
+                      value={@search_query}
+                      placeholder="Search by user or package..."
+                      class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button type="submit" class="px-4 py-2 bg-gray-600 text-white rounded-r-lg hover:bg-gray-700 transition-colors">
+                      Search
+                    </button>
+                  </form>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    phx-click="filter_payment_proofs_status"
+                    phx-value-status="all"
+                    class={[
+                      "px-4 py-2 rounded-lg transition-colors",
+                      if(@status_filter == "all", do: "bg-blue-600 text-white", else: "bg-gray-200 text-gray-700 hover:bg-gray-300")
+                    ]}>
+                    All
+                  </button>
+                  <button
+                    phx-click="filter_payment_proofs_status"
+                    phx-value-status="submitted"
+                    class={[
+                      "px-4 py-2 rounded-lg transition-colors",
+                      if(@status_filter == "submitted", do: "bg-yellow-600 text-white", else: "bg-gray-200 text-gray-700 hover:bg-gray-300")
+                    ]}>
+                    Pending
+                  </button>
+                  <button
+                    phx-click="filter_payment_proofs_status"
+                    phx-value-status="approved"
+                    class={[
+                      "px-4 py-2 rounded-lg transition-colors",
+                      if(@status_filter == "approved", do: "bg-green-600 text-white", else: "bg-gray-200 text-gray-700 hover:bg-gray-300")
+                    ]}>
+                    Approved
+                  </button>
+                  <button
+                    phx-click="filter_payment_proofs_status"
+                    phx-value-status="rejected"
+                    class={[
+                      "px-4 py-2 rounded-lg transition-colors",
+                      if(@status_filter == "rejected", do: "bg-red-600 text-white", else: "bg-gray-200 text-gray-700 hover:bg-gray-300")
+                    ]}>
+                    Rejected
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table view for payment proofs -->
+            <div class="px-6 pb-4">
               <%= if Enum.empty?(@pending_proofs) do %>
                 <div class="py-12 text-center">
                   <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <h3 class="mt-2 text-sm font-medium text-gray-900">No pending proofs</h3>
+                  <h3 class="mt-2 text-sm font-medium text-gray-900">No results</h3>
                   <p class="mt-1 text-sm text-gray-500">
-                    All payment proofs have been reviewed.
+                    Try adjusting your search or filter criteria.
                   </p>
                 </div>
               <% else %>
@@ -322,7 +445,16 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                             <%= UmrahlyWeb.Timezone.format_local(proof.payment_proof_submitted_at, "%B %d, %Y at %I:%M %p") %>
                           </td>
                           <td class="py-3 px-3">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending Review</span>
+                            <%= case proof.payment_proof_status do %>
+                              <% "submitted" -> %>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending Review</span>
+                              <% "approved" -> %>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>
+                              <% "rejected" -> %>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>
+                              <% _ -> %>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Unknown</span>
+                            <% end %>
                           </td>
                         </tr>
                       <% end %>

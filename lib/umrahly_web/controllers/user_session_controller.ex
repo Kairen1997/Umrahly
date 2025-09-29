@@ -4,6 +4,10 @@ defmodule UmrahlyWeb.UserSessionController do
   alias Umrahly.Accounts
   alias UmrahlyWeb.UserAuth
 
+  def new(conn, _params) do
+    render(conn, :new)
+  end
+
   def create(conn, %{"_action" => "registered"} = params) do
     create(conn, params, "Account created successfully!")
   end
@@ -38,6 +42,20 @@ defmodule UmrahlyWeb.UserSessionController do
     conn
     |> put_flash(:error, "Invalid parameters")
     |> redirect(to: ~p"/users/log_in")
+  end
+
+  def log_in_confirm(conn, %{"email" => email, "redirect" => redirect_path}) do
+    # Get the user and log them in
+    if user = Accounts.get_user_by_email(email) do
+      conn
+      |> put_flash(:info, "Welcome back!")
+      |> UserAuth.log_in_user(user, %{})
+      |> redirect(to: redirect_path)
+    else
+      conn
+      |> put_flash(:error, "Invalid email")
+      |> redirect(to: ~p"/users/log_in")
+    end
   end
 
   def delete(conn, _params) do

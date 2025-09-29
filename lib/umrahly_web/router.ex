@@ -66,8 +66,6 @@ defmodule UmrahlyWeb.Router do
       live "/users/reset_password", UserForgotPasswordLive, :new
       live "/users/reset_password/:token", UserResetPasswordLive, :edit
     end
-
-    post "/users/log_in", UserSessionController, :create
   end
 
   scope "/", UmrahlyWeb do
@@ -80,6 +78,7 @@ defmodule UmrahlyWeb.Router do
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new
     live "/payments", UserPaymentsLive, :index
     live "/payments/:tab", UserPaymentsLive, :index
+    live "/notifications", NotificationsLive, :index
     get "/receipts/:id/view", PageController, :view_receipt
     get "/receipts/:id/download", PageController, :download_receipt
   end
@@ -144,6 +143,7 @@ defmodule UmrahlyWeb.Router do
     pipe_through [:browser]
 
     delete "/users/log_out", UserSessionController, :delete
+    get "/users/log_in_confirm", UserSessionController, :log_in_confirm
 
     live_session :current_user,
       on_mount: [{UmrahlyWeb.UserAuth, :mount_current_user}] do

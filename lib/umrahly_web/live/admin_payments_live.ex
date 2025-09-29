@@ -165,8 +165,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       status: b.status,
       number_of_persons: b.number_of_persons,
       is_booking_for_self: b.is_booking_for_self,
-      current_step: 4,
-      max_steps: 4,
+      current_step: 5,
+      max_steps: 5,
       inserted_at: b.inserted_at,
       updated_at: b.updated_at,
       travelers_data: nil
@@ -179,18 +179,23 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       BookingFlowProgress
       |> join(:inner, [bfp], u in User, on: bfp.user_id == u.id)
       |> join(:inner, [bfp, u], p in Package, on: bfp.package_id == p.id)
+      # Exclude progresses that already have a booking for same user & schedule
+      |> join(:left, [bfp, u, p], b in Booking,
+        on: b.user_id == bfp.user_id and b.package_schedule_id == bfp.package_schedule_id
+      )
+      |> where([bfp, u, p, b], is_nil(b.id))
 
     filtered_query =
       case status_filter do
         "all" -> base_query
-        "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
-        "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
+        "completed" -> base_query |> where([bfp, u, p, b], bfp.status == "completed")
+        "in_progress" -> base_query |> where([bfp, u, p, b], bfp.status == "in_progress")
+        "canceled" -> base_query |> where([bfp, u, p, b], bfp.status == "abandoned")
         _ -> base_query
       end
 
     filtered_query
-    |> select([bfp, u, p], %{
+    |> select([bfp, u, p, b], %{
       id: bfp.id,
       source: "progress",
       user_name: u.full_name,
@@ -209,7 +214,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       updated_at: bfp.updated_at,
       travelers_data: bfp.travelers_data
     })
-    |> order_by([bfp, u, p], [desc: bfp.inserted_at])
+    |> order_by([bfp, u, p, b], [desc: bfp.inserted_at])
     |> Repo.all()
   end
 
@@ -247,8 +252,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           status: b.status,
           number_of_persons: b.number_of_persons,
           is_booking_for_self: b.is_booking_for_self,
-          current_step: 4,
-          max_steps: 4,
+          current_step: 5,
+          max_steps: 5,
           inserted_at: b.inserted_at,
           updated_at: b.updated_at,
           travelers_data: nil
@@ -298,18 +303,23 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
         ilike(u.email, ^search_pattern) or
         ilike(p.name, ^search_pattern)
       )
+      # Exclude progresses that already have a booking for same user & schedule
+      |> join(:left, [bfp, u, p], b in Booking,
+        on: b.user_id == bfp.user_id and b.package_schedule_id == bfp.package_schedule_id
+      )
+      |> where([bfp, u, p, b], is_nil(b.id))
 
     filtered_query =
       case status_filter do
         "all" -> base_query
-        "completed" -> base_query |> where([bfp, u, p], bfp.status == "completed")
-        "in_progress" -> base_query |> where([bfp, u, p], bfp.status == "in_progress")
-        "canceled" -> base_query |> where([bfp, u, p], bfp.status == "abandoned")
+        "completed" -> base_query |> where([bfp, u, p, b], bfp.status == "completed")
+        "in_progress" -> base_query |> where([bfp, u, p, b], bfp.status == "in_progress")
+        "canceled" -> base_query |> where([bfp, u, p, b], bfp.status == "abandoned")
         _ -> base_query
       end
 
     filtered_query
-    |> select([bfp, u, p], %{
+    |> select([bfp, u, p, b], %{
       id: bfp.id,
       source: "progress",
       user_name: u.full_name,
@@ -434,7 +444,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       booking_reference: "BK-#{String.pad_leading("#{payment.id}", 6, "0")}",
       number_of_persons: payment.number_of_persons || 1,
       current_step: payment.current_step || 1,
-      max_steps: payment.max_steps || 4,
+      max_steps: payment.max_steps || 5,
       inserted_at: payment.inserted_at,
       updated_at: payment.updated_at,
       # Traveler information
@@ -452,11 +462,15 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
   end
 
   defp normalize_status(nil), do: "unknown"
-  defp normalize_status("confirmed"), do: "completed"
-  defp normalize_status("pending"), do: "in_progress"
-  defp normalize_status("cancelled"), do: "canceled"
-  defp normalize_status("abandoned"), do: "canceled"
-  defp normalize_status(status), do: status
+  defp normalize_status(status) do
+    case to_string(status) do
+      "confirmed" -> "completed"
+      "pending" -> "in_progress"
+      "cancelled" -> "canceled"
+      "abandoned" -> "canceled"
+      other -> other
+    end
+  end
 
   defp format_amount(nil), do: "RM 0"
   defp format_amount(%Decimal{} = amount) do

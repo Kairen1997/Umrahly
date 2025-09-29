@@ -29,6 +29,13 @@
             
             <%= if @current_user do %>
               <div class="flex items-center gap-3">
+                <!-- Notification Bell -->
+                <.notification_bell 
+                  notifications={@notifications || []} 
+                  unread_count={@unread_notifications || 0}
+                  current_user={@current_user}
+                />
+                
                 <!-- Profile Dropdown -->
                 <div class="relative" id="profile-dropdown">
                   <button id="profile-toggle" class="flex items-center gap-2 hover:text-zinc-900 focus:outline-none">
@@ -109,6 +116,31 @@
           if (!profileToggle.contains(e.target) && !dropdownMenu.contains(e.target)) {
             dropdownMenu.classList.add('hidden');
             dropdownArrow.style.transform = 'rotate(0deg)';
+          }
+        });
+      }
+
+      // Notification Dropdown Script
+      const notificationToggle = document.getElementById('notification-toggle');
+      const notificationMenu = document.getElementById('notification-menu');
+
+      if (notificationToggle && notificationMenu) {
+        notificationToggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const isOpen = !notificationMenu.classList.contains('hidden');
+          
+          if (isOpen) {
+            notificationMenu.classList.add('hidden');
+          } else {
+            notificationMenu.classList.remove('hidden');
+          }
+        });
+
+        // Close notification dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!notificationToggle.contains(e.target) && !notificationMenu.contains(e.target)) {
+            notificationMenu.classList.add('hidden');
           }
         });
       }

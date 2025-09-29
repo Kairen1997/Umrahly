@@ -827,6 +827,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
     DateFieldUpdate,
     DateDropdown,
     DepartureDateChange,
+    NotificationToggle,
   }
 })
 
@@ -1407,6 +1408,80 @@ const DepartureDateChange = {
           this.pushEvent("departure_date_selected", {
             package_schedule: packageScheduleData
           });
+        }
+      }
+    });
+  }
+};
+
+// Modal handling
+window.addEventListener("phx:show-modal", (e) => {
+  console.log("Showing modal:", e.detail);
+  const modalId = e.detail.modal_id;
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove("hidden");
+    // Set the booking ID for the confirm button
+    if (modalId === "cancel-booking-modal") {
+      const confirmButton = document.getElementById("confirm-cancel-booking");
+      if (confirmButton && e.detail.booking_id) {
+        confirmButton.setAttribute("phx-value-id", e.detail.booking_id);
+        console.log("Set booking ID:", e.detail.booking_id);
+      }
+    }
+  }
+});
+
+window.addEventListener("phx:hide-modal", (e) => {
+  console.log("Hiding modal:", e.detail);
+  const modalId = e.detail.modal_id;
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+});
+
+// Close modal when clicking outside
+document.addEventListener("click", (e) => {
+  if (e.target.id === "cancel-booking-modal") {
+    document.getElementById("cancel-booking-modal").classList.add("hidden");
+  }
+});
+
+// Close modal with cancel button (fallback)
+document.addEventListener("click", (e) => {
+  if (e.target.id === "cancel-cancel-booking") {
+    document.getElementById("cancel-booking-modal").classList.add("hidden");
+  }
+});
+
+function showCancelModal(bookingId) {
+  console.log("Showing cancel modal for booking:", bookingId);
+  const modal = document.getElementById("cancel-booking-modal");
+  const confirmButton = document.getElementById("confirm-cancel-booking");
+  
+  if (modal && confirmButton) {
+    confirmButton.setAttribute("phx-value-id", bookingId);
+    modal.classList.remove("hidden");
+  }
+}
+
+// Custom hook for notification toggle
+const NotificationToggle = {
+  mounted() {
+    console.log("NotificationToggle hook mounted");
+    
+    // Listen for the js:toggle-notifications event from LiveView
+    this.handleEvent("js:toggle-notifications", () => {
+      console.log("Received js:toggle-notifications event");
+      
+      const notificationMenu = document.getElementById('notification-menu');
+      if (notificationMenu) {
+        const isHidden = notificationMenu.classList.contains('hidden');
+        if (isHidden) {
+          notificationMenu.classList.remove('hidden');
+        } else {
+          notificationMenu.classList.add('hidden');
         }
       }
     });

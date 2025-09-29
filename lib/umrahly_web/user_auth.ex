@@ -5,6 +5,7 @@ defmodule UmrahlyWeb.UserAuth do
   import Phoenix.Controller
 
   alias Umrahly.Accounts
+  alias Umrahly.Notifications
 
   @doc """
   Logs the user in.
@@ -90,9 +91,24 @@ defmodule UmrahlyWeb.UserAuth do
       false
     end
 
+    # Set notification assigns for the root layout
+    notifications = if user do
+      Notifications.list_notifications(user.id, limit: 10)
+    else
+      []
+    end
+
+    unread_notifications = if user do
+      Notifications.unread_count(user.id)
+    else
+      0
+    end
+
     conn
     |> assign(:current_user, user)
     |> assign(:has_profile, has_profile)
+    |> assign(:notifications, notifications)
+    |> assign(:unread_notifications, unread_notifications)
   end
 
   defp ensure_user_token(conn) do
@@ -193,12 +209,29 @@ defmodule UmrahlyWeb.UserAuth do
     end)
 
     # Set has_profile assign for LiveViews
-    Phoenix.Component.assign_new(socket, :has_profile, fn ->
+    socket = Phoenix.Component.assign_new(socket, :has_profile, fn ->
       if user = socket.assigns.current_user do
         profile = Umrahly.Profiles.get_profile_by_user_id(user.id)
         profile != nil
       else
         false
+      end
+    end)
+
+    # Set notification assigns for the root layout
+    socket = Phoenix.Component.assign_new(socket, :notifications, fn ->
+      if user = socket.assigns.current_user do
+        Notifications.list_notifications(user.id, limit: 10)
+      else
+        []
+      end
+    end)
+
+    Phoenix.Component.assign_new(socket, :unread_notifications, fn ->
+      if user = socket.assigns.current_user do
+        Notifications.unread_count(user.id)
+      else
+        0
       end
     end)
   end

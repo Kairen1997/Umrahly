@@ -1,52 +1,177 @@
 defmodule UmrahlyWeb.AdminFlightsLive do
   use UmrahlyWeb, :live_view
+  require Logger
 
   import UmrahlyWeb.AdminLayout
   alias Umrahly.Flights
   alias Umrahly.Flights.Flight
 
-
   def mount(_params, _session, socket) do
-    flights = Flights.list_flights()
-    changeset = Flights.change_flight(%Flight{})
+    # Wrap database operations in try-catch to handle schema mismatches
+    case safe_load_flights() do
+      {:ok, flights} ->
+        changeset = safe_create_changeset()
 
-    per_page = 10
-    page = 1
-    filtered = flights
-    total_pages = calc_total_pages(length(filtered), per_page)
-    paged = paginate(filtered, page, per_page)
+        per_page = 10
+        page = 1
+        filtered = flights
+        total_pages = calc_total_pages(length(filtered), per_page)
+        paged = paginate(filtered, page, per_page)
 
-    socket =
-      socket
-      |> assign(:flights, flights)
-      |> assign(:filtered_flights, filtered)
-      |> assign(:paged_flights, paged)
-      |> assign(:page, page)
-      |> assign(:per_page, per_page)
-      |> assign(:total_pages, total_pages)
-      |> assign(:search_query, "")
-      |> assign(:status_filter, "All")
-      |> assign(:current_page, "flights")
-      |> assign(:has_profile, true)
-      |> assign(:is_admin, true)
-      |> assign(:profile, socket.assigns.current_user)
-      |> assign(:show_new_flight_form, false)
-      |> assign(:form, to_form(changeset))
-      |> assign(:selected_flight, nil)
-      |> assign(:show_view_flight_modal, false)
-      |> assign(:editing_flight_id, nil)
-    {:ok, socket}
+        socket =
+          socket
+          |> assign(:flights, flights)
+          |> assign(:filtered_flights, filtered)
+          |> assign(:paged_flights, paged)
+          |> assign(:page, page)
+          |> assign(:per_page, per_page)
+          |> assign(:total_pages, total_pages)
+          |> assign(:search_query, "")
+          |> assign(:status_filter, "All")
+          |> assign(:current_page, "flights")
+          |> assign(:has_profile, true)
+          |> assign(:is_admin, true)
+          |> assign(:profile, socket.assigns.current_user)
+          |> assign(:show_new_flight_form, false)
+          |> assign(:form, to_form(changeset))
+          |> assign(:selected_flight, nil)
+          |> assign(:show_view_flight_modal, false)
+          |> assign(:editing_flight_id, nil)
+          |> assign(:database_error, false)
+        {:ok, socket}
+
+      {:error, reason} ->
+        Logger.error("Failed to load flights: #{inspect(reason)}")
+
+        # Initialize with empty data and show error message
+        changeset = safe_create_changeset()
+
+        socket =
+          socket
+          |> assign(:flights, [])
+          |> assign(:filtered_flights, [])
+          |> assign(:paged_flights, [])
+          |> assign(:page, 1)
+          |> assign(:per_page, 10)
+          |> assign(:total_pages, 1)
+          |> assign(:search_query, "")
+          |> assign(:status_filter, "All")
+          |> assign(:current_page, "flights")
+          |> assign(:has_profile, true)
+          |> assign(:is_admin, true)
+          |> assign(:profile, socket.assigns.current_user)
+          |> assign(:show_new_flight_form, false)
+          |> assign(:form, to_form(changeset))
+          |> assign(:selected_flight, nil)
+          |> assign(:show_view_flight_modal, false)
+          |> assign(:editing_flight_id, nil)
+          |> assign(:database_error, true)
+          |> put_flash(:error, "Database error: Unable to load flights. Please contact system administrator.")
+
+        {:ok, socket}
+    end
   end
 
-  def handle_event("show_new_flight_form", _, socket) do
-    # Create a fresh empty changeset for new flight
-    changeset = Flights.change_flight(%Flight{})
+  # Safe wrapper for loading flights
+  defp safe_load_flights do
+    try do
+      flights = Flights.list_flights()
+      {:ok, flights}
+    rescue
+      e in Postgrex.Error ->
+        Logger.error("Postgrex error loading flights: #{inspect(e)}")
+        {:error, :database_schema_mismatch}
+      e ->
+        Logger.error("Unexpected error loading flights: #{inspect(e)}")
+        {:error, :unexpected_error}
+    end
+  end
 
-    {:noreply,
-      socket
-      |> assign(:show_new_flight_form, true)
-      |> assign(:editing_flight_id, nil)
-      |> assign(:form, to_form(changeset))}
+  # Safe wrapper for creating changeset
+  defp safe_create_changeset do
+    try do
+      Flights.change_flight(%Flight{})
+    rescue
+      e ->
+        Logger.error("Error creating flight changeset: #{inspect(e)}")
+        # Return a basic changeset structure
+        %Ecto.Changeset{data: %Flight{}, changes: %{}, errors: [], valid?: true}
+    end
+  end
+
+  # Safe wrapper for getting a flight
+  defp safe_get_flight(id) do
+    try do
+      flight = Flights.get_flight!(id)
+      {:ok, flight}
+    rescue
+      Ecto.NoResultsError ->
+        {:error, :not_found}
+      e in Postgrex.Error ->
+        Logger.error("Postgrex error getting flight #{id}: #{inspect(e)}")
+        {:error, :database_error}
+      e ->
+        Logger.error("Unexpected error getting flight #{id}: #{inspect(e)}")
+        {:error, :unexpected_error}
+    end
+  end
+
+  # Safe wrapper for creating flight
+  defp safe_create_flight(attrs) do
+    try do
+      Flights.create_flight(attrs)
+    rescue
+      e in Postgrex.Error ->
+        Logger.error("Postgrex error creating flight: #{inspect(e)}")
+        {:error, :database_error}
+      e ->
+        Logger.error("Unexpected error creating flight: #{inspect(e)}")
+        {:error, :unexpected_error}
+    end
+  end
+
+  # Safe wrapper for updating flight
+  defp safe_update_flight(flight, attrs) do
+    try do
+      Flights.update_flight(flight, attrs)
+    rescue
+      e in Postgrex.Error ->
+        Logger.error("Postgrex error updating flight: #{inspect(e)}")
+        {:error, :database_error}
+      e ->
+        Logger.error("Unexpected error updating flight: #{inspect(e)}")
+        {:error, :unexpected_error}
+    end
+  end
+
+  # Safe wrapper for deleting flight
+  defp safe_delete_flight(flight) do
+    try do
+      Flights.delete_flight(flight)
+    rescue
+      e in Postgrex.Error ->
+        Logger.error("Postgrex error deleting flight: #{inspect(e)}")
+        {:error, :database_error}
+      e ->
+        Logger.error("Unexpected error deleting flight: #{inspect(e)}")
+        {:error, :unexpected_error}
+    end
+  end
+
+  # All handle_event functions grouped together
+  def handle_event("show_new_flight_form", _, socket) do
+    if socket.assigns.database_error do
+      {:noreply, put_flash(socket, :error, "Cannot create flights due to database error.")}
+    else
+      # Create a fresh empty changeset for new flight
+      changeset = safe_create_changeset()
+
+      {:noreply,
+        socket
+        |> assign(:show_new_flight_form, true)
+        |> assign(:editing_flight_id, nil)
+        |> assign(:form, to_form(changeset))}
+    end
   end
 
   def handle_event("hide_new_flight_form", _, socket) do
@@ -54,100 +179,139 @@ defmodule UmrahlyWeb.AdminFlightsLive do
   end
 
   def handle_event("save_flight", %{"flight" => flight_params}, socket) do
-    case socket.assigns[:editing_flight_id] do
-      nil ->
-        flight_params = flight_params
-        |> Map.put("capacity_booked", 0)
-        |> calculate_duration_days()
+    if socket.assigns.database_error do
+      {:noreply, put_flash(socket, :error, "Cannot save flights due to database error.")}
+    else
+      case socket.assigns[:editing_flight_id] do
+        nil ->
+          flight_params = flight_params
+          |> Map.put("capacity_booked", 0)
+          |> calculate_duration_days()
 
-        case Flights.create_flight(flight_params) do
-          {:ok, flight} ->
-            new_flights = [flight | socket.assigns.flights]
-            new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
-            total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
-            page = clamp_page(socket.assigns.page, total_pages)
-            paged = paginate(new_filtered, page, socket.assigns.per_page)
-            {:noreply,
+          case safe_create_flight(flight_params) do
+            {:ok, _flight} ->  # Fixed: Use _flight instead of flight to indicate it's intentionally unused
+              case safe_load_flights() do
+                {:ok, new_flights} ->
+                  new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
+                  total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
+                  page = clamp_page(socket.assigns.page, total_pages)
+                  paged = paginate(new_filtered, page, socket.assigns.per_page)
+                  {:noreply,
+                    socket
+                    |> assign(:flights, new_flights)
+                    |> assign(:filtered_flights, new_filtered)
+                    |> assign(:paged_flights, paged)
+                    |> assign(:total_pages, total_pages)
+                    |> assign(:page, page)
+                    |> assign(:show_new_flight_form, false)
+                    |> assign(:editing_flight_id, nil)
+                    |> put_flash(:info, "Flight created successfully")
+                  }
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Flight created but failed to refresh list.")}
+              end
+
+            {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+              {:noreply,
               socket
-              |> assign(:flights, new_flights)
-              |> assign(:filtered_flights, new_filtered)
-              |> assign(:paged_flights, paged)
-              |> assign(:total_pages, total_pages)
-              |> assign(:page, page)
-              |> assign(:show_new_flight_form, false)
-              |> assign(:editing_flight_id, nil)
-              |> put_flash(:info, "Flight created successfully")
-            }
+              |> assign(:form, to_form(changeset))
+              |> put_flash(:error, "Failed to create flight. Please check the form and try again.")
+              }
+            {:error, _reason} ->
+              {:noreply, put_flash(socket, :error, "Database error occurred while creating flight.")}
+          end
 
-          {:error, changeset} ->
-            {:noreply,
-            socket
-            |> assign(:form, to_form(changeset))
-            |> put_flash(:error, "Failed to create flight. Please check the form and try again.")
-            }
-        end
+        id when not is_nil(id) ->
+          case safe_get_flight(id) do
+            {:ok, flight} ->
+              # Calculate duration before updating
+              flight_params_with_duration = calculate_duration_days(flight_params)
 
-      id when not is_nil(id) ->  # This line should be here, inside the case
-        flight = Flights.get_flight!(id)
+              case safe_update_flight(flight, flight_params_with_duration) do
+                {:ok, _updated_flight} ->
+                  case safe_load_flights() do
+                    {:ok, new_flights} ->
+                      new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
+                      total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
+                      page = clamp_page(socket.assigns.page, total_pages)
+                      paged = paginate(new_filtered, page, socket.assigns.per_page)
+                      {:noreply,
+                        socket
+                        |> assign(:flights, new_flights)
+                        |> assign(:filtered_flights, new_filtered)
+                        |> assign(:paged_flights, paged)
+                        |> assign(:total_pages, total_pages)
+                        |> assign(:page, page)
+                        |> assign(:show_new_flight_form, false)
+                        |> assign(:editing_flight_id, nil)
+                        |> put_flash(:info, "Flight updated successfully")}
+                    {:error, _} ->
+                      {:noreply, put_flash(socket, :error, "Flight updated but failed to refresh list.")}
+                  end
 
-        # Calculate duration before updating
-        flight_params_with_duration = calculate_duration_days(flight_params)
-
-        case Flights.update_flight(flight, flight_params_with_duration) do
-          {:ok, updated_flight} ->
-            new_flights = Enum.map(socket.assigns.flights, fn f -> if f.id == updated_flight.id, do: updated_flight, else: f end)
-            new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
-            total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
-            page = clamp_page(socket.assigns.page, total_pages)
-            paged = paginate(new_filtered, page, socket.assigns.per_page)
-            {:noreply,
-              socket
-              |> assign(:flights, new_flights)
-              |> assign(:filtered_flights, new_filtered)
-              |> assign(:paged_flights, paged)
-              |> assign(:total_pages, total_pages)
-              |> assign(:page, page)
-              |> assign(:show_new_flight_form, false)
-              |> assign(:editing_flight_id, nil)
-              |> put_flash(:info, "Flight updated successfully")}
-
-          {:error, changeset} ->
-            {:noreply,
-            socket
-            |> assign(:form, to_form(changeset))
-            |> put_flash(:error, "Failed to update flight.")}
-        end
+                {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+                  {:noreply,
+                  socket
+                  |> assign(:form, to_form(changeset))
+                  |> put_flash(:error, "Failed to update flight.")}
+                {:error, _reason} ->
+                  {:noreply, put_flash(socket, :error, "Database error occurred while updating flight.")}
+              end
+            {:error, :not_found} ->
+              {:noreply, put_flash(socket, :error, "Flight not found.")}
+            {:error, _reason} ->
+              {:noreply, put_flash(socket, :error, "Database error occurred while retrieving flight.")}
+          end
+      end
     end
   end
 
   def handle_event("validate", %{"flight" => flight_params}, socket) do
-    # Calculate duration_days if both dates are present
-    flight_params = calculate_duration_days(flight_params)
+    if socket.assigns.database_error do
+      {:noreply, socket}
+    else
+      # Calculate duration_days if both dates are present
+      flight_params = calculate_duration_days(flight_params)
 
-    changeset = case socket.assigns[:editing_flight_id] do
-      nil ->
-       %Flight{}
-       |> Flights.change_flight(flight_params)
-       |> Map.put(:action, :validate)
-      flight_id ->
-        flight = Flights.get_flight!(flight_id)
-        flight
-        |> Flights.change_flight(flight_params)
-        |> Map.put(:action, :validate)
+      changeset = case socket.assigns[:editing_flight_id] do
+        nil ->
+         %Flight{}
+         |> Flights.change_flight(flight_params)
+         |> Map.put(:action, :validate)
+        flight_id ->
+          case safe_get_flight(flight_id) do
+            {:ok, flight} ->
+              flight
+              |> Flights.change_flight(flight_params)
+              |> Map.put(:action, :validate)
+            {:error, _} ->
+              # Fallback to empty flight if we can't get the existing one
+              %Flight{}
+              |> Flights.change_flight(flight_params)
+              |> Map.put(:action, :validate)
+          end
+      end
+
+      {:noreply, assign(socket, :form, to_form(changeset))}
     end
-
-
-    {:noreply, assign(socket, :form, to_form(changeset))}
   end
 
-  # View Flight
   def handle_event("view_flight", %{"id" => id}, socket) do
-    flight = Flights.get_flight!(id)
-
-    {:noreply,
-      socket
-      |> assign(:selected_flight, flight)
-      |> assign(:show_view_flight_modal, true)}
+    if socket.assigns.database_error do
+      {:noreply, put_flash(socket, :error, "Cannot view flight due to database error.")}
+    else
+      case safe_get_flight(id) do
+        {:ok, flight} ->
+          {:noreply,
+            socket
+            |> assign(:selected_flight, flight)
+            |> assign(:show_view_flight_modal, true)}
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "Flight not found.")}
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Database error occurred while retrieving flight.")}
+      end
+    end
   end
 
   def handle_event("close_view_flight_modal", _, socket) do
@@ -157,56 +321,78 @@ defmodule UmrahlyWeb.AdminFlightsLive do
       |> assign(:selected_flight, nil)}
   end
 
+  def handle_event("edit_flight", %{"id" => id}, socket) do
+    if socket.assigns.database_error do
+      {:noreply, put_flash(socket, :error, "Cannot edit flight due to database error.")}
+    else
+      case safe_get_flight(id) do
+        {:ok, flight} ->
+          # Convert flight data to form params and calculate duration
+          flight_params = %{
+            "flight_number" => flight.flight_number,
+            "origin" => flight.origin,
+            "destination" => flight.destination,
+            "departure_time" => format_datetime_for_input(flight.departure_time),
+            "arrival_time" => format_datetime_for_input(flight.arrival_time),
+            "aircraft" => flight.aircraft,
+            "capacity_total" => flight.capacity_total,
+            "status" => flight.status,
+            "return_date" => (if flight.return_date, do: format_datetime_for_input(flight.return_date), else: nil)
+          }
 
-# Edit Flight
-def handle_event("edit_flight", %{"id" => id}, socket) do
-  flight = Flights.get_flight!(id)
+          # Calculate duration for the form
+          flight_params_with_duration = calculate_duration_days(flight_params)
 
-  # Convert flight data to form params and calculate duration
-  flight_params = %{
-    "flight_number" => flight.flight_number,
-    "origin" => flight.origin,
-    "destination" => flight.destination,
-    "departure_time" => format_datetime_for_input(flight.departure_time),
-    "arrival_time" => format_datetime_for_input(flight.arrival_time),
-    "aircraft" => flight.aircraft,
-    "capacity_total" => flight.capacity_total,
-    "status" => flight.status,
-    "return_date" => (if flight.return_date, do: format_datetime_for_input(flight.return_date), else: nil)
-  }
+          changeset = Flights.change_flight(flight, flight_params_with_duration)
 
-  # Calculate duration for the form
-  flight_params_with_duration = calculate_duration_days(flight_params)
+          {:noreply,
+            socket
+            |> assign(:form, to_form(changeset))
+            |> assign(:show_new_flight_form, true)
+            |> assign(:editing_flight_id, flight.id)}
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "Flight not found.")}
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Database error occurred while retrieving flight.")}
+      end
+    end
+  end
 
-  changeset = Flights.change_flight(flight, flight_params_with_duration)
-
-  {:noreply,
-    socket
-    |> assign(:form, to_form(changeset))
-    |> assign(:show_new_flight_form, true)
-    |> assign(:editing_flight_id, flight.id)}
-end
-
-
-# Delete Flight
-def handle_event("delete_flight", %{"id" => id}, socket) do
-  flight = Flights.get_flight!(id)
-  {:ok, _} = Flights.delete_flight(flight)
-
-  new_flights = Enum.reject(socket.assigns.flights, &(&1.id == flight.id))
-  new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
-  total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
-  page = clamp_page(socket.assigns.page, total_pages)
-  paged = paginate(new_filtered, page, socket.assigns.per_page)
-  {:noreply,
-    socket
-    |> assign(:flights, new_flights)
-    |> assign(:filtered_flights, new_filtered)
-    |> assign(:paged_flights, paged)
-    |> assign(:total_pages, total_pages)
-    |> assign(:page, page)
-    |> put_flash(:info, "Flight deleted successfully")}
-end
+  def handle_event("delete_flight", %{"id" => id}, socket) do
+    if socket.assigns.database_error do
+      {:noreply, put_flash(socket, :error, "Cannot delete flight due to database error.")}
+    else
+      case safe_get_flight(id) do
+        {:ok, flight} ->
+          case safe_delete_flight(flight) do
+            {:ok, _} ->
+              case safe_load_flights() do
+                {:ok, new_flights} ->
+                  new_filtered = apply_filters(new_flights, socket.assigns.search_query, socket.assigns.status_filter)
+                  total_pages = calc_total_pages(length(new_filtered), socket.assigns.per_page)
+                  page = clamp_page(socket.assigns.page, total_pages)
+                  paged = paginate(new_filtered, page, socket.assigns.per_page)
+                  {:noreply,
+                    socket
+                    |> assign(:flights, new_flights)
+                    |> assign(:filtered_flights, new_filtered)
+                    |> assign(:paged_flights, paged)
+                    |> assign(:total_pages, total_pages)
+                    |> assign(:page, page)
+                    |> put_flash(:info, "Flight deleted successfully")}
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Flight deleted but failed to refresh list.")}
+              end
+            {:error, _reason} ->
+              {:noreply, put_flash(socket, :error, "Database error occurred while deleting flight.")}
+          end
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "Flight not found.")}
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Database error occurred while retrieving flight.")}
+      end
+    end
+  end
 
   def handle_event("search", params, socket) do
     q =
@@ -278,35 +464,35 @@ end
       |> assign(:paged_flights, paged)}
   end
 
-defp calculate_duration_days(flight_params) do
-  case {flight_params["departure_time"], flight_params["return_date"]} do
-    {departure_time, return_date} when not is_nil(departure_time) and not is_nil(return_date) ->
-      # Extract just the date part (YYYY-MM-DD) from datetime-local input
-      departure_date_str = String.split(departure_time, "T") |> List.first()
-      return_date_str = String.split(return_date, "T") |> List.first()
+  # Private helper functions
+  defp calculate_duration_days(flight_params) do
+    case {flight_params["departure_time"], flight_params["return_date"]} do
+      {departure_time, return_date} when not is_nil(departure_time) and not is_nil(return_date) ->
+        # Extract just the date part (YYYY-MM-DD) from datetime-local input
+        departure_date_str = String.split(departure_time, "T") |> List.first()
+        return_date_str = String.split(return_date, "T") |> List.first()
 
-      with {:ok, departure_date} <- Date.from_iso8601(departure_date_str),
-           {:ok, return_date_only} <- Date.from_iso8601(return_date_str) do
-        duration_days = Date.diff(return_date_only, departure_date)
+        with {:ok, departure_date} <- Date.from_iso8601(departure_date_str),
+             {:ok, return_date_only} <- Date.from_iso8601(return_date_str) do
+          duration_days = Date.diff(return_date_only, departure_date)
 
-        Map.put(flight_params, "duration_days", duration_days)
-      else
-        _error ->
-
-          flight_params
-      end
-    _ ->
-      flight_params
+          Map.put(flight_params, "duration_days", duration_days)
+        else
+          _error ->
+            flight_params
+        end
+      _ ->
+        flight_params
+    end
   end
-end
 
-defp format_datetime_for_input(datetime) do
-  datetime
-  |> DateTime.to_naive()
-  |> NaiveDateTime.truncate(:second)
-  |> NaiveDateTime.to_string()
-  |> String.slice(0, 16)  # Keep only "YYYY-MM-DDTHH:MM"
-end
+  defp format_datetime_for_input(datetime) do
+    datetime
+    |> DateTime.to_naive()
+    |> NaiveDateTime.truncate(:second)
+    |> NaiveDateTime.to_string()
+    |> String.slice(0, 16)  # Keep only "YYYY-MM-DDTHH:MM"
+  end
 
   defp apply_filters(flights, query, status) do
     normalized_query = String.downcase(String.trim(query || ""))

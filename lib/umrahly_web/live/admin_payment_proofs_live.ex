@@ -512,33 +512,25 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
         <h4 class="text-sm font-medium text-gray-900 mb-2">Details</h4>
         <div class="overflow-hidden rounded-lg border border-gray-200">
           <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50">
+                <th class="px-4 py-3 text-gray-600 font-medium">Name</th>
+                <th class="px-4 py-3 text-gray-600 font-medium">Email</th>
+                <th class="px-4 py-3 text-gray-600 font-medium">Phone</th>
+                <th class="px-4 py-3 text-gray-600 font-medium">Package</th>
+                <th class="px-4 py-3 text-gray-600 font-medium">Amount</th>
+                <th class="px-4 py-3 text-gray-600 font-medium">Payment Method</th>
+                <th class="px-4 py-3 text-gray-600 font-medium">Booking Date</th>
+              </tr>
+            </thead>
             <tbody>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Name</th>
+              <tr>
                 <td class="px-4 py-3 text-gray-900 font-medium"><%= @selected_booking.user.full_name %></td>
-              </tr>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Email</th>
                 <td class="px-4 py-3 text-gray-700"><%= @selected_booking.user.email %></td>
-              </tr>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Phone</th>
                 <td class="px-4 py-3 text-gray-700"><%= @selected_booking.user.phone_number %></td>
-              </tr>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Package</th>
                 <td class="px-4 py-3 text-gray-700"><%= @selected_booking.package_schedule.package.name %></td>
-              </tr>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Amount</th>
                 <td class="px-4 py-3 text-gray-900 font-medium">RM <%= @selected_booking.total_amount %></td>
-              </tr>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Payment Method</th>
                 <td class="px-4 py-3 text-gray-700"><%= String.replace(@selected_booking.payment_method, "_", " ") |> String.capitalize() %></td>
-              </tr>
-              <tr class="even:bg-gray-50">
-                <th class="w-44 px-4 py-3 text-gray-600 bg-gray-50 font-medium align-top">Booking Date</th>
                 <td class="px-4 py-3 text-gray-700"><%= UmrahlyWeb.Timezone.format_local(@selected_booking.booking_date, "%B %d, %Y") %></td>
               </tr>
             </tbody>

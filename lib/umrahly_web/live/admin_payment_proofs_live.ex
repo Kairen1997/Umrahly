@@ -21,6 +21,9 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
         |> assign(:pending_proofs, pending_proofs)
         |> assign(:selected_booking, nil)
         |> assign(:admin_notes, "")
+        |> assign(:page_size, 10)
+        |> assign(:page, 1)
+        |> assign_pagination()
 
       {:ok, socket}
     else
@@ -97,6 +100,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
             |> assign(:pending_proofs, pending_proofs)
             |> assign(:selected_booking, nil)
             |> assign(:admin_notes, "")
+            |> assign_pagination()
 
           {:noreply, push_navigate(socket, to: ~p"/admin/payment-proofs")}
 
@@ -132,6 +136,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
             |> assign(:pending_proofs, pending_proofs)
             |> assign(:selected_booking, nil)
             |> assign(:admin_notes, "")
+            |> assign_pagination()
 
           {:noreply, push_navigate(socket, to: ~p"/admin/payment-proofs")}
 
@@ -147,6 +152,24 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
         socket = put_flash(socket, :error, "Error processing rejection: #{inspect(error)}")
         {:noreply, socket}
     end
+  end
+
+  def handle_event("paginate", %{"action" => action}, socket) do
+    page = socket.assigns.page
+    total_pages = socket.assigns.total_pages
+
+    new_page = case action do
+      "first" -> 1
+      "prev" -> max(page - 1, 1)
+      "next" -> min(page + 1, total_pages)
+      "last" -> max(total_pages, 1)
+      _ -> page
+    end
+
+    {:noreply,
+      socket
+      |> assign(:page, new_page)
+      |> assign_pagination()}
   end
 
   # Helper function to get file extension
@@ -189,6 +212,33 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     "/uploads/payment_proof/#{filename}"
   end
 
+  # --- Pagination helpers ---
+  defp assign_pagination(socket, proofs \\ nil) do
+    proofs = proofs || socket.assigns.pending_proofs
+    page_size = socket.assigns.page_size
+    total_count = length(proofs)
+    total_pages = calc_total_pages(total_count, page_size)
+    page = socket.assigns.page |> min(total_pages) |> max(1)
+    visible_proofs = paginate_list(proofs, page, page_size)
+
+    socket
+    |> assign(:pending_proofs, proofs)
+    |> assign(:total_count, total_count)
+    |> assign(:total_pages, total_pages)
+    |> assign(:page, page)
+    |> assign(:visible_proofs, visible_proofs)
+  end
+
+  defp calc_total_pages(0, _page_size), do: 1
+  defp calc_total_pages(total_count, page_size) when page_size > 0 do
+    div(total_count + page_size - 1, page_size)
+  end
+
+  defp paginate_list(list, page, page_size) do
+    start_index = (page - 1) * page_size
+    Enum.slice(list, start_index, page_size)
+  end
+
   def render(assigns) do
     ~H"""
     <.admin_layout page_title={@page_title} current_page={@current_page}>
@@ -228,7 +278,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
           <div class="bg-white shadow rounded-lg">
             <div class="px-6 py-4 border-b border-gray-200">
               <h2 class="text-lg font-medium text-gray-900">
-                Pending Payment Proofs (<%= length(@pending_proofs) %>)
+                Pending Payment Proofs (<%= @total_count %>)
               </h2>
             </div>
 
@@ -257,7 +307,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
-                      <%= for proof <- @pending_proofs do %>
+                      <%= for proof <- @visible_proofs do %>
                         <tr phx-click={JS.navigate(~p"/admin/payment-proofs/#{proof.id}")} class="hover:bg-teal-50 cursor-pointer">
                           <td class="py-3 px-3 text-gray-900 font-medium truncate max-w-[12rem]">
                             <%= proof.user.full_name %>
@@ -279,6 +329,39 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
                     </tbody>
                   </table>
                 </div>
+
+                <!-- Pagination Controls -->
+                <div class="mt-4 flex items-center justify-between">
+                  <div class="text-sm text-gray-600">
+                    <%= if @total_count > 0 do %>
+                      <%= start_idx = ((@page - 1) * @page_size) + 1 %>
+                      <%= end_idx = min(@total_count, @page * @page_size) %>
+                      Showing <%= start_idx %>–<%= end_idx %> of <%= @total_count %>
+                    <% else %>
+                      Showing 0–0 of 0
+                    <% end %>
+                  </div>
+                  <div class="flex gap-2">
+                    <button phx-click="paginate" phx-value-action="first" class={[
+                      "px-3 py-1 rounded border",
+                      if(@page == 1, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                    ]} disabled={@page == 1}>&laquo; First</button>
+                    <button phx-click="paginate" phx-value-action="prev" class={[
+                      "px-3 py-1 rounded border",
+                      if(@page == 1, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                    ]} disabled={@page == 1}>&lsaquo; Prev</button>
+                    <span class="px-3 py-1 text-sm text-gray-600">Page <%= @page %> of <%= @total_pages %></span>
+                    <button phx-click="paginate" phx-value-action="next" class={[
+                      "px-3 py-1 rounded border",
+                      if(@page >= @total_pages, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                    ]} disabled={@page >= @total_pages}>Next &rsaquo;</button>
+                    <button phx-click="paginate" phx-value-action="last" class={[
+                      "px-3 py-1 rounded border",
+                      if(@page >= @total_pages, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                    ]} disabled={@page >= @total_pages}>Last &raquo;</button>
+                  </div>
+                </div>
+
               <% end %>
             </div>
           </div>

@@ -638,7 +638,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
 
           <div class="overflow-x-auto border border-gray-200 rounded-lg">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
-              <thead class="bg-gray-50">
+              <thead class="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Payment ID</th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Booked By</th>

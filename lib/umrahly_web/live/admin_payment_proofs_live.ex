@@ -31,6 +31,8 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
         |> assign(:page, page)
         |> assign(:status_filter, status_filter)
         |> assign(:search_query, search_query)
+        |> assign(:show_reject_modal, false)
+        |> assign(:reject_booking_id, nil)
         |> assign_pagination()
 
       {:ok, socket}
@@ -189,6 +191,79 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     end
   end
 
+  # Open reject confirmation modal
+  def handle_event("open_reject_modal", %{"id" => booking_id}, socket) do
+    {:noreply,
+      socket
+      |> assign(:reject_booking_id, booking_id)
+      |> assign(:show_reject_modal, true)}
+  end
+
+  # Close reject confirmation modal
+  def handle_event("close_reject_modal", _params, socket) do
+    {:noreply,
+      socket
+      |> assign(:show_reject_modal, false)
+      |> assign(:reject_booking_id, nil)}
+  end
+
+  # Confirm reject action from modal
+  def handle_event("confirm_reject_payment", _params, socket) do
+    booking_id = socket.assigns.reject_booking_id
+
+    if is_nil(booking_id) do
+      {:noreply, assign(socket, :show_reject_modal, false)}
+    else
+      try do
+        booking =
+          Umrahly.Bookings.Booking
+          |> Repo.get!(booking_id)
+          |> Repo.preload([:user, package_schedule: :package])
+
+        case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
+          {:ok, _updated_booking} ->
+            proofs = fetch_payment_proofs(socket.assigns.search_query, socket.assigns.status_filter)
+
+            socket =
+              socket
+              |> put_flash(:info, "Payment proof rejected successfully!")
+              |> assign(:pending_proofs, proofs)
+              |> assign(:selected_booking, nil)
+              |> assign(:admin_notes, "")
+              |> assign(:show_reject_modal, false)
+              |> assign(:reject_booking_id, nil)
+              |> assign_pagination()
+
+            {:noreply, push_navigate(socket, to: ~p"/admin/payment-proofs")}
+
+          {:error, _changeset} ->
+            socket =
+              socket
+              |> put_flash(:error, "Failed to reject payment proof.")
+              |> assign(:show_reject_modal, false)
+
+            {:noreply, socket}
+        end
+      rescue
+        Ecto.NoResultsError ->
+          socket =
+            socket
+            |> put_flash(:error, "Booking not found.")
+            |> assign(:show_reject_modal, false)
+            |> assign(:reject_booking_id, nil)
+
+          {:noreply, socket}
+        error ->
+          socket =
+            socket
+            |> put_flash(:error, "Error processing rejection: #{inspect(error)}")
+            |> assign(:show_reject_modal, false)
+
+          {:noreply, socket}
+      end
+    end
+  end
+
   def handle_event("paginate", %{"action" => action}, socket) do
     page = socket.assigns.page
     total_pages = socket.assigns.total_pages
@@ -335,6 +410,27 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
               </div>
               <div class="px-6 py-4">
                 <%= render_details(assigns) %>
+
+                <!-- Reject Confirmation Modal -->
+                <.modal id="reject-payment-modal" show={@show_reject_modal} on_cancel={JS.push("close_reject_modal")}>
+                  <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                      <h3 class="text-base font-semibold leading-6 text-gray-900">Reject Payment Proof</h3>
+                      <div class="mt-2">
+                        <p class="text-sm text-gray-500">Are you sure you want to reject this payment proof? This action cannot be undone.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                    <button phx-click="confirm_reject_payment" type="button" class="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 sm:ml-3 sm:w-auto">Yes, Reject</button>
+                    <button phx-click={JS.exec("data-cancel", to: "#reject-payment-modal")} type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">Cancel</button>
+                  </div>
+                </.modal>
               </div>
             </div>
           </div>
@@ -641,8 +737,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
 
         <button
           type="button"
-          phx-click="reject_payment"
-          phx-value-id={@selected_booking.id}
+          phx-click={JS.push("open_reject_modal", value: %{id: @selected_booking.id}) |> show_modal("reject-payment-modal")}
           class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center space-x-2"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

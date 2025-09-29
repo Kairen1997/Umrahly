@@ -26,6 +26,12 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
       |> assign(:expanded_descriptions, %{})
+      # Pagination state
+      |> assign(:page, 1)
+      |> assign(:page_size, 10)
+      |> assign(:total_count, length(sorted_packages))
+      |> assign(:total_pages, calc_total_pages(length(sorted_packages), 10))
+      |> assign(:visible_packages, paginate_list(sorted_packages, 1, 10))
 
     {:ok, socket}
   end
@@ -44,6 +50,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:search_query, search_query)
       |> assign(:search_status, search_status)
       |> assign(:search_sort, search_sort)
+      # Reset pagination on new search
+      |> assign(:page, 1)
+      |> assign(:total_count, length(sorted_packages))
+      |> assign(:total_pages, calc_total_pages(length(sorted_packages), socket.assigns.page_size))
+      |> assign(:visible_packages, paginate_list(sorted_packages, 1, socket.assigns.page_size))
 
     {:noreply, socket}
   end
@@ -55,6 +66,11 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:search_query, "")
       |> assign(:search_status, "")
       |> assign(:search_sort, "recent")
+      # Reset pagination
+      |> assign(:page, 1)
+      |> assign(:total_count, length(socket.assigns.packages))
+      |> assign(:total_pages, calc_total_pages(length(socket.assigns.packages), socket.assigns.page_size))
+      |> assign(:visible_packages, paginate_list(socket.assigns.packages, 1, socket.assigns.page_size))
 
     {:noreply, socket}
   end
@@ -90,8 +106,35 @@ defmodule UmrahlyWeb.AdminPackagesLive do
       |> assign(:viewing_package_id, nil)
       |> assign(:current_package, nil)
       |> assign(:scroll_target, nil)
+      # Recalculate pagination
+      |> assign(:page, 1)
+      |> assign(:total_count, length(sorted_packages))
+      |> assign(:total_pages, calc_total_pages(length(sorted_packages), socket.assigns.page_size))
+      |> assign(:visible_packages, paginate_list(sorted_packages, 1, socket.assigns.page_size))
 
     {:noreply, socket}
+  end
+
+  # Pagination events matching other admin pages
+  def handle_event("paginate", %{"action" => action}, socket) do
+    page = socket.assigns.page
+    total_pages = max(socket.assigns.total_pages, 1)
+
+    new_page =
+      case action do
+        "first" -> 1
+        "prev" -> max(page - 1, 1)
+        "next" -> min(page + 1, total_pages)
+        "last" -> total_pages
+        _ -> page
+      end
+
+    visible = paginate_list(socket.assigns.filtered_packages, new_page, socket.assigns.page_size)
+
+    {:noreply,
+     socket
+     |> assign(:page, new_page)
+     |> assign(:visible_packages, visible)}
   end
 
   defp truncate_description(description, max_length \\ 100) do
@@ -118,87 +161,33 @@ defmodule UmrahlyWeb.AdminPackagesLive do
 
   defp sort_packages_by_recent_activity(packages) do
     # Sort packages by updated_at timestamp (most recent first)
-    # This will put recently edited packages at the top
-    packages
-    |> Enum.sort_by(fn package ->
-      # Sort by updated_at timestamp (most recent first)
-      # If updated_at is nil, put at the end
-      package.updated_at || ~N[1970-01-01 00:00:00]
-    end, {:desc, DateTime})
+    Enum.sort_by(packages, fn package -> package.updated_at || ~N[1970-01-01 00:00:00] end, {:desc, NaiveDateTime})
   end
 
-  defp sort_packages_by_criteria(packages, sort_criteria) do
-    case sort_criteria do
-      "recent" ->
-        # Sort by updated_at timestamp (most recent first)
-        packages
-        |> Enum.sort_by(fn package ->
-          package.updated_at || ~N[1970-01-01 00:00:00]
-        end, {:desc, DateTime})
-
-      "name" ->
-        # Sort by name alphabetically
-        packages
-        |> Enum.sort_by(fn package ->
-          String.downcase(package.name)
-        end, :asc)
-
-      "price_low" ->
-        # Sort by price (low to high)
-        packages
-        |> Enum.sort_by(fn package ->
-          package.price
-        end, :asc)
-
-      "price_high" ->
-        # Sort by price (high to low)
-        packages
-        |> Enum.sort_by(fn package ->
-          package.price
-        end, {:desc, :integer})
-
-      "duration" ->
-        # Sort by duration (shortest to longest)
-        packages
-        |> Enum.sort_by(fn package ->
-          package.duration_days
-        end, :asc)
-
-      _ ->
-        # Default to recent sorting
-        sort_packages_by_recent_activity(packages)
-    end
-  end
-
-  defp is_recently_updated?(package) do
-    # Consider a package "recently updated" if it was updated within the last 24 hours
-    case package.updated_at do
-      nil -> false
-      updated_at ->
-        DateTime.diff(DateTime.utc_now(), updated_at, :hour) < 24
-    end
-  end
-
+  defp sort_packages_by_criteria(packages, "recent"), do: sort_packages_by_recent_activity(packages)
+  defp sort_packages_by_criteria(packages, "name"), do: Enum.sort_by(packages, &String.downcase(&1.name))
+  defp sort_packages_by_criteria(packages, "price_low"), do: Enum.sort_by(packages, & &1.price)
+  defp sort_packages_by_criteria(packages, "price_high"), do: Enum.sort_by(packages, & &1.price, :desc)
+  defp sort_packages_by_criteria(packages, "duration"), do: Enum.sort_by(packages, & &1.duration_days, :desc)
+  defp sort_packages_by_criteria(packages, _), do: packages
 
   defp calculate_overall_statistics(packages) do
-    packages
-    |> Enum.reduce(%{total_quota: 0, total_confirmed: 0, total_available: 0, total_percentage: 0, total_schedules: 0}, fn package, acc ->
-      package_stats = package.package_schedules
-      |> Enum.reduce(%{quota: 0, confirmed: 0, available: 0, percentage: 0}, fn schedule, schedule_acc ->
-        if schedule.quota && schedule.quota > 0 do
-          confirmed = Packages.get_package_schedule_booking_stats(schedule.id).confirmed_bookings
-          available = schedule.quota - confirmed
-          percentage = if schedule.quota > 0, do: (confirmed / schedule.quota) * 100, else: 0.0
+    # Aggregate booking stats across all packages
+    Enum.reduce(packages, %{total_quota: 0, total_confirmed: 0, total_available: 0, total_percentage: 0.0, total_schedules: 0}, fn package, acc ->
+      package_stats = Enum.reduce(package.package_schedules || [], %{quota: 0, confirmed: 0, available: 0, percentage: 0.0}, fn schedule, schedule_acc ->
+        quota = schedule.quota || 0
+        # Fetch booking stats per schedule to avoid relying on a non-existent field on the struct
+        stats = Packages.get_package_schedule_booking_stats(schedule.id)
+        confirmed = stats.confirmed_bookings
+        available = max(quota - confirmed, 0)
+        percentage = if quota > 0, do: confirmed * 100.0 / quota, else: 0.0
 
-          %{
-            quota: schedule_acc.quota + schedule.quota,
-            confirmed: schedule_acc.confirmed + confirmed,
-            available: schedule_acc.available + available,
-            percentage: schedule_acc.percentage + percentage
-          }
-        else
-          schedule_acc
-        end
+        %{
+          quota: schedule_acc.quota + quota,
+          confirmed: schedule_acc.confirmed + confirmed,
+          available: schedule_acc.available + available,
+          percentage: schedule_acc.percentage + percentage
+        }
       end)
 
       %{
@@ -214,6 +203,37 @@ defmodule UmrahlyWeb.AdminPackagesLive do
     end)
   end
 
+  defp is_recently_updated?(package) do
+    case package.updated_at do
+      nil -> false
+      %NaiveDateTime{} = updated_at ->
+        NaiveDateTime.diff(NaiveDateTime.utc_now(), updated_at, :hour) < 24
+      other ->
+        # Fallback if a different datetime struct is provided
+        try do
+          {:ok, ndt} =
+            case other do
+              %DateTime{} = dt -> {:ok, DateTime.to_naive(dt)}
+              _ -> :error
+            end
+
+          NaiveDateTime.diff(NaiveDateTime.utc_now(), ndt, :hour) < 24
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  # --- Pagination helpers (same pattern as other admin pages) ---
+  defp calc_total_pages(0, _page_size), do: 1
+  defp calc_total_pages(total_count, page_size) when page_size > 0 do
+    div(total_count + page_size - 1, page_size)
+  end
+
+  defp paginate_list(list, page, page_size) do
+    start_index = (page - 1) * page_size
+    Enum.slice(list, start_index, page_size)
+  end
 
 
   def render(assigns) do
@@ -290,7 +310,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
           <!-- Search Results Summary -->
           <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
             <p class="text-sm text-gray-600">
-              Showing <%= length(@filtered_packages) %> of <%= length(@packages) %> packages
+              Showing <%= @total_count %> of <%= length(@packages) %> packages
               <%= if @search_query != "" || @search_status != "" do %>
                 (filtered by package name and status)
               <% end %>
@@ -419,7 +439,7 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
-                    <%= for package <- @filtered_packages do %>
+                    <%= for package <- @visible_packages do %>
                       <tr class="hover:bg-teal-50 transition-colors">
                         <td class="px-4 py-3">
                           <div class="flex items-center">
@@ -557,6 +577,38 @@ defmodule UmrahlyWeb.AdminPackagesLive do
                     <% end %>
                   </tbody>
                 </table>
+              </div>
+
+              <!-- Pagination Controls -->
+              <div class="mt-4 flex items-center justify-between px-6 pb-6">
+                <div class="text-sm text-gray-600">
+                  <%= if @total_count > 0 do %>
+                    <%= start_idx = ((@page - 1) * @page_size) + 1 %>
+                    <%= end_idx = min(@total_count, @page * @page_size) %>
+                    Showing <%= start_idx %>–<%= end_idx %> of <%= @total_count %>
+                  <% else %>
+                    Showing 0–0 of 0
+                  <% end %>
+                </div>
+                <div class="flex gap-2">
+                  <button phx-click="paginate" phx-value-action="first" class={[
+                    "px-3 py-1 rounded border",
+                    if(@page == 1, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                  ]} disabled={@page == 1}>&laquo; First</button>
+                  <button phx-click="paginate" phx-value-action="prev" class={[
+                    "px-3 py-1 rounded border",
+                    if(@page == 1, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                  ]} disabled={@page == 1}>&lsaquo; Prev</button>
+                  <span class="px-3 py-1 text-sm text-gray-600">Page <%= @page %> of <%= @total_pages %></span>
+                  <button phx-click="paginate" phx-value-action="next" class={[
+                    "px-3 py-1 rounded border",
+                    if(@page >= @total_pages, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                  ]} disabled={@page >= @total_pages}>Next &rsaquo;</button>
+                  <button phx-click="paginate" phx-value-action="last" class={[
+                    "px-3 py-1 rounded border",
+                    if(@page >= @total_pages, do: "bg-gray-100 text-gray-400 cursor-not-allowed", else: "bg-white text-gray-700 hover:bg-gray-50")
+                  ]} disabled={@page >= @total_pages}>Last &raquo;</button>
+                </div>
               </div>
             <% end %>
           </div>

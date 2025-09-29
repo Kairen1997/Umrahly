@@ -3,6 +3,7 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
 
   import UmrahlyWeb.AdminLayout
   alias Umrahly.ActivityLogs
+  alias Phoenix.LiveView.JS
 
   @page_size 10
 
@@ -17,6 +18,8 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
       |> assign(:has_profile, true)
       |> assign(:is_admin, true)
       |> assign(:profile, socket.assigns.current_user)
+      |> assign(:selected_activity, nil)
+      |> assign(:show_activity_modal, false)
 
     {:ok, socket, temporary_assigns: [activities: []]}
   end
@@ -52,6 +55,28 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
     end
   end
 
+  # Actions: View & Details
+  def handle_event("view_activity", %{"id" => id}, socket) do
+    {:noreply, show_activity_modal(socket, id)}
+  end
+
+  def handle_event("details_activity", %{"id" => id}, socket) do
+    {:noreply, show_activity_modal(socket, id)}
+  end
+
+  def handle_event("close_activity_modal", _params, socket) do
+    {:noreply, socket |> assign(:show_activity_modal, false) |> assign(:selected_activity, nil)}
+  end
+
+  defp show_activity_modal(socket, id) do
+    {int_id, _} = Integer.parse(to_string(id))
+    activity = Enum.find(socket.assigns.activities, fn a -> a.id == int_id end)
+
+    socket
+    |> assign(:selected_activity, activity)
+    |> assign(:show_activity_modal, true)
+  end
+
   def render(assigns) do
     ~H"""
     <.admin_layout current_page={@current_page} has_profile={@has_profile} current_user={@current_user} profile={@profile} is_admin={@is_admin}>
@@ -66,29 +91,27 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
             </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+          <div>
+            <table class="w-full table-fixed divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Timestamp</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">User</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">Action</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Status</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">IP Address</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Actions</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <%= for activity <- @activities do %>
                   <tr class="hover:bg-teal-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.timestamp %></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><%= activity.user_name %></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.action %></td>
-                    <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={activity.details}>
-                      <%= activity.details %>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-4 text-sm text-gray-900"><%= activity.timestamp %></td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900"><%= activity.user_name %></td>
+                    <td class="px-6 py-4 text-sm text-gray-900"><%= activity.action %></td>
+                    <td class="px-6 py-4 text-sm text-gray-900 whitespace-normal break-words"><%= activity.details %></td>
+                    <td class="px-6 py-4">
                       <%= if activity.status do %>
                         <span class={[
                           "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
@@ -103,10 +126,10 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
                         </span>
                       <% end %>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= activity.ip_address %></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button class="text-teal-600 hover:text-teal-900 mr-3">View</button>
-                      <button class="text-blue-600 hover:text-blue-900">Details</button>
+                    <td class="px-6 py-4 text-sm text-gray-900"><%= activity.ip_address %></td>
+                    <td class="px-6 py-4 text-sm font-medium">
+                      <button phx-click="view_activity" phx-value-id={activity.id} class="text-teal-600 hover:text-teal-900 mr-3">View</button>
+                      <button phx-click="details_activity" phx-value-id={activity.id} class="text-blue-600 hover:text-blue-900">Details</button>
                     </td>
                   </tr>
                 <% end %>
@@ -134,6 +157,46 @@ defmodule UmrahlyWeb.AdminActivityLogLive do
           </div>
         </div>
       </div>
+
+      <!-- Activity Modal -->
+      <.modal :if={@show_activity_modal} id="activity-modal" show={true} on_cancel={JS.push("close_activity_modal")}>
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-gray-900">Activity Details</h2>
+          <%= if @selected_activity do %>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <div class="text-gray-500">User</div>
+                <div class="text-gray-900 font-medium"><%= @selected_activity.user_name %></div>
+              </div>
+              <div>
+                <div class="text-gray-500">Timestamp</div>
+                <div class="text-gray-900"><%= @selected_activity.timestamp %></div>
+              </div>
+              <div>
+                <div class="text-gray-500">Action</div>
+                <div class="text-gray-900"><%= @selected_activity.action %></div>
+              </div>
+              <div>
+                <div class="text-gray-500">Status</div>
+                <div class="text-gray-900"><%= @selected_activity.status || "-" %></div>
+              </div>
+              <div>
+                <div class="text-gray-500">IP Address</div>
+                <div class="text-gray-900"><%= @selected_activity.ip_address || "-" %></div>
+              </div>
+              <div class="sm:col-span-2">
+                <div class="text-gray-500">Details</div>
+                <div class="text-gray-900 whitespace-pre-wrap break-words"><%= @selected_activity.details %></div>
+              </div>
+            </div>
+          <% else %>
+            <div class="text-gray-600">Activity not found.</div>
+          <% end %>
+          <div class="pt-4 flex justify-end">
+            <button phx-click={JS.push("close_activity_modal")} class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Close</button>
+          </div>
+        </div>
+      </.modal>
     </.admin_layout>
     """
   end

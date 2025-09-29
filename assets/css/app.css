@@ -230,3 +230,35 @@ html {
   border-color: #059669 !important;
   background-color: #ecfdf5 !important;
 }
+
+/* Flatpickr overrides - Tailwind/teal theme */
+.flatpickr-calendar {
+  border: 1px solid #d1d5db;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+  border-radius: 0.75rem;
+}
+.flatpickr-day {
+  border-radius: 0.5rem;
+}
+.flatpickr-day:hover {
+  background: #e6fffb;
+  border-color: #99f6e4;
+}
+.flatpickr-day.today {
+  border-color: #14b8a6;
+}
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+  background: #14b8a6;
+  border-color: #0d9488;
+}
+.flatpickr-months .flatpickr-month,
+.flatpickr-weekdays {
+  color: #0f172a;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.375rem;
+}

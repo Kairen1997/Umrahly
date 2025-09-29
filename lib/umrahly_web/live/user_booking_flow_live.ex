@@ -1540,6 +1540,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                   |> assign(:requires_online_payment, true)
                   |> assign(:current_booking_id, booking.id)
                   |> assign(:booking_flow_progress, nil)
+                  |> redirect(external: payment_url)
               else
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
@@ -1547,6 +1548,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                   |> assign(:requires_online_payment, false)
                   |> assign(:current_booking_id, booking.id)
                   |> assign(:booking_flow_progress, nil)
+                  |> push_navigate(to: ~p"/my-bookings")
               end
 
               # Create notification for booking creation

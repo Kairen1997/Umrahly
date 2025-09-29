@@ -73,6 +73,7 @@ defmodule UmrahlyWeb.Router do
 
     get "/dashboard", PageController, :dashboard
     live "/bookings", UserActiveBookingsLive, :index
+    live "/my-bookings", UserMyBookingsLive, :index
     live "/packages", UserPackagesLive, :index
     live "/packages/:id", UserPackageDetailsLive, :show
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new

@@ -113,6 +113,7 @@ defmodule UmrahlyWeb.Router do
       live "/payments/:id/:source", AdminPaymentDetailsLive, :show
       live "/payments/:id/:source/refund", AdminPaymentRefundLive, :new
       live "/payment-proofs", AdminPaymentProofsLive, :index
+      live "/payment-proofs/:id", AdminPaymentProofsLive, :show
       live "/flights", AdminFlightsLive, :index
       live "/activity-log", AdminActivityLogLive, :index
       live "/profile", AdminProfileLive, :edit

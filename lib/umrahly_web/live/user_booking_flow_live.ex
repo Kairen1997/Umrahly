@@ -170,7 +170,13 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
       # Optionally jump straight to success (payment proof) when requested
       socket = case Map.get(params, "jump_to") do
-        "success" -> assign(socket, :current_step, 5)
+        "success" ->
+          # When jumping to success, we need to retrieve the existing booking
+          existing_booking = Bookings.get_latest_booking_for_user_schedule(user_id, String.to_integer(schedule_id))
+
+          socket
+          |> assign(:current_step, 5)
+          |> assign(:current_booking_id, if(existing_booking, do: existing_booking.id, else: nil))
         _ -> socket
       end
 

@@ -3,7 +3,7 @@ import Config
 # Configure your database
 config :umrahly, Umrahly.Repo,
   username: "postgres",
-  password: "123456",
+  password: "Kairen@89100",
   hostname: "localhost",
   database: "umrahly_dev",
   stacktrace: true,

@@ -6,6 +6,7 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
   alias Umrahly.Repo
   alias Phoenix.LiveView.JS
   import Ecto.Query
+  alias Umrahly.Notifications
 
   on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
@@ -127,6 +128,9 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
           # Update the booking status to confirmed
           {:ok, _final_booking} = Bookings.update_booking(updated_booking, %{"status" => "confirmed"})
 
+          # Notify user about approval (shows up in bell)
+          _ = notify_payment_decision(updated_booking, :approved)
+
           # Refresh with current filters
           proofs = fetch_payment_proofs(socket.assigns.search_query, socket.assigns.status_filter)
 
@@ -163,6 +167,9 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
 
       case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
         {:ok, _updated_booking} ->
+          # Notify user about rejection (shows up in bell)
+          _ = notify_payment_decision(booking, :rejected)
+
           # Refresh with current filters
           proofs = fetch_payment_proofs(socket.assigns.search_query, socket.assigns.status_filter)
 
@@ -221,6 +228,9 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
 
         case Bookings.update_payment_proof_status(booking, "rejected", socket.assigns.admin_notes) do
           {:ok, _updated_booking} ->
+            # Notify user about rejection (shows up in bell)
+            _ = notify_payment_decision(booking, :rejected)
+
             proofs = fetch_payment_proofs(socket.assigns.search_query, socket.assigns.status_filter)
 
             socket =
@@ -349,6 +359,17 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
     base
     |> order_by([b], desc: b.payment_proof_submitted_at)
     |> Repo.all()
+  end
+
+  # --- Notifications helper ---
+  defp notify_payment_decision(booking, type) when type in [:approved, :rejected] do
+    virtual_payment = %{
+      id: booking.id,
+      amount: booking.total_amount,
+      booking_reference: "BK#{booking.id}"
+    }
+
+    Notifications.create_payment_notification(booking.user_id, virtual_payment, type)
   end
 
   # --- Pagination helpers ---

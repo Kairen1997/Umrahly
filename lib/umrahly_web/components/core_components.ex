@@ -673,7 +673,7 @@ defmodule UmrahlyWeb.CoreComponents do
                       <%= notification.message %>
                     </p>
                     <p class="text-xs text-gray-500 mt-1">
-                      <%= notification.timestamp %>
+                      <%= Calendar.strftime(notification.inserted_at, "%B %d, %Y at %I:%M %p") %>
                     </p>
                   </div>
                 </div>

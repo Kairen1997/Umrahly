@@ -192,7 +192,10 @@ defmodule UmrahlyWeb.AdminDashboardLive do
             </div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+          <a
+            href="/admin/payment-proofs"
+            class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500 cursor-pointer hover:shadow-lg transition-shadow block"
+          >
             <div class="flex items-center">
               <div class="flex-shrink-0">
                 <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -204,9 +207,10 @@ defmodule UmrahlyWeb.AdminDashboardLive do
               <div class="ml-4">
                 <p class="text-sm font-medium text-gray-600">Pending Verification</p>
                 <p class="text-4xl font-bold text-gray-900"><%= @admin_stats.pending_verification %></p>
+                <p class="text-xs text-yellow-600 mt-1">Click to view payment proofs</p>
               </div>
             </div>
-          </div>
+          </a>
         </div>
 
         <%= if @show_packages_details do %>

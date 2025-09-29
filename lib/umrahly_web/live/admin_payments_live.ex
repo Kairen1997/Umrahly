@@ -165,8 +165,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       status: b.status,
       number_of_persons: b.number_of_persons,
       is_booking_for_self: b.is_booking_for_self,
-      current_step: 4,
-      max_steps: 4,
+      current_step: 5,
+      max_steps: 5,
       inserted_at: b.inserted_at,
       updated_at: b.updated_at,
       travelers_data: nil
@@ -252,8 +252,8 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
           status: b.status,
           number_of_persons: b.number_of_persons,
           is_booking_for_self: b.is_booking_for_self,
-          current_step: 4,
-          max_steps: 4,
+          current_step: 5,
+          max_steps: 5,
           inserted_at: b.inserted_at,
           updated_at: b.updated_at,
           travelers_data: nil
@@ -444,7 +444,7 @@ defmodule UmrahlyWeb.AdminPaymentsLive do
       booking_reference: "BK-#{String.pad_leading("#{payment.id}", 6, "0")}",
       number_of_persons: payment.number_of_persons || 1,
       current_step: payment.current_step || 1,
-      max_steps: payment.max_steps || 4,
+      max_steps: payment.max_steps || 5,
       inserted_at: payment.inserted_at,
       updated_at: payment.updated_at,
       # Traveler information

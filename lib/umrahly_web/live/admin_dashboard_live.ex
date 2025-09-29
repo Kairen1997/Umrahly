@@ -45,7 +45,31 @@ defmodule UmrahlyWeb.AdminDashboardLive do
       |> assign(:current_page, "dashboard")
       |> assign(:show_packages_details, false)
 
+    # Subscribe to admin notifications
+    Phoenix.PubSub.subscribe(Umrahly.PubSub, "admin:notifications")
+
     {:ok, socket}
+  end
+
+  def handle_info({:booking_cancelled, notification}, socket) do
+    # Log the cancellation for admin
+    Umrahly.ActivityLogs.log_user_action(
+      socket.assigns.current_user.id,
+      "Admin Notified: Booking Cancelled",
+      "User #{notification.user_name} cancelled booking for #{notification.package_name}",
+      %{
+        cancelled_user_id: notification.user_id,
+        cancelled_user_name: notification.user_name,
+        booking_flow_id: notification.booking_flow_id,
+        package_name: notification.package_name,
+        cancelled_at: notification.cancelled_at
+      }
+    )
+
+    # Show notification to admin
+    socket = put_flash(socket, :warning, "Booking cancelled: #{notification.user_name} cancelled #{notification.package_name}")
+
+    {:noreply, socket}
   end
 
   defp format_rm(nil), do: "RM 0.00"
@@ -383,6 +407,41 @@ defmodule UmrahlyWeb.AdminDashboardLive do
         </div>
       </div>
     </.admin_layout>
+
+    <!-- Cancel Booking Confirmation Modal -->
+    <div id="cancel-booking-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+            <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mt-2">Cancel Booking</h3>
+          <div class="mt-2 px-7 py-3">
+            <p class="text-sm text-gray-500">
+              Are you sure you want to cancel this booking? This action cannot be undone and the admin will be notified.
+            </p>
+          </div>
+          <div class="items-center px-4 py-3">
+            <button
+              id="confirm-cancel-booking"
+              phx-click="cancel_booking"
+              phx-value-id=""
+              class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 mr-2"
+            >
+              Yes, Cancel Booking
+            </button>
+            <button
+              id="cancel-cancel-booking"
+              class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            >
+              Keep Booking
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     """
   end
 end

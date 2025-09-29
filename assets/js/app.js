@@ -1412,3 +1412,55 @@ const DepartureDateChange = {
     });
   }
 };
+
+// Modal handling
+window.addEventListener("phx:show-modal", (e) => {
+  console.log("Showing modal:", e.detail);
+  const modalId = e.detail.modal_id;
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove("hidden");
+    // Set the booking ID for the confirm button
+    if (modalId === "cancel-booking-modal") {
+      const confirmButton = document.getElementById("confirm-cancel-booking");
+      if (confirmButton && e.detail.booking_id) {
+        confirmButton.setAttribute("phx-value-id", e.detail.booking_id);
+        console.log("Set booking ID:", e.detail.booking_id);
+      }
+    }
+  }
+});
+
+window.addEventListener("phx:hide-modal", (e) => {
+  console.log("Hiding modal:", e.detail);
+  const modalId = e.detail.modal_id;
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+});
+
+// Close modal when clicking outside
+document.addEventListener("click", (e) => {
+  if (e.target.id === "cancel-booking-modal") {
+    document.getElementById("cancel-booking-modal").classList.add("hidden");
+  }
+});
+
+// Close modal with cancel button (fallback)
+document.addEventListener("click", (e) => {
+  if (e.target.id === "cancel-cancel-booking") {
+    document.getElementById("cancel-booking-modal").classList.add("hidden");
+  }
+});
+
+function showCancelModal(bookingId) {
+  console.log("Showing cancel modal for booking:", bookingId);
+  const modal = document.getElementById("cancel-booking-modal");
+  const confirmButton = document.getElementById("confirm-cancel-booking");
+  
+  if (modal && confirmButton) {
+    confirmButton.setAttribute("phx-value-id", bookingId);
+    modal.classList.remove("hidden");
+  }
+}

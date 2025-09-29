@@ -608,52 +608,87 @@ defmodule UmrahlyWeb.CoreComponents do
     """
   end
 
-  def navbar(assigns) do
+  @doc """
+  Renders a notification bell icon with dropdown for notifications.
+  """
+  attr :notifications, :list, default: []
+  attr :unread_count, :integer, default: 0
+  attr :current_user, :map, required: true
+
+  def notification_bell(assigns) do
     ~H"""
-    <nav class="w-full sticky top-0 z-50">
-      <div class="px-4 bg-teal-300 sm:px-6 lg:px-10">
-        <div class="flex items-center justify-between py-2">
-          <!-- Logo -->
-          <a href="/" class="font-extrabold tracking-wider text-zinc-900 text-xl">UMRAHLY</a>
+    <div class="relative" id="notification-dropdown">
+      <button
+        id="notification-toggle"
+        class="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+        phx-click="toggle_notifications"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+        </svg>
+        <%= if @unread_count > 0 do %>
+          <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            <%= @unread_count %>
+          </span>
+        <% end %>
+      </button>
 
-          <!-- Menu -->
-          <div class="flex items-center gap-4 text-sm font-medium text-zinc-700 rounded-lg bg-amber-200 px-3 py-1">
-            <button id="lang-toggle" class="text-zinc-900 hover:underline focus:outline-none">
-              EN/MY
-            </button>
-
-            <%= if @current_user do %>
-              <div class="flex items-center gap-3">
-                <!-- Profile Photo -->
-                <div class="relative">
-                  <% display_name = @current_user.full_name || @current_user.email %>
-                  <%= if @has_profile do %>
-                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(display_name) |> String.upcase() %>
-                    </div>
-                  <% else %>
-                    <div class="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                      <%= String.first(display_name) |> String.upcase() %>
-                    </div>
-                  <% end %>
-                </div>
-
-                <span class="text-zinc-900 font-semibold"><%= display_name %></span>
-                <%= if @has_profile do %>
-                  <a href="/dashboard" class="hover:text-zinc-900">Dashboard</a>
-                <% else %>
-                  <button id="show-profile-modal" class="hover:text-zinc-900">Complete Profile</button>
-                <% end %>
-                <.link href="/users/log_out" method="delete" class="hover:text-zinc-900">Log out</.link>
-              </div>
-            <% else %>
-              <a href="/users/register" class="hover:text-zinc-900">Register</a>
-              <a href="/users/log_in" class="hover:text-zinc-900">Login</a>
+      <!-- Notification Dropdown -->
+      <div id="notification-menu" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+        <div class="px-4 py-2 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900">Notifications</h3>
+            <%= if @unread_count > 0 do %>
+              <button
+                phx-click="mark_all_read"
+                class="text-xs text-blue-600 hover:text-blue-800"
+              >
+                Mark all as read
+              </button>
             <% end %>
           </div>
         </div>
+
+        <div class="max-h-64 overflow-y-auto">
+          <%= if @notifications == [] do %>
+            <div class="px-4 py-3 text-sm text-gray-500 text-center">
+              No notifications
+            </div>
+          <% else %>
+            <%= for notification <- @notifications do %>
+              <div class={[
+                "px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer",
+                if(notification.read, do: "bg-gray-50", else: "bg-blue-50")
+              ]}>
+                <div class="flex items-start space-x-3">
+                  <div class={[
+                    "w-2 h-2 rounded-full mt-2",
+                    if(notification.read, do: "bg-gray-300", else: "bg-blue-500")
+                  ]}></div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900">
+                      <%= notification.title %>
+                    </p>
+                    <p class="text-sm text-gray-600">
+                      <%= notification.message %>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                      <%= notification.timestamp %>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+
+        <div class="px-4 py-2 border-t border-gray-200">
+          <a href="/notifications" class="text-sm text-blue-600 hover:text-blue-800 text-center block">
+            View all notifications
+          </a>
+        </div>
       </div>
-    </nav>
+    </div>
     """
   end
 

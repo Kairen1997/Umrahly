@@ -1543,6 +1543,16 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                   |> assign(:booking_flow_progress, nil)
               end
 
+              # Create notification for booking creation
+              booking_with_package = Umrahly.Repo.preload(booking, [package_schedule: :package])
+              package_name = booking_with_package.package_schedule.package.name
+
+              Umrahly.Notifications.create_booking_notification(
+                socket.assigns.current_user.id,
+                %{id: booking.id, package_name: package_name, booking_reference: "BK#{booking.id}"},
+                :created
+              )
+
               {:noreply, socket}
 
             {:error, %Ecto.Changeset{} = changeset} ->

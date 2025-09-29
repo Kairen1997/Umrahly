@@ -33,6 +33,10 @@ defmodule UmrahlyWeb.AdminDashboardLive do
 
     recent_activities = ActivityLogs.recent_activities(5)
 
+    # Get notifications for admin
+    notifications = Umrahly.Notifications.list_notifications(current_user.id, limit: 10)
+    unread_count = Umrahly.Notifications.unread_count(current_user.id)
+
     socket =
       socket
       |> assign(:admin_stats, admin_stats)
@@ -44,6 +48,8 @@ defmodule UmrahlyWeb.AdminDashboardLive do
       |> assign(:is_admin, true)
       |> assign(:current_page, "dashboard")
       |> assign(:show_packages_details, false)
+      |> assign(:notifications, notifications)
+      |> assign(:unread_notifications, unread_count)
 
     # Subscribe to admin notifications
     Phoenix.PubSub.subscribe(Umrahly.PubSub, "admin:notifications")
@@ -52,6 +58,9 @@ defmodule UmrahlyWeb.AdminDashboardLive do
   end
 
   def handle_info({:booking_cancelled, notification}, socket) do
+    # Debug: Log that the notification was received
+    IO.puts("DEBUG: Admin received booking cancellation notification for #{notification.user_name}")
+
     # Log the cancellation for admin
     Umrahly.ActivityLogs.log_user_action(
       socket.assigns.current_user.id,

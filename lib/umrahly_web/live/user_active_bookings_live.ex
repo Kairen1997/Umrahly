@@ -25,9 +25,14 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
       socket
       |> assign(:active_bookings, enriched)
       |> assign(:page_title, "Active Bookings")
+      |> assign(:booking_to_cancel, nil)
+      |> assign(:show_cancel_modal, false)
+      |> assign(:notifications, [])
+      |> assign(:unread_notifications, 0)
 
     # Subscribe to admin notifications
     Phoenix.PubSub.subscribe(Umrahly.PubSub, "admin:notifications")
+    Phoenix.PubSub.subscribe(Umrahly.PubSub, "user:notifications:#{socket.assigns.current_user.id}")
 
     {:ok, socket}
   end
@@ -128,8 +133,15 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
   end
 
   def handle_event("show_cancel_confirmation", %{"id" => id}, socket) do
-    # Show the modal with booking ID
-    {:noreply, push_event(socket, "js:show-modal", %{modal_id: "cancel-booking-modal", booking_id: id})}
+    # Find the booking to cancel
+    booking_to_cancel = Enum.find(socket.assigns.active_bookings, &(&1.id == String.to_integer(id)))
+
+    socket =
+      socket
+      |> assign(:booking_to_cancel, booking_to_cancel)
+      |> assign(:show_cancel_modal, true)
+
+    {:noreply, socket}
   end
 
   def handle_event("confirm_cancel_booking", %{"id" => id}, socket) do
@@ -170,7 +182,26 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
   end
 
   def handle_event("hide_cancel_modal", _params, socket) do
-    {:noreply, push_event(socket, "js:hide-modal", %{modal_id: "cancel-booking-modal"})}
+    {:noreply, assign(socket, :show_cancel_modal, false)}
+  end
+
+  def handle_event("toggle_notifications", _params, socket) do
+    # Toggle notification dropdown visibility
+    {:noreply, push_event(socket, "js:toggle-notifications", %{})}
+  end
+
+
+  def handle_event("mark_all_read", _params, socket) do
+    # Mark all notifications as read
+    updated_notifications = Enum.map(socket.assigns.notifications, &Map.put(&1, :read, true))
+    unread_count = 0
+
+    socket =
+      socket
+      |> assign(:notifications, updated_notifications)
+      |> assign(:unread_notifications, unread_count)
+
+    {:noreply, socket}
   end
 
   def handle_info({:booking_cancelled, notification}, socket) do
@@ -188,11 +219,28 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
       }
     )
 
-    # Show notification to admin
-    socket = put_flash(socket, :warning, "Booking cancelled: #{notification.user_name} cancelled #{notification.package_name}")
+    # Add notification for user
+    new_notification = %{
+      id: System.unique_integer([:positive]),
+      title: "Booking Cancelled",
+      message: "Your booking for #{notification.package_name} has been cancelled",
+      timestamp: DateTime.utc_now() |> DateTime.to_naive() |> NaiveDateTime.to_string(),
+      read: false
+    }
+
+    updated_notifications = [new_notification | socket.assigns.notifications]
+    unread_count = socket.assigns.unread_notifications + 1
+
+    socket =
+      socket
+      |> assign(:notifications, updated_notifications)
+      |> assign(:unread_notifications, unread_count)
+      |> put_flash(:info, "Booking cancelled successfully")
 
     {:noreply, socket}
   end
+
+
 
   def render(assigns) do
     ~H"""
@@ -402,7 +450,8 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
                         </button>
                       <% end %>
                       <button
-                        onclick="showCancelModal(#{booking.id})"
+                        phx-click="show_cancel_confirmation"
+                        phx-value-id={booking.id}
                         class="inline-flex justify-center items-center bg-white text-red-600 px-4 py-2 rounded-lg ring-1 ring-red-300 hover:bg-red-50 active:bg-red-100 transition-colors font-medium text-sm"
                       >
                         Cancel Booking
@@ -685,40 +734,42 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
     </.sidebar>
 
     <!-- Cancel Booking Confirmation Modal -->
-    <div id="cancel-booking-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3 text-center">
-          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-            <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-medium text-gray-900 mt-2">Cancel Booking</h3>
-          <div class="mt-2 px-7 py-3">
-            <p class="text-sm text-gray-500">
-              Are you sure you want to cancel this booking? This action cannot be undone and the admin will be notified.
-            </p>
-          </div>
-          <div class="items-center px-4 py-3">
-            <button
-              id="confirm-cancel-booking"
-              phx-click="cancel_booking"
-              phx-value-id=""
-              class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 mr-2"
-            >
-              Yes, Cancel Booking
-            </button>
-            <button
-              id="cancel-cancel-booking"
-              phx-click="hide_cancel_modal"
-              class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-            >
-              Keep Booking
-            </button>
+    <%= if @show_cancel_modal do %>
+      <div id="cancel-booking-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+          <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+              <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mt-2">Cancel Booking</h3>
+            <div class="mt-2 px-7 py-3">
+              <p class="text-sm text-gray-500">
+                Are you sure you want to cancel this booking? This action cannot be undone and the admin will be notified.
+              </p>
+            </div>
+            <div class="items-center px-4 py-3">
+              <button
+                id="confirm-cancel-booking"
+                phx-click="confirm_cancel_booking"
+                phx-value-id={@booking_to_cancel.id}
+                class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 mr-2"
+              >
+                Yes, Cancel Booking
+              </button>
+              <button
+                id="cancel-cancel-booking"
+                phx-click="hide_cancel_modal"
+                class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Keep Booking
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    <% end %>
     """
   end
 end

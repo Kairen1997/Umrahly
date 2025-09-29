@@ -827,6 +827,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
     DateFieldUpdate,
     DateDropdown,
     DepartureDateChange,
+    NotificationToggle,
   }
 })
 
@@ -1464,3 +1465,25 @@ function showCancelModal(bookingId) {
     modal.classList.remove("hidden");
   }
 }
+
+// Custom hook for notification toggle
+const NotificationToggle = {
+  mounted() {
+    console.log("NotificationToggle hook mounted");
+    
+    // Listen for the js:toggle-notifications event from LiveView
+    this.handleEvent("js:toggle-notifications", () => {
+      console.log("Received js:toggle-notifications event");
+      
+      const notificationMenu = document.getElementById('notification-menu');
+      if (notificationMenu) {
+        const isHidden = notificationMenu.classList.contains('hidden');
+        if (isHidden) {
+          notificationMenu.classList.remove('hidden');
+        } else {
+          notificationMenu.classList.add('hidden');
+        }
+      }
+    });
+  }
+};

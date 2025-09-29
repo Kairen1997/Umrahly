@@ -558,64 +558,64 @@ defmodule UmrahlyWeb.AdminFlightsLive do
             </form>
           </div>
 
-          <div>
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flight Number</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departure Time</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arrival Time</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aircraft</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration Days</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200">
-                    <%= for flight <- @paged_flights do %>
-                      <tr class="hover:bg-teal-50">
-                        <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= flight.flight_number %></td>
-                        <td class="px-3 py-3 whitespace-nowrap">
-                          <div class="text-sm text-gray-900">
-                            <div><%= flight.origin %></div>
-                            <div class="text-gray-500">→</div>
-                            <div><%= flight.destination %></div>
+          <div class="overflow-x-auto max-h-[70vh] overflow-y-auto">
+            <table class="w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr class="shadow-sm">
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flight Number</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departure Time</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arrival Time</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aircraft</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration Days</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <%= for flight <- @paged_flights do %>
+                  <tr class="hover:bg-teal-50 transition-colors">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900"><%= flight.flight_number %></td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                      <div class="text-sm text-gray-900">
+                        <div><%= flight.origin %></div>
+                        <div class="text-gray-500">→</div>
+                        <div><%= flight.destination %></div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <%= UmrahlyWeb.Timezone.format_local(flight.departure_time, "%Y-%m-%d %H:%M") %>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <%= UmrahlyWeb.Timezone.format_local(flight.arrival_time, "%Y-%m-%d %H:%M") %>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <%= if flight.return_date do %>
+                        <%= UmrahlyWeb.Timezone.format_local(flight.return_date, "%Y-%m-%d %H:%M") %>
+                      <% else %>
+                        <span class="text-gray-500">N/A</span>
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <%= if flight.duration_days do %>
+                        <%= flight.duration_days %> days
+                      <% else %>
+                        <span class="text-gray-500">N/A</span>
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <div class="flex items-center">
+                        <span class="mr-2"><%= flight.capacity_booked %>/<%= flight.capacity_total %></span>
+                        <div class="w-16 bg-gray-200 rounded-full h-2">
+                          <div class="bg-teal-600 h-2 rounded-full" style={"width: #{flight.capacity_booked / flight.capacity_total * 100}%"}>
                           </div>
-                        </td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <%= UmrahlyWeb.Timezone.format_local(flight.departure_time, "%Y-%m-%d %H:%M") %>
-                        </td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <%= UmrahlyWeb.Timezone.format_local(flight.arrival_time, "%Y-%m-%d %H:%M") %>
-                        </td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900"><%= flight.aircraft %></td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <%= if flight.return_date do %>
-                            <%= UmrahlyWeb.Timezone.format_local(flight.return_date, "%Y-%m-%d %H:%M") %>
-                          <% else %>
-                            <span class="text-gray-500">N/A</span>
-                          <% end %>
-                        </td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <%= if flight.duration_days do %>
-                            <%= flight.duration_days %> days
-                          <% else %>
-                            <span class="text-gray-500">N/A</span>
-                          <% end %>
-                        </td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <div class="flex items-center">
-                            <span class="mr-2"><%= flight.capacity_booked %>/<%= flight.capacity_total %></span>
-                            <div class="w-16 bg-gray-200 rounded-full h-2">
-                              <div class="bg-teal-600 h-2 rounded-full" style={"width: #{flight.capacity_booked / flight.capacity_total * 100}%"}>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                    <td class="px-3 py-3 whitespace-nowrap">
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
                       <span class={[
                         "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
                         case flight.status do
@@ -629,7 +629,7 @@ defmodule UmrahlyWeb.AdminFlightsLive do
                         <%= flight.status %>
                       </span>
                     </td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
                       <button phx-click="view_flight" phx-value-id={flight.id}
                               class="text-blue-600 hover:text-blue-900 mr-3">
                         View

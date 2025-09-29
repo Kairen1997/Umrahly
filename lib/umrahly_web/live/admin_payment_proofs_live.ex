@@ -105,13 +105,12 @@ defmodule UmrahlyWeb.AdminPaymentProofsLive do
   # Status filter click
   def handle_event("filter_payment_proofs_status", %{"status" => status}, socket) do
     term = socket.assigns.search_query
-    proofs = fetch_payment_proofs(status == "all" && term == "" && false, status)
-    proofs = if is_list(proofs), do: proofs, else: fetch_payment_proofs(term, status)
+    proofs = fetch_payment_proofs(term, status)
 
     {:noreply,
       socket
       |> assign(:status_filter, status)
-      |> assign(:pending_proofs, fetch_payment_proofs(socket.assigns.search_query, status))
+      |> assign(:pending_proofs, proofs)
       |> assign(:page, 1)
       |> assign_pagination()}
   end

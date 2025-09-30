@@ -116,7 +116,7 @@ defmodule UmrahlyWeb.UserMyBookingsLive do
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <%= for b <- @visible_bookings do %>
-                    <tr>
+                    <tr class="hover:bg-teal-50 hover:shadow-sm transition-colors duration-150 cursor-pointer">
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#<%= b.booking_reference %></td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><%= b.package_name %></td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"> <%= format_amount(b.total_amount) %> </td>

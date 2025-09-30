@@ -39,20 +39,29 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Booking Status -->
-          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm hover:shadow-md transition-shadow">
-            <div class="flex items-start gap-3">
-              <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                    <!-- Booking Status -->
+          <a href="/my-bookings" class="block focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-xl">
+            <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Status</div>
+                  <div class="mt-1 text-sm font-medium text-gray-900"><%= String.capitalize(@latest_booking.status) %></div>
+                  <div class="mt-2 flex items-center gap-1 text-xs text-blue-800">
+                    <span>View details</span>
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <div class="min-w-0">
-                <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Status</div>
-                <div class="mt-1 text-sm font-medium text-gray-900"><%= String.capitalize(@latest_booking.status) %></div>
-              </div>
+              <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-200/40"></div>
             </div>
-            <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-200/40"></div>
-          </div>
+          </a>
           <!-- Selected Package -->
           <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200 p-4 shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-start gap-3">

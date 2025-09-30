@@ -38,6 +38,10 @@ defmodule UmrahlyWeb.PageController do
     render(conn, :privacy, layout: false)
   end
 
+  def contact(conn, _params) do
+    render(conn, :contact, layout: false)
+  end
+
   def dashboard(conn, _params) do
     current_user = conn.assigns.current_user
 

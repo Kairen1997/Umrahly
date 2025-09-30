@@ -22,6 +22,9 @@ defmodule UmrahlyWeb.Router do
 
     get "/", PageController, :home
     get "/test-flash", PageController, :test_flash
+    get "/faq", PageController, :faq
+    get "/terms", PageController, :terms
+    get "/privacy", PageController, :privacy
   end
 
   # Payment callback routes (no authentication required)

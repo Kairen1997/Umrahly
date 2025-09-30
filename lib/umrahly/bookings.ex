@@ -508,4 +508,57 @@ defmodule Umrahly.Bookings do
     |> Repo.delete_all()
   end
 
+  def get_booking_with_details(id) do
+    from(b in Booking,
+      left_join: ps in Umrahly.Packages.PackageSchedule, on: b.package_schedule_id == ps.id,
+      left_join: p in Umrahly.Packages.Package, on: ps.package_id == p.id,
+      left_join: u in Umrahly.Accounts.User, on: b.user_id == u.id,
+      where: b.id == ^id,
+      select: %{
+        id: b.id,
+        booking_reference: fragment("'BK' || ?", b.id),
+        package_name: p.name,
+        status: b.status,
+        total_amount: b.total_amount,
+        paid_amount: b.deposit_amount,
+        payment_method: b.payment_method,
+        payment_plan: b.payment_plan,
+        booking_date: b.booking_date,
+        travel_date: ps.departure_date,
+        user_id: b.user_id,
+        package_schedule_id: b.package_schedule_id
+      }
+    )
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      booking ->
+        # Get travelers data from BookingFlowProgress
+        travelers = get_booking_travelers(booking.id)
+        Map.put(booking, :travelers, travelers)
+    end
+  end
+
+  defp get_booking_travelers(booking_id) do
+    # Get the booking to find the user_id and package_schedule_id
+    booking = Repo.get(Booking, booking_id)
+
+    if booking do
+      # Find the most recent booking flow progress for this user and package schedule
+      from(bfp in BookingFlowProgress,
+        where: bfp.user_id == ^booking.user_id and bfp.package_schedule_id == ^booking.package_schedule_id,
+        order_by: [desc: bfp.inserted_at],
+        limit: 1,
+        select: bfp.travelers_data
+      )
+      |> Repo.one()
+      |> case do
+        nil -> []
+        travelers_data -> travelers_data || []
+      end
+    else
+      []
+    end
+  end
+
 end

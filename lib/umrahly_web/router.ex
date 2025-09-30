@@ -85,6 +85,7 @@ defmodule UmrahlyWeb.Router do
     live "/notifications", NotificationsLive, :index
     get "/receipts/:id/view", PageController, :view_receipt
     get "/receipts/:id/download", PageController, :download_receipt
+    live "/bookings/:id", UserBookingDetailsLive, :show
   end
 
   scope "/", UmrahlyWeb do

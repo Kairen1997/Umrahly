@@ -9,6 +9,10 @@ defmodule Umrahly.Packages.Itinerary do
     field :itinerary_items, {:array, :map}
     field :order_index, :integer
 
+    # New fields to support WYSIWYG content and optional photo path
+    field :itinerary_content, :string
+    field :day_photo, :string
+
     belongs_to :package, Umrahly.Packages.Package
 
     timestamps(type: :utc_datetime)
@@ -17,7 +21,16 @@ defmodule Umrahly.Packages.Itinerary do
   @doc false
   def changeset(itinerary, attrs) do
     itinerary
-    |> cast(attrs, [:day_number, :day_title, :day_description, :itinerary_items, :order_index, :package_id])
+    |> cast(attrs, [
+      :day_number,
+      :day_title,
+      :day_description,
+      :itinerary_items,
+      :order_index,
+      :package_id,
+      :itinerary_content,
+      :day_photo
+    ])
     |> validate_required([:day_number, :day_title, :package_id])
     |> validate_number(:day_number, greater_than: 0)
     |> validate_number(:order_index, greater_than_or_equal_to: 0)

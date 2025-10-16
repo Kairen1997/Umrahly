@@ -1,6 +1,15 @@
 defmodule UmrahlyWeb.SidebarComponent do
   use UmrahlyWeb, :html
 
+  attr :flash, :map, default: %{}
+  attr :page_title, :string, default: "Dashboard"
+  attr :current_user, :any, default: nil
+  attr :user, :any, default: nil
+  attr :profile, :any, default: nil
+  attr :profile_complete, :boolean, default: nil
+  
+  slot :inner_block, required: true
+  
   def sidebar(assigns) do
     ~H"""
     <div x-data="{ open: true }" class="flex min-h-screen bg-gray-100" style="min-height: calc(100vh - 64px);">
@@ -75,7 +84,7 @@ defmodule UmrahlyWeb.SidebarComponent do
             <!-- Page Title -->
             <div class="mb-0">
               <h1 class="text-2xl font-semibold text-gray-900">
-                <%= Map.get(assigns, :page_title, "Dashboard") %>
+                <%= @page_title %>
               </h1>
             </div>
           </div>
@@ -95,6 +104,7 @@ defmodule UmrahlyWeb.SidebarComponent do
         </div>
         <!-- Page Content -->
         <main class="flex-1 bg-gray-50 p-6 overflow-auto">
+          <.flash_group flash={@flash} />
           <%= render_slot(@inner_block) %>
         </main>
       </div>

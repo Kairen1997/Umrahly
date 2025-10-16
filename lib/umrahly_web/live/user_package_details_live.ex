@@ -192,7 +192,7 @@ defmodule UmrahlyWeb.UserPackageDetailsLive do
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title={@page_title}>
+    <.sidebar page_title={@page_title} flash={@flash}>
       <div class="max-w-6xl mx-auto space-y-6 px-4">
 
 

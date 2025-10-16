@@ -204,7 +204,7 @@ defmodule UmrahlyWeb.UserPackagesLive do
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title={@page_title}>
+    <.sidebar page_title={@page_title} flash={@flash}>
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <!-- Search and Filter Section -->
         <div class="bg-white/90 backdrop-blur rounded-xl shadow-sm ring-1 ring-gray-200">

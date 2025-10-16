@@ -244,7 +244,7 @@ defmodule UmrahlyWeb.UserActiveBookingsLive do
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title={@page_title}>
+    <.sidebar page_title={@page_title} flash={@flash}>
       <div class="max-w-6xl mx-auto space-y-6">
         <!-- Header -->
         <div class="bg-white/80 backdrop-blur rounded-xl shadow-sm ring-1 ring-gray-200 p-6">

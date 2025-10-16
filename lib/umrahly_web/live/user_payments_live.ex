@@ -822,7 +822,7 @@ defmodule UmrahlyWeb.UserPaymentsLive do
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title="Payments">
+    <.sidebar page_title="Payments" flash={@flash}>
       <%= render_payments_content(assigns) %>
     </.sidebar>
     """

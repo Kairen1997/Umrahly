@@ -1692,7 +1692,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title={@page_title}>
+    <.sidebar page_title={@page_title} flash={@flash}>
       <div id="booking-flow-container" class="max-w-4xl mx-auto space-y-6"
 
            data-step={@current_step}

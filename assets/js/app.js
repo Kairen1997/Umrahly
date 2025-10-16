@@ -828,6 +828,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
     DateDropdown,
     DepartureDateChange,
     NotificationToggle,
+    UploadHook,
   }
 })
 
@@ -1483,6 +1484,45 @@ const NotificationToggle = {
         } else {
           notificationMenu.classList.add('hidden');
         }
+      }
+    });
+  }
+};
+
+// Custom hook for file uploads
+const UploadHook = {
+  mounted() {
+    console.log("UploadHook mounted on element:", this.el);
+    console.log("Element attributes:", this.el.attributes);
+    
+    this.el.addEventListener("change", (e) => {
+      const files = e.target.files;
+      console.log("File input changed, files:", files);
+      
+      if (files && files.length > 0) {
+        console.log("File selected:", files[0].name);
+        console.log("File size:", files[0].size);
+        console.log("File type:", files[0].type);
+        
+        // Check file size (5MB limit)
+        if (files[0].size > 5 * 1024 * 1024) {
+          alert("File size must be less than 5MB");
+          e.target.value = "";
+          return;
+        }
+        
+        // Check file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(files[0].type)) {
+          alert("Please select a valid image file (JPG, JPEG, or PNG)");
+          e.target.value = "";
+          return;
+        }
+        
+        // LiveView's auto-upload will handle the upload automatically
+        // We just need to trigger the validation event to process the upload
+        console.log("Triggering validate event");
+        this.pushEvent("validate", {});
       }
     });
   }

@@ -47,7 +47,7 @@ defmodule UmrahlyWeb.UserBookingDetailsLive do
 
   def render(assigns) do
     ~H"""
-    <.sidebar page_title={@page_title}>
+    <.sidebar page_title={@page_title} flash={@flash}>
       <div class="p-6">
         <div class="mb-6">
           <a href="/my-bookings" class="text-blue-600 hover:text-blue-800 text-sm font-medium">

@@ -16,8 +16,8 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
             day_number: itinerary.day_number,
             day_title: itinerary.day_title,
             day_description: itinerary.day_description || "",
-            itinerary_content: itinerary.itinerary_content || "",
-            day_photo: itinerary.day_photo || nil
+            itinerary_content: Map.get(itinerary, :itinerary_content) || "",
+            day_photo: Map.get(itinerary, :day_photo) || nil
           }
         end)
       else
@@ -549,12 +549,13 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
                         id={"wysiwyg-editor-#{day_index}"}
                         class="min-h-48 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent prose prose-sm max-w-none"
                         contenteditable="true"
+                        phx-hook="WysiwygEditor"
                         phx-blur="update_itinerary_content"
                         phx-value-day_index={day_index}
                         phx-value-content=""
                         data-content={day.itinerary_content}
                         placeholder="Enter your itinerary content here... Use the toolbar above to format your text."
-                      ><%= day.itinerary_content %></div>
+                      ><%= Phoenix.HTML.raw(day.itinerary_content || "") %></div>
                     </div>
                     <input
                       type="hidden"
@@ -592,24 +593,25 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
                     />
 
                     <!-- Photo upload form -->
-                    <form phx-submit="upload_itinerary_photo" class="mt-2">
-                      <input type="hidden" name="day_index" value={day_index} />
+                    <div class="mt-2">
                       <div class="flex items-center space-x-2">
                         <div class="flex-1">
                           <.live_file_input
                             upload={@uploads.itinerary_photos}
                             accept={~w(.jpg .jpeg .png .gif)}
-                            class="block w-full text-xs text-gray-900 border border-gray-300 rounded cursor-pointer bg-gray-50 focus:outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            class="file-input-single block w-full text-xs text-gray-900 border border-gray-300 rounded cursor-pointer bg-gray-50 focus:outline-none"
                           />
                         </div>
                         <button
-                          type="submit"
+                          type="button"
+                          phx-click="upload_itinerary_photo"
+                          phx-value-day_index={day_index}
                           class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                         >
                           Upload
                         </button>
                       </div>
-                    </form>
+                    </div>
 
                     <!-- Upload preview -->
                     <%= if @uploads.itinerary_photos.entries != [] do %>
@@ -695,64 +697,58 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
           document.execCommand(command, false, null);
         }
 
-        // Initialize WYSIWYG editors
-        document.addEventListener('DOMContentLoaded', function() {
-          const editors = document.querySelectorAll('[id^="wysiwyg-editor-"]');
-
-          editors.forEach(function(editor) {
-            const dayIndex = editor.id.replace('wysiwyg-editor-', '');
+        // LiveView Hook for WYSIWYG editors so they initialize correctly after patches
+        window.Hooks = window.Hooks || {};
+        window.Hooks.WysiwygEditor = {
+          mounted() {
+            this.initialize();
+          },
+          updated() {
+            this.initialize();
+          },
+          destroyed() {
+            if (this._onInput) this.el.removeEventListener('input', this._onInput);
+            if (this._onBlur) this.el.removeEventListener('blur', this._onBlur);
+            if (this._onSubmit && this._form) this._form.removeEventListener('submit', this._onSubmit);
+          },
+          initialize() {
+            const dayIndex = this.el.id.replace('wysiwyg-editor-', '');
             const hiddenInput = document.getElementById('itinerary-content-input-' + dayIndex);
+            this._form = this.el.closest('form');
 
-            // Set initial content
-            if (hiddenInput && hiddenInput.value) {
-              editor.innerHTML = hiddenInput.value;
+            if (hiddenInput && hiddenInput.value && this.el.innerHTML !== hiddenInput.value) {
+              this.el.innerHTML = hiddenInput.value;
             }
 
-            // Update hidden input on content change
-            editor.addEventListener('input', function() {
-              if (hiddenInput) {
-                hiddenInput.value = editor.innerHTML;
+            this._onInput = () => {
+              if (hiddenInput) hiddenInput.value = this.el.innerHTML;
+            };
+            this._onBlur = () => {
+              if (hiddenInput) hiddenInput.value = this.el.innerHTML;
+            };
+
+            this.el.removeEventListener('input', this._onInput);
+            this.el.removeEventListener('blur', this._onBlur);
+            this.el.addEventListener('input', this._onInput);
+            this.el.addEventListener('blur', this._onBlur);
+
+            // Ensure all editors sync before submit (works for every day, like Day 1)
+            this._onSubmit = (event) => {
+              if (event.target.matches('form[phx-submit="save_itinerary"]')) {
+                const editors = event.target.querySelectorAll('[id^="wysiwyg-editor-"]');
+                editors.forEach((editorEl) => {
+                  const idx = editorEl.id.replace('wysiwyg-editor-', '');
+                  const linkedInput = document.getElementById('itinerary-content-input-' + idx);
+                  if (linkedInput) linkedInput.value = editorEl.innerHTML;
+                });
               }
-            });
-
-            // Update hidden input on blur
-            editor.addEventListener('blur', function() {
-              if (hiddenInput) {
-                hiddenInput.value = editor.innerHTML;
-              }
-            });
-          });
-        });
-
-        // Handle form submission to sync content
-        document.addEventListener('submit', function(event) {
-          if (event.target.matches('form[phx-submit="save_itinerary"]')) {
-            const editors = document.querySelectorAll('[id^="wysiwyg-editor-"]');
-
-            editors.forEach(function(editor) {
-              const dayIndex = editor.id.replace('wysiwyg-editor-', '');
-              const hiddenInput = document.getElementById('itinerary-content-input-' + dayIndex);
-
-              if (hiddenInput) {
-                hiddenInput.value = editor.innerHTML;
-              }
-            });
-          }
-        });
-
-        // Handle LiveView blur events
-        document.addEventListener('phx:blur', function(event) {
-          if (event.target.matches('[id^="wysiwyg-editor-"]')) {
-            const dayIndex = event.target.id.replace('wysiwyg-editor-', '');
-            const content = event.target.innerHTML;
-
-            // Update the hidden input
-            const hiddenInput = document.getElementById('itinerary-content-input-' + dayIndex);
-            if (hiddenInput) {
-              hiddenInput.value = content;
+            };
+            if (this._form) {
+              this._form.removeEventListener('submit', this._onSubmit);
+              this._form.addEventListener('submit', this._onSubmit);
             }
           }
-        });
+        };
       </script>
 
       <style>
@@ -764,6 +760,26 @@ defmodule UmrahlyWeb.AdminPackageItineraryLive do
 
         [contenteditable="true"]:focus {
           outline: none;
+        }
+
+        /* Fix for duplicate file inputs */
+        .file-input-single {
+          display: block !important;
+        }
+
+        .file-input-single:not(:first-of-type) {
+          display: none !important;
+        }
+
+        /* Ensure only one file input is visible */
+        input[type="file"].file-input-single {
+          position: relative;
+          z-index: 1;
+        }
+
+        /* Hide any duplicate file inputs that might be created by CSS */
+        input[type="file"]:not(.file-input-single) {
+          display: none !important;
         }
 
         .prose {

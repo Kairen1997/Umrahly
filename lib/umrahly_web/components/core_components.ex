@@ -658,12 +658,12 @@ defmodule UmrahlyWeb.CoreComponents do
             <%= for notification <- @notifications do %>
               <div class={[
                 "px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer",
-                if(notification.read, do: "bg-gray-50", else: "bg-blue-50")
+                if(notification.read, do: "bg-gray-50", else: (if notification.notification_type == "payment_approved", do: "bg-green-50", else: "bg-blue-50"))
               ]}>
                 <div class="flex items-start space-x-3">
                   <div class={[
                     "w-2 h-2 rounded-full mt-2",
-                    if(notification.read, do: "bg-gray-300", else: "bg-blue-500")
+                    if(notification.read, do: "bg-gray-300", else: (if notification.notification_type == "payment_approved", do: "bg-green-500", else: "bg-blue-500"))
                   ]}></div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-gray-900">
@@ -673,7 +673,7 @@ defmodule UmrahlyWeb.CoreComponents do
                       <%= notification.message %>
                     </p>
                     <p class="text-xs text-gray-500 mt-1">
-                      <%= notification.timestamp %>
+                      <%= Calendar.strftime(notification.inserted_at, "%B %d, %Y at %I:%M %p") %>
                     </p>
                   </div>
                 </div>

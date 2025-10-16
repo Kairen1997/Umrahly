@@ -1487,3 +1487,53 @@ const NotificationToggle = {
     });
   }
 };
+
+// Initialize Flatpickr on all date inputs with a consistent theme
+function initializeDatePickers() {
+  if (!window.flatpickr) return;
+  const dateInputs = document.querySelectorAll('input[type="date"]');
+  dateInputs.forEach((input) => {
+    // Avoid double-init by replacing native date with text and attaching flatpickr
+    if (input.dataset.fpInitialized === 'true') return;
+
+    // Convert to text so Flatpickr renders consistently across browsers
+    input.setAttribute('type', 'text');
+    input.classList.add('flatpickr-input');
+
+    const defaultValue = input.value;
+    window.flatpickr(input, {
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'F j, Y',
+      allowInput: true,
+      defaultDate: defaultValue || undefined,
+      disableMobile: true,
+    });
+
+    input.dataset.fpInitialized = 'true';
+  });
+}
+
+// Re-initialize on LiveView events
+window.addEventListener('phx:page-loading-stop', () => {
+  initializeDatePickers();
+});
+
+// Also run after initial load
+document.addEventListener('DOMContentLoaded', () => {
+  initializeDatePickers();
+});
+
+// Ensure pickers initialize when LiveView patches DOM
+const datepickerObserver = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+      initializeDatePickers();
+      break;
+    }
+  }
+});
+
+if (document.body) {
+  datepickerObserver.observe(document.body, { childList: true, subtree: true });
+}

@@ -106,7 +106,7 @@ defmodule Umrahly.ActivityLogs do
     formatted_time =
       case activity.inserted_at do
         %NaiveDateTime{} = ndt ->
-          ndt |> UmrahlyWeb.Timezone.to_local() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+          ndt |> DateTime.from_naive!("Etc/UTC") |> UmrahlyWeb.Timezone.to_local() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
         %DateTime{} = dt ->
           UmrahlyWeb.Timezone.format_local(dt, "%Y-%m-%d %H:%M:%S")
         _ ->

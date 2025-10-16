@@ -39,20 +39,29 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Booking Status -->
-          <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm hover:shadow-md transition-shadow">
-            <div class="flex items-start gap-3">
-              <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                    <!-- Booking Status -->
+          <a href="/my-bookings" class="block focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-xl">
+            <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Status</div>
+                  <div class="mt-1 text-sm font-medium text-gray-900"><%= String.capitalize(@latest_booking.status) %></div>
+                  <div class="mt-2 flex items-center gap-1 text-xs text-blue-800">
+                    <span>View details</span>
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <div class="min-w-0">
-                <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Status</div>
-                <div class="mt-1 text-sm font-medium text-gray-900"><%= String.capitalize(@latest_booking.status) %></div>
-              </div>
+              <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-200/40"></div>
             </div>
-            <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-200/40"></div>
-          </div>
+          </a>
           <!-- Selected Package -->
           <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200 p-4 shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-start gap-3">
@@ -163,48 +172,50 @@
       <% end %>
     </div>
 
-    <!-- Stats Section -->
-    <div class="mt-8 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
-      <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-lg font-medium text-gray-900">Your Stats</h3>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Active Bookings -->
-        <div class="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/60 p-4 hover:bg-blue-50 hover:shadow-sm transition-colors transition-shadow">
-          <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Active Bookings</div>
-              <div class="text-2xl font-bold text-blue-700"><%= if @user_stats, do: @user_stats.active_bookings, else: 0 %></div>
+    <!-- Stats Section - Only show when there's an active booking -->
+    <%= if @latest_booking do %>
+      <div class="mt-8 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-lg font-medium text-gray-900">Your Stats</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Active Bookings -->
+          <div class="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/60 p-4 hover:bg-blue-50 hover:shadow-sm transition-colors transition-shadow">
+            <div class="flex items-center gap-3">
+              <div class="rounded-lg bg-blue-100 p-2 text-blue-700">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-wide text-blue-700">Active Bookings</div>
+                <div class="text-2xl font-bold text-blue-700"><%= if @user_stats, do: @user_stats.active_bookings, else: 0 %></div>
+              </div>
             </div>
           </div>
-        </div>
-        <!-- Total Payments -->
-        <div class="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 p-4 hover:bg-purple-50 hover:shadow-sm transition-colors transition-shadow">
-          <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-purple-100 p-2 text-purple-700">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-10v10m9-5a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <div class="text-xs font-semibold uppercase tracking-wide text-purple-700">Total Payments</div>
-              <div class="text-2xl font-bold text-purple-700">
-                <% total_paid = if @user_stats, do: @user_stats.total_paid, else: 0 %>
-                <%= case total_paid do
-                  %Decimal{} -> Decimal.to_string(total_paid)
-                  _ -> to_string(total_paid)
-                end %>
+          <!-- Total Payments -->
+          <div class="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 p-4 hover:bg-purple-50 hover:shadow-sm transition-colors transition-shadow">
+            <div class="flex items-center gap-3">
+              <div class="rounded-lg bg-purple-100 p-2 text-purple-700">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-10v10m9-5a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-wide text-purple-700">Total Payments</div>
+                <div class="text-2xl font-bold text-purple-700">
+                  <% total_paid = if @user_stats, do: @user_stats.total_paid, else: 0 %>
+                  <%= case total_paid do
+                    %Decimal{} -> Decimal.to_string(total_paid)
+                    _ -> to_string(total_paid)
+                  end %>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    <% end %>
 
     <!-- Main Content Area -->
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -226,7 +237,7 @@
                     <div class="min-w-0 flex-1">
                       <div class="text-sm text-gray-700 truncate"><%= activity.action %><%= if activity.details, do: ": #{activity.details}" %></div>
                     </div>
-                    <div class="text-xs text-gray-400 whitespace-nowrap"><%= Calendar.strftime(activity.inserted_at, "%d %b %Y %H:%M") %></div>
+                    <div class="text-xs text-gray-400 whitespace-nowrap"><%= UmrahlyWeb.Timezone.format_local(activity.inserted_at, "%d %b %Y %H:%M") %></div>
                   </div>
                 <% end %>
               </div>

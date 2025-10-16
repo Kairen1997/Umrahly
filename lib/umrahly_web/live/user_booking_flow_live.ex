@@ -170,7 +170,13 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
       # Optionally jump straight to success (payment proof) when requested
       socket = case Map.get(params, "jump_to") do
-        "success" -> assign(socket, :current_step, 5)
+        "success" ->
+          # When jumping to success, we need to retrieve the existing booking
+          existing_booking = Bookings.get_latest_booking_for_user_schedule(user_id, String.to_integer(schedule_id))
+
+          socket
+          |> assign(:current_step, 5)
+          |> assign(:current_booking_id, if(existing_booking, do: existing_booking.id, else: nil))
         _ -> socket
       end
 
@@ -229,7 +235,24 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
 
         final_travelers = if socket.assigns.is_booking_for_self and length(all_travelers) > 0 do
           first_traveler = List.first(all_travelers)
-          updated_first_traveler = Map.put(first_traveler, "address", socket.assigns.current_user.address || "")
+          updated_first_traveler = Map.merge(first_traveler, %{
+            "full_name" => socket.assigns.current_user.full_name || "",
+            "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+            "passport_number" => socket.assigns.current_user.passport_number || "",
+            "phone" => socket.assigns.current_user.phone_number || "",
+            "date_of_birth" => case socket.assigns.current_user.birthdate do
+              nil -> ""
+              birthdate -> Date.to_string(birthdate)
+            end,
+            "address" => socket.assigns.current_user.address || "",
+            "poskod" => socket.assigns.current_user.poskod || "",
+            "city" => socket.assigns.current_user.city || "",
+            "state" => socket.assigns.current_user.state || "",
+            "citizenship" => socket.assigns.current_user.citizenship || "Malaysia",
+            "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+            "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+            "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
+          })
           [updated_first_traveler] ++ List.delete_at(all_travelers, 0)
         else
           all_travelers
@@ -911,8 +934,20 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
       updated_first_traveler = Map.merge(first_traveler, %{
         "full_name" => socket.assigns.current_user.full_name || "",
         "identity_card_number" => socket.assigns.current_user.identity_card_number || "",
+        "passport_number" => socket.assigns.current_user.passport_number || "",
         "phone" => socket.assigns.current_user.phone_number || "",
-        "address" => socket.assigns.current_user.address || ""
+        "date_of_birth" => case socket.assigns.current_user.birthdate do
+          nil -> ""
+          birthdate -> Date.to_string(birthdate)
+        end,
+        "address" => socket.assigns.current_user.address || "",
+        "poskod" => socket.assigns.current_user.poskod || "",
+        "city" => socket.assigns.current_user.city || "",
+        "state" => socket.assigns.current_user.state || "",
+        "citizenship" => socket.assigns.current_user.citizenship || "Malaysia",
+        "emergency_contact_name" => socket.assigns.current_user.emergency_contact_name || "",
+        "emergency_contact_phone" => socket.assigns.current_user.emergency_contact_phone || "",
+        "emergency_contact_relationship" => socket.assigns.current_user.emergency_contact_relationship || ""
       })
       [updated_first_traveler] ++ List.delete_at(updated_travelers, 0)
     else
@@ -1534,6 +1569,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                   |> assign(:requires_online_payment, true)
                   |> assign(:current_booking_id, booking.id)
                   |> assign(:booking_flow_progress, nil)
+                  |> redirect(external: payment_url)
               else
                 socket
                   |> put_flash(:info, "Booking created successfully! Please complete your payment offline.")
@@ -1541,6 +1577,7 @@ on_mount {UmrahlyWeb.UserAuth, :mount_current_user}
                   |> assign(:requires_online_payment, false)
                   |> assign(:current_booking_id, booking.id)
                   |> assign(:booking_flow_progress, nil)
+                  |> push_navigate(to: ~p"/my-bookings")
               end
 
               # Create notification for booking creation

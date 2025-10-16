@@ -6,7 +6,7 @@ defmodule UmrahlyWeb.UserRegistrationLive do
 
   def render(assigns) do
     ~H"""
-    <div class="relative min-h-screen">
+    <div class="relative min-h-screen overflow-hidden">
     <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover">
         <source src={~p"/images/tawaf.mp4"} type="video/mp4" />
       </video>

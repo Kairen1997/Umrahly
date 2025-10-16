@@ -22,6 +22,10 @@ defmodule UmrahlyWeb.Router do
 
     get "/", PageController, :home
     get "/test-flash", PageController, :test_flash
+    get "/faq", PageController, :faq
+    get "/terms", PageController, :terms
+    get "/privacy", PageController, :privacy
+    get "/contact", PageController, :contact
   end
 
   # Payment callback routes (no authentication required)
@@ -73,6 +77,7 @@ defmodule UmrahlyWeb.Router do
 
     get "/dashboard", PageController, :dashboard
     live "/bookings", UserActiveBookingsLive, :index
+    live "/my-bookings", UserMyBookingsLive, :index
     live "/packages", UserPackagesLive, :index
     live "/packages/:id", UserPackageDetailsLive, :show
     live "/book/:package_id/:schedule_id", UserBookingFlowLive, :new
@@ -81,6 +86,7 @@ defmodule UmrahlyWeb.Router do
     live "/notifications", NotificationsLive, :index
     get "/receipts/:id/view", PageController, :view_receipt
     get "/receipts/:id/download", PageController, :download_receipt
+    live "/bookings/:id", UserBookingDetailsLive, :show
   end
 
   scope "/", UmrahlyWeb do
@@ -113,6 +119,7 @@ defmodule UmrahlyWeb.Router do
       live "/payments/:id/:source", AdminPaymentDetailsLive, :show
       live "/payments/:id/:source/refund", AdminPaymentRefundLive, :new
       live "/payment-proofs", AdminPaymentProofsLive, :index
+      live "/payment-proofs/:id", AdminPaymentProofsLive, :show
       live "/flights", AdminFlightsLive, :index
       live "/activity-log", AdminActivityLogLive, :index
       live "/profile", AdminProfileLive, :edit

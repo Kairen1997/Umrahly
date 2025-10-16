@@ -1,0 +1,280 @@
+<!-- Terms & Conditions Page -->
+<!DOCTYPE html>
+<html lang="en" class="[scrollbar-gutter:stable]">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title>
+      <%= assigns[:page_title] || "Terms & Conditions" %>
+    </.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
+    </script>
+  </head>
+  <body class="bg-white antialiased">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <!-- Logo -->
+          <div class="flex items-center">
+            <a href="/" class="flex items-center">
+              <span class="text-2xl font-bold text-teal-600">Umrahly</span>
+            </a>
+          </div>
+
+          <!-- Navigation Links -->
+          <div class="hidden md:flex items-center space-x-8">
+            <a href="/" class="text-gray-700 hover:text-teal-600 transition-colors">Home</a>
+            <a href="/packages" class="text-gray-700 hover:text-teal-600 transition-colors">Packages</a>
+            <a href="/faq" class="text-gray-700 hover:text-teal-600 transition-colors">FAQ</a>
+            <a href="/terms" class="text-teal-600 font-semibold">Terms & Conditions</a>
+            <%= if @conn.assigns[:current_user] do %>
+              <a href="/dashboard" class="text-gray-700 hover:text-teal-600 transition-colors">Dashboard</a>
+              <a href="/users/log_out" data-method="delete" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+                Log Out
+              </a>
+            <% else %>
+              <a href="/users/log_in" class="text-gray-700 hover:text-teal-600 transition-colors">Log In</a>
+              <a href="/users/register" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+                Sign Up
+              </a>
+            <% end %>
+          </div>
+
+          <!-- Mobile menu button -->
+          <div class="md:hidden flex items-center">
+            <button id="mobile-menu-button" class="text-gray-700 hover:text-teal-600">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile menu -->
+      <div id="mobile-menu" class="hidden md:hidden">
+        <div class="px-2 pt-2 pb-3 space-y-1">
+          <a href="/" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">Home</a>
+          <a href="/packages" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">Packages</a>
+          <a href="/faq" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">FAQ</a>
+          <a href="/terms" class="block px-3 py-2 text-teal-600 font-semibold bg-teal-50 rounded-md">Terms & Conditions</a>
+          <%= if @conn.assigns[:current_user] do %>
+            <a href="/dashboard" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">Dashboard</a>
+            <a href="/users/log_out" data-method="delete" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">Log Out</a>
+          <% else %>
+            <a href="/users/log_in" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">Log In</a>
+            <a href="/users/register" class="block px-3 py-2 text-gray-700 hover:text-teal-600 hover:bg-gray-50 rounded-md">Sign Up</a>
+          <% end %>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="px-4 sm:px-6 lg:px-10 py-12">
+      <!-- Hero Section -->
+      <section class="max-w-4xl mx-auto text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Terms & Conditions</h1>
+        <p class="text-lg text-gray-600">Please read these terms and conditions carefully before using our services</p>
+        <p class="text-sm text-gray-500 mt-2">Last updated: January 2025</p>
+      </section>
+
+      <!-- Terms Content -->
+      <section class="max-w-4xl mx-auto">
+        <div class="prose prose-lg max-w-none">
+          
+          <!-- 1. Acceptance of Terms -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">1. Acceptance of Terms</h2>
+            <p class="text-gray-700 leading-relaxed">
+              By accessing and using Umrahly's services, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+            </p>
+          </div>
+
+          <!-- 2. Service Description -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">2. Service Description</h2>
+            <p class="text-gray-700 leading-relaxed mb-4">
+              Umrahly provides online booking services for Umrah packages, including but not limited to:
+            </p>
+            <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+              <li>Umrah package browsing and selection</li>
+              <li>Booking management and payment processing</li>
+              <li>Travel documentation assistance</li>
+              <li>Customer support and guidance</li>
+            </ul>
+          </div>
+
+          <!-- 3. User Responsibilities -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">3. User Responsibilities</h2>
+            <p class="text-gray-700 leading-relaxed mb-4">As a user of our services, you agree to:</p>
+            <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+              <li>Provide accurate and complete information during registration and booking</li>
+              <li>Maintain the confidentiality of your account credentials</li>
+              <li>Notify us immediately of any unauthorized use of your account</li>
+              <li>Comply with all applicable laws and regulations</li>
+              <li>Respect the rights of other users and our staff</li>
+            </ul>
+          </div>
+
+          <!-- 4. Booking and Payment Terms -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">4. Booking and Payment Terms</h2>
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">4.1 Booking Process</h3>
+                <p class="text-gray-700 leading-relaxed">
+                  All bookings are subject to availability and confirmation. We reserve the right to refuse or cancel any booking at our discretion.
+                </p>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">4.2 Payment Terms</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>Full payment or deposit is required as specified in the package details</li>
+                  <li>Installment payments must be completed according to the agreed schedule</li>
+                  <li>Late payments may incur additional charges</li>
+                  <li>All prices are in Malaysian Ringgit (RM) unless otherwise stated</li>
+                </ul>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">4.3 Refund Policy</h3>
+                <p class="text-gray-700 leading-relaxed">
+                  Refunds are subject to our cancellation policy and may be subject to administrative fees. Refund requests must be submitted in writing and are processed within 14-21 business days.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Cancellation Policy -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">5. Cancellation Policy</h2>
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">5.1 Customer Cancellation</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-1 ml-4">
+                  <li>More than 60 days before departure: 90% refund</li>
+                  <li>30-60 days before departure: 70% refund</li>
+                  <li>15-30 days before departure: 50% refund</li>
+                  <li>Less than 15 days before departure: No refund</li>
+                </ul>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">5.2 Force Majeure</h3>
+                <p class="text-gray-700 leading-relaxed">
+                  We are not liable for cancellations due to circumstances beyond our control, including but not limited to natural disasters, government restrictions, or health emergencies.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Travel Documentation -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">6. Travel Documentation</h2>
+            <p class="text-gray-700 leading-relaxed mb-4">
+              It is the customer's responsibility to ensure they have all required travel documents, including:
+            </p>
+            <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+              <li>Valid passport with at least 6 months validity</li>
+              <li>Required visas and permits</li>
+              <li>Health certificates and vaccinations</li>
+              <li>Travel insurance (recommended)</li>
+            </ul>
+            <p class="text-gray-700 leading-relaxed mt-4">
+              We will provide guidance on documentation requirements but are not responsible for denied entry due to incomplete or invalid documents.
+            </p>
+          </div>
+
+          <!-- 7. Limitation of Liability -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">7. Limitation of Liability</h2>
+            <p class="text-gray-700 leading-relaxed">
+              Umrahly's liability is limited to the amount paid for the services. We are not liable for any indirect, incidental, or consequential damages arising from the use of our services or travel arrangements.
+            </p>
+          </div>
+
+          <!-- 8. Privacy Policy -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">8. Privacy Policy</h2>
+            <p class="text-gray-700 leading-relaxed">
+              Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the service, to understand our practices.
+            </p>
+          </div>
+
+          <!-- 9. Modifications -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">9. Modifications to Terms</h2>
+            <p class="text-gray-700 leading-relaxed">
+              We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting. Your continued use of the service constitutes acceptance of the modified terms.
+            </p>
+          </div>
+
+          <!-- 10. Contact Information -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">10. Contact Information</h2>
+            <p class="text-gray-700 leading-relaxed mb-4">
+              If you have any questions about these Terms & Conditions, please contact us:
+            </p>
+            <div class="bg-teal-50 rounded-lg p-4">
+              <p class="text-gray-700"><strong>Email:</strong> support@umrahly.com</p>
+              <p class="text-gray-700"><strong>Phone:</strong> [Contact Number]</p>
+              <p class="text-gray-700"><strong>Address:</strong> [Company Address]</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-300 py-10 mt-16">
+      <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-4 gap-8">
+        <div>
+          <h3 class="text-xl font-bold text-white mb-4">Umrahly</h3>
+          <p class="text-sm">Making your Umrah journey simple, affordable, and stress-free.</p>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-3">Quick Links</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="/" class="hover:text-white">Home</a></li>
+            <li><a href="/packages" class="hover:text-white">Packages</a></li>
+            <li><a href="/faq" class="hover:text-white">FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-3">Support</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="/faq" class="hover:text-white">FAQ</a></li>
+            <li><a href="/terms" class="hover:text-white">Terms & Conditions</a></li>
+            <li><a href="/privacy" class="hover:text-white">Privacy Policy</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-3">Follow Us</h4>
+          <div class="flex space-x-4">
+            <a href="https://www.facebook.com/umrahly" target="_blank" rel="noopener noreferrer" class="hover:text-white">Facebook</a>
+            <a href="https://www.instagram.com/umrahly" target="_blank" rel="noopener noreferrer" class="hover:text-white">Instagram</a>
+            <a href="https://twitter.com/umrahly" target="_blank" rel="noopener noreferrer" class="hover:text-white">Twitter</a>
+          </div>
+        </div>
+      </div>
+      <div class="mt-8 text-center text-xs text-gray-500">
+        &copy; 2025 Umrahly. All rights reserved.
+      </div>
+    </footer>
+
+    <script>
+      // Mobile menu toggle
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      
+      if (mobileMenuButton && mobileMenu) {
+        mobileMenuButton.addEventListener('click', () => {
+          mobileMenu.classList.toggle('hidden');
+        });
+      }
+    </script>
+  </body>
+</html>

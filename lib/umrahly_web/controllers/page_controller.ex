@@ -26,6 +26,22 @@ defmodule UmrahlyWeb.PageController do
     |> render(:test_flash)
   end
 
+  def faq(conn, _params) do
+    render(conn, :faq, layout: false)
+  end
+
+  def terms(conn, _params) do
+    render(conn, :terms, layout: false)
+  end
+
+  def privacy(conn, _params) do
+    render(conn, :privacy, layout: false)
+  end
+
+  def contact(conn, _params) do
+    render(conn, :contact, layout: false)
+  end
+
   def dashboard(conn, _params) do
     current_user = conn.assigns.current_user
 

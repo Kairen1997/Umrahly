@@ -88,7 +88,7 @@
 
                 <div>
                   <.label>Birthdate *</.label>
-                  <input type="date" name="user[birthdate]" value={@changeset.data.birthdate} class="w-full border border-gray-300 rounded-lg p-2" required />
+                  <input type="date" name="user[birthdate]" value={@changeset.data.birthdate} placeholder="YYYY-MM-DD" class="w-full border border-gray-300 rounded-lg p-2" required />
                   <%= if @changeset.errors[:birthdate] do %>
                     <%= for {msg, _opts} <- List.wrap(@changeset.errors[:birthdate]) do %>
                       <p class="text-red-600 text-sm mt-1"><%= msg %></p>
